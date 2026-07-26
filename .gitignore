@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+*.log
+.DS_Store
+
+# env.development e env.test sao versionados de proposito (valores locais).
+# Segredos reais vem do ambiente em producao.
+env.production
+.env
+.env.*
