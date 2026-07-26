@@ -6,7 +6,7 @@ Gerenciador de Tarefas — API REST em arquitetura MVC com Express e PostgreSQL.
 
 | Camada     | Ferramenta                        |
 | ---------- | --------------------------------- |
-| Runtime    | Node.js (LTS, ver `.nvmrc`)       |
+| Runtime    | Node.js 24.18.0 LTS (`.nvmrc`)    |
 | HTTP       | Express 4                         |
 | Banco      | PostgreSQL 18 (imagem alpine)     |
 | Driver     | `pg` (queries parametrizadas)     |
@@ -31,6 +31,7 @@ src/
 └── errors/api-error.js             # erro com status HTTP
 migrations/                         # node-pg-migrate
 seeds/seed.js                       # 5 tarefas de exemplo
+scripts/wait-for-postgres.js        # espera o banco aceitar conexoes
 tests/                              # suite de integracao da API
 ```
 
@@ -40,16 +41,36 @@ template, por ser uma API.
 ## Setup
 
 ```bash
-nvm install --lts && nvm use   # opcional, respeita o .nvmrc
+nvm install                    # instala o Node declarado no .nvmrc
 npm install
-npm run db:up                  # sobe o Postgres via compose.yaml
-npm run migrate:up             # cria a tabela tasks
-npm run seed                   # popula com 5 tarefas de exemplo
 npm run dev                    # http://localhost:3000
 ```
 
+O `npm run dev` faz todo o resto sozinho: sobe o container, espera o banco
+aceitar conexoes, aplica as migrations pendentes e so entao inicia o servidor.
+O `npm run seed` segue a mesma cadeia antes de popular as 5 tarefas de exemplo.
+
 O `compose.yaml` cria dois bancos: `tasktab_development` e `tasktab_test`
 (este ultimo via `docker/initdb/`, executado na primeira subida do volume).
+
+### Scripts
+
+| Script                    | O que faz                                             |
+| ------------------------- | ----------------------------------------------------- |
+| `dev`                     | Servicos + espera + migrations + servidor em watch    |
+| `start`                   | So o servidor (assume banco pronto — uso em producao) |
+| `seed`                    | Servicos + espera + migrations + 5 tarefas de exemplo |
+| `services:up`             | Sobe os containers em background                      |
+| `services:stop`           | Para os containers, preservando os dados              |
+| `services:down`           | Remove os containers (`-v` tambem apaga o volume)     |
+| `services:wait:database`  | Bloqueia ate o Postgres aceitar conexoes              |
+| `migrations:up` / `:down` | Aplica / reverte migrations                           |
+| `migrations:create`       | Gera um novo arquivo de migration                     |
+
+O `services:wait:database` abre uma conexao real com o banco da aplicacao em
+vez de so checar se o container subiu — assim valida tambem as credenciais e a
+existencia do database, que e do que as migrations dependem. Ele respeita o
+`NODE_ENV`, entao aponta para o banco de teste quando chamado pelo `pretest`.
 
 ## Variaveis de ambiente
 
@@ -109,12 +130,17 @@ validacao, com `details` por campo), `500` (erro interno).
 ## Testes
 
 ```bash
-npm test
+npm test          # sobe os servicos, roda a suite e para os containers
+npm run test:watch  # sem subir/parar servicos, para iterar
 ```
 
-Roda contra `tasktab_test` com `NODE_ENV=test`. As migrations sao aplicadas
-automaticamente no `globalSetup` e a tabela e truncada antes de cada teste — o
-Postgres precisa estar no ar (`npm run db:up`).
+Roda contra `tasktab_test` com `NODE_ENV=test`. Nao e preciso preparar nada
+antes: o `pretest` sobe os servicos e espera o banco, o `globalSetup` do Jest
+aplica as migrations e cada teste roda sobre uma tabela truncada. Ao final o
+`posttest` para os containers.
+
+Como o `posttest` derruba os servicos, use `test:watch` (com os containers ja
+no ar) enquanto estiver iterando.
 
 ## Qualidade de codigo
 
