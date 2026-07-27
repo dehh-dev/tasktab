@@ -11,6 +11,7 @@ Gerenciador de Tarefas — API REST em arquitetura MVC com Express e PostgreSQL.
 | Banco      | PostgreSQL 18 (imagem alpine)     |
 | Driver     | `pg` (queries parametrizadas)     |
 | Migrations | `node-pg-migrate`                 |
+| Interface  | React 19 + Vite 7 (CSS proprio)   |
 | Testes     | Jest + Supertest                  |
 | Qualidade  | ESLint 9 (flat config) + Prettier |
 
@@ -33,22 +34,34 @@ migrations/                         # node-pg-migrate
 seeds/seed.js                       # 5 tarefas de exemplo
 scripts/wait-for-postgres.js        # espera o banco aceitar conexoes
 tests/                              # suite de integracao da API
+web/                                # interface React (workspace npm)
+├── vite.config.js                  # proxy /api -> :3000 em desenvolvimento
+└── src/
+    ├── App.jsx                     # estado da pagina e orquestracao
+    ├── api.js                      # cliente HTTP da API
+    ├── constants.js                # enum de status e formatacao de data
+    ├── styles.css                  # paleta e layout, sem framework CSS
+    └── components/                 # StatusFilter, TaskForm, TaskList, ConfirmDialog
 ```
 
-A "View" e a representacao JSON produzida pelos controllers — nao ha camada de
-template, por ser uma API.
+No backend, a "View" e a representacao JSON produzida pelos controllers. A
+interface consome essa mesma API publica, sem atalhos para o banco.
 
 ## Setup
 
 ```bash
 nvm install                    # instala o Node declarado no .nvmrc
-npm install
-npm run dev                    # http://localhost:3000
+npm install                    # instala a raiz + o workspace web/
+npm run dev                    # interface em http://localhost:5173
 ```
 
 O `npm run dev` faz todo o resto sozinho: sobe o container, espera o banco
-aceitar conexoes, aplica as migrations pendentes e so entao inicia o servidor.
-O `npm run seed` segue a mesma cadeia antes de popular as 5 tarefas de exemplo.
+aceitar conexoes, aplica as migrations pendentes e entao inicia a API (`:3000`)
+e a interface (`:5173`) em paralelo. O `npm run seed` segue a mesma cadeia antes
+de popular as 5 tarefas de exemplo.
+
+No navegador, use a porta **5173**: e o Vite, que serve a interface e encaminha
+`/api` para o Express.
 
 O `compose.yaml` cria dois bancos: `tasktab_development` e `tasktab_test`
 (este ultimo via `docker/initdb/`, executado na primeira subida do volume).
@@ -57,7 +70,9 @@ O `compose.yaml` cria dois bancos: `tasktab_development` e `tasktab_test`
 
 | Script                    | O que faz                                             |
 | ------------------------- | ----------------------------------------------------- |
-| `dev`                     | Servicos + espera + migrations + servidor em watch    |
+| `dev`                     | Servicos + espera + migrations + API e interface      |
+| `dev:api` / `dev:web`     | Sobe apenas um dos dois, sem preparar o banco         |
+| `build`                   | Gera o build de producao da interface em `web/dist`   |
 | `start`                   | So o servidor (assume banco pronto — uso em producao) |
 | `seed`                    | Servicos + espera + migrations + 5 tarefas de exemplo |
 | `services:up`             | Sobe os containers em background                      |
@@ -127,6 +142,45 @@ em `{ "error": { "message", "details?" } }`.
 Codigos: `400` (id/JSON invalido), `404` (inexistente), `422` (falha de
 validacao, com `details` por campo), `500` (erro interno).
 
+## Interface web
+
+React 19 com Vite, sem router e sem biblioteca de estado — a tela e unica e o
+estado vive no `App`. O CSS e proprio, sem framework externo.
+
+- **Listagem** com filtro por status (Todas / Pendente / Em andamento /
+  Concluida) e contagem total vinda do `meta` da API.
+- **Formulario unico** para criar e editar, com contador de caracteres do
+  titulo. Erros `422` do backend sao exibidos no campo correspondente,
+  preservando o que foi digitado.
+- **Exclusao** passa por um dialogo de confirmacao: `Escape` e clique fora
+  cancelam, e o foco inicial fica no botao seguro para que um `Enter`
+  acidental nao delete nada.
+
+### Paleta
+
+Baseada no tema **GitHub Dark Colorblind** (Protanopia & Deuteranopia), cuja
+troca central em relacao ao dark padrao e substituir verde por azul e vermelho
+por laranja — justamente o par que esses tipos de daltonismo confundem. Por
+isso as acoes destrutivas sao laranja (`#ec8e2c`), nao vermelhas.
+
+Os status seguem a mesma logica e evitam o eixo verde/vermelho por completo:
+
+| Status       | Cor               |
+| ------------ | ----------------- |
+| Pendente     | Amarelo `#d29922` |
+| Em andamento | Azul `#4184e4`    |
+| Concluida    | Roxo `#a371f7`    |
+
+Cor nunca e o unico canal de informacao: cada badge tambem carrega o texto do
+status, entao a leitura sobrevive em tons de cinza.
+
+### Producao
+
+Em desenvolvimento o Vite serve a interface e encaminha `/api` para o Express.
+Em producao nao ha Vite: rode `npm run build` e o Express passa a servir
+`web/dist` na mesma origem, com fallback de SPA para rotas que nao comecem com
+`/api`. Nos dois casos front e back ficam na mesma origem, o que dispensa CORS.
+
 ## Testes
 
 ```bash
@@ -145,8 +199,21 @@ no ar) enquanto estiver iterando.
 ## Qualidade de codigo
 
 ```bash
-npm run lint          # ESLint
+npm run lint          # ESLint (backend CommonJS + frontend JSX)
 npm run lint:fix
 npm run format        # Prettier
 npm run format:check
 ```
+
+### Sobre o `npm audit`
+
+Os `overrides` do `package.json` sao escopados por versao de `minimatch`,
+porque cada major consome uma API diferente do `brace-expansion`: a 3.x espera
+o export CommonJS da linha 1.x, enquanto a 10.x usa a 5.x. Forcar uma unica
+versao para as duas quebra o ESLint com `expand is not a function`.
+
+Resta um aviso conhecido, sem correcao possivel hoje: o ESLint fixa
+`minimatch ^3.1.2` internamente e essa linha nao tem versao considerada
+corrigida pelo advisory. O impacto e nulo aqui — trata-se de negacao de
+servico ao expandir um glob malicioso, e os unicos globs em uso vem dos
+proprios arquivos de configuracao do projeto, nao de entrada externa.
