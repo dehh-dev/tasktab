@@ -12,7 +12,7 @@ Gerenciador de Tarefas — API REST em arquitetura MVC com Express e PostgreSQL.
 | Driver     | `pg` (queries parametrizadas)     |
 | Migrations | `node-pg-migrate`                 |
 | Interface  | React 19 + Vite 7 (CSS proprio)   |
-| Testes     | Jest + Supertest                  |
+| Testes     | Jest (integracao, HTTP real)      |
 | Qualidade  | ESLint 9 (flat config) + Prettier |
 
 ## Estrutura
@@ -28,12 +28,14 @@ src/
 ├── controllers/task.controller.js  # C — orquestra validacao + model + resposta
 ├── routes/                         # mapeamento REST
 ├── validators/                     # regras de validacao de entrada
-├── middlewares/                    # asyncHandler + tratamento de erros
-└── errors/api-error.js             # erro com status HTTP
+└── middlewares/async-handler.js    # encaminha rejeicao de handler async
+infra/
+├── errors.js                       # BaseError + erros especificos
+└── controller.js                   # handlers de erro plugados no Express
 migrations/                         # node-pg-migrate
 seeds/seed.js                       # 5 tarefas de exemplo
 scripts/wait-for-postgres.js        # espera o banco aceitar conexoes
-tests/                              # suite de integracao da API
+tests/                              # suite de integracao (orchestrator + specs)
 web/                                # interface React (workspace npm)
 ├── vite.config.js                  # proxy /api -> :3000 em desenvolvimento
 └── src/
@@ -137,10 +139,23 @@ curl -X DELETE localhost:3000/api/tasks/1
 ```
 
 Sucesso vem envelopado em `{ "data": ... }` (listagem inclui `meta`). Erro vem
-em `{ "error": { "message", "details?" } }`.
+plano, sempre no mesmo formato:
+
+```json
+{
+  "name": "ValidationError",
+  "message": "Falha de validacao.",
+  "action": "Ajuste os campos indicados em details e tente de novo.",
+  "status_code": 422,
+  "details": [{ "field": "title", "message": "title e obrigatorio" }]
+}
+```
+
+O `action` diz o que fazer a seguir, e o `details` (so em `422`) aponta o campo
+culpado — e o que permite a interface exibir o erro no campo certo.
 
 Codigos: `400` (id/JSON invalido), `404` (inexistente), `422` (falha de
-validacao, com `details` por campo), `500` (erro interno).
+validacao), `500` (erro interno).
 
 ## Interface web
 
@@ -189,9 +204,13 @@ npm run test:watch  # sem subir/parar servicos, para iterar
 ```
 
 Roda contra `tasktab_test` com `NODE_ENV=test`. Nao e preciso preparar nada
-antes: o `pretest` sobe os servicos e espera o banco, o `globalSetup` do Jest
-aplica as migrations e cada teste roda sobre uma tabela truncada. Ao final o
+antes: o `pretest` sobe os servicos e espera o banco, o proprio `test` sobe a
+API em `:3001` em paralelo ao Jest, e o `tests/orchestrator.js` espera o
+`/api/health`, aplica as migrations e trunca a tabela a cada teste. Ao final o
 `posttest` para os containers.
+
+Os testes falam **HTTP de verdade** com a API, como qualquer outro cliente —
+nao importam `src/app` nem usam supertest.
 
 Como o `posttest` derruba os servicos, use `test:watch` (com os containers ja
 no ar) enquanto estiver iterando.
@@ -203,7 +222,18 @@ npm run lint          # ESLint (backend CommonJS + frontend JSX)
 npm run lint:fix
 npm run format        # Prettier
 npm run format:check
+npm run commit        # commit guiado pelo Conventional Commits
 ```
+
+### Commits
+
+O historico segue **Conventional Commits**, validado pelo commitlint no hook
+`commit-msg` do husky — inclusive o escopo, restrito ao enum de
+`commitlint.config.js`. Use `npm run commit` para ser guiado pelo prompt.
+
+O hook `pre-commit` roda apenas `lint` e `format:check`. `npm test` fica de fora
+de proposito: o `posttest` derruba o Docker, o que mataria os containers em uso
+durante o desenvolvimento — rode a suite no terminal antes de commitar.
 
 ### Sobre o `npm audit`
 
