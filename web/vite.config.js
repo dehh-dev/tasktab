@@ -9,7 +9,9 @@ export default defineConfig({
     // durante o desenvolvimento, dispensando CORS.
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        // O E2E aponta para a API de teste (:3001) via API_URL, para nunca
+        // tocar no banco de desenvolvimento.
+        target: process.env.API_URL || 'http://localhost:3000',
         changeOrigin: true,
       },
     },
