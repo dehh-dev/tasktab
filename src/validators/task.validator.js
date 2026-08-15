@@ -1,6 +1,16 @@
 'use strict';
 
-const ApiError = require('../errors/api-error');
+const { BadRequestError, ValidationError } = require('../../infra/errors');
+
+const BODY_NOT_OBJECT = {
+  message: 'Corpo da requisicao deve ser um objeto JSON.',
+  action: 'Envie um objeto com os campos da tarefa.',
+};
+
+const INVALID_ID = {
+  message: 'id deve ser um inteiro positivo.',
+  action: 'Use o id numerico devolvido pela listagem de tarefas.',
+};
 
 const TASK_STATUSES = ['pending', 'in_progress', 'done'];
 const TITLE_MAX_LENGTH = 255;
@@ -88,13 +98,13 @@ function validateDueDate(value, errors) {
 
 function assertValid(errors) {
   if (errors.length > 0) {
-    throw ApiError.unprocessable('Falha de validacao', errors);
+    throw new ValidationError({ details: errors });
   }
 }
 
 function validateCreate(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    throw ApiError.badRequest('Corpo da requisicao deve ser um objeto JSON');
+    throw new BadRequestError(BODY_NOT_OBJECT);
   }
 
   const errors = [];
@@ -124,7 +134,7 @@ function validateCreate(body) {
 
 function validateUpdate(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    throw ApiError.badRequest('Corpo da requisicao deve ser um objeto JSON');
+    throw new BadRequestError(BODY_NOT_OBJECT);
   }
 
   const errors = [];
@@ -149,12 +159,15 @@ function validateUpdate(body) {
   assertValid(errors);
 
   if (Object.keys(data).length === 0) {
-    throw ApiError.unprocessable('Informe ao menos um campo para atualizar', [
-      {
-        field: 'body',
-        message: 'campos aceitos: title, description, status, due_date',
-      },
-    ]);
+    throw new ValidationError({
+      message: 'Informe ao menos um campo para atualizar.',
+      details: [
+        {
+          field: 'body',
+          message: 'campos aceitos: title, description, status, due_date',
+        },
+      ],
+    });
   }
 
   return data;
@@ -163,11 +176,11 @@ function validateUpdate(body) {
 /** Valida o :id da rota, que precisa ser um inteiro positivo. */
 function validateId(rawId) {
   if (!/^\d+$/.test(String(rawId))) {
-    throw ApiError.badRequest('id deve ser um inteiro positivo');
+    throw new BadRequestError(INVALID_ID);
   }
   const id = Number(rawId);
   if (!Number.isSafeInteger(id) || id < 1) {
-    throw ApiError.badRequest('id deve ser um inteiro positivo');
+    throw new BadRequestError(INVALID_ID);
   }
   return id;
 }

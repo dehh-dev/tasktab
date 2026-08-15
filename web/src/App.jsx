@@ -30,7 +30,7 @@ export default function App() {
       setTotal(response.meta.total);
       setError(null);
     } catch (caught) {
-      setError(caught.message);
+      setError({ message: caught.message, action: caught.action });
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ export default function App() {
       if (Object.keys(byField).length > 0) {
         setFieldErrors(byField);
       } else {
-        setError(caught.message);
+        setError({ message: caught.message, action: caught.action });
       }
     } finally {
       setSubmitting(false);
@@ -94,7 +94,7 @@ export default function App() {
       }
       await load();
     } catch (caught) {
-      setError(caught.message);
+      setError({ message: caught.message, action: caught.action });
       setPendingDelete(null);
     } finally {
       setDeleting(false);
@@ -110,8 +110,8 @@ export default function App() {
 
       {error && (
         <div className="alert" role="alert">
-          <div className="alert__title">Algo deu errado</div>
-          <div>{error}</div>
+          <div className="alert__title">{error.message}</div>
+          {error.action && <div>{error.action}</div>}
         </div>
       )}
 

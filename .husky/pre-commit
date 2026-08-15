@@ -1,0 +1,5 @@
+# Só lint aqui: `npm test` sobe e derruba o Docker (via posttest), o que
+# mataria os containers em uso durante o desenvolvimento. A suite roda no
+# terminal, antes do commit.
+npm run lint
+npm run format:check

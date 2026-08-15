@@ -5,9 +5,10 @@ const BASE_URL = '/api/tasks';
  * (status 422), para que o formulario possa exibi-los no campo correto.
  */
 export class ApiError extends Error {
-  constructor(message, details) {
+  constructor(message, { action, details } = {}) {
     super(message);
     this.name = 'ApiError';
+    this.action = action ?? null;
     this.details = details ?? [];
   }
 
@@ -31,7 +32,9 @@ async function request(url, options = {}) {
       ...options,
     });
   } catch {
-    throw new ApiError('Nao foi possivel falar com o servidor.');
+    throw new ApiError('Nao foi possivel falar com o servidor.', {
+      action: 'Verifique sua conexao e se a API esta no ar.',
+    });
   }
 
   if (response.status === 204) {
@@ -40,10 +43,12 @@ async function request(url, options = {}) {
 
   const body = await response.json().catch(() => null);
 
+  // O backend serializa erro em { name, message, action, status_code,
+  // details? } — o `action` diz ao usuario o que fazer a seguir.
   if (!response.ok) {
     throw new ApiError(
-      body?.error?.message ?? `Falha na requisicao (${response.status})`,
-      body?.error?.details,
+      body?.message ?? `Falha na requisicao (${response.status})`,
+      { action: body?.action, details: body?.details },
     );
   }
 
