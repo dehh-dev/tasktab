@@ -176,6 +176,26 @@ afterAll(orchestrator.closeDatabase);
 - Vale a mesma regra de nao mockar. A unica excecao esta anotada em
   `form-validation.spec.js` e explicada la.
 
+## Logs
+
+`pino` via `infra/logger.js`. **Nao use `console.*` em `src/` nem em `infra/`** —
+use `logger` (fora de requisicao) ou `req.log` (dentro dela, que ja vem com o
+`request_id` anexado).
+
+- Todo erro 5xx devolve `request_id` no corpo; os 4xx nao (mudaria o contrato
+  sem ganho, e ha teste afirmando o corpo exato do 404).
+- Em teste o logger e `silent`, para nao poluir a saida da suite.
+- Os serializers sao enxutos de proposito: o padrao do `pino-http` despeja
+  todos os headers em cada linha.
+
+## Container
+
+`Dockerfile` multi-stage; o runtime nao tem devDependencies, roda como `node` e
+nao carrega arquivo de env. O `HEALTHCHECK` usa `/api/health` e respeita `PORT`.
+
+Migrations **nao** rodam a partir dessa imagem: `node-pg-migrate` e
+devDependency. Aplicar migration e passo separado do pipeline.
+
 ## Protecoes HTTP
 
 `helmet()` com a politica padrao e dois limitadores em `/api`

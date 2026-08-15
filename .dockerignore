@@ -1,0 +1,31 @@
+# O que nunca deve entrar na imagem: dependencias reinstaladas la dentro,
+# artefatos de teste, historico e — principalmente — arquivos de ambiente.
+# Em producao as variaveis reais vem do ambiente, nunca de um arquivo commitado.
+
+node_modules
+web/node_modules
+web/dist
+
+.git
+.github
+.husky
+
+coverage
+playwright-report
+test-results
+tests
+e2e
+playwright.config.js
+jest.config.js
+
+env.development
+env.test
+.env
+.env.*
+
+*.log
+.DS_Store
+Dockerfile
+.dockerignore
+README.md
+CLAUDE.md
