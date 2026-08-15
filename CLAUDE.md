@@ -96,13 +96,14 @@ Toda resposta de erro nasce de uma classe em `infra/errors.js` que estende
 { "name": "...", "message": "...", "action": "...", "status_code": 000 }
 ```
 
-| Classe                | Status | Quando                                         |
-| --------------------- | ------ | ---------------------------------------------- |
-| `BadRequestError`     | 400    | id invalido, JSON malformado, corpo nao-objeto |
-| `NotFoundError`       | 404    | recurso ou rota inexistente                    |
-| `ValidationError`     | 422    | falha de validacao; carrega `details`          |
-| `ServiceError`        | 503    | dependencia fora do ar (banco)                 |
-| `InternalServerError` | 500    | qualquer erro inesperado                       |
+| Classe                 | Status | Quando                                         |
+| ---------------------- | ------ | ---------------------------------------------- |
+| `BadRequestError`      | 400    | id invalido, JSON malformado, corpo nao-objeto |
+| `NotFoundError`        | 404    | recurso ou rota inexistente                    |
+| `ValidationError`      | 422    | falha de validacao; carrega `details`          |
+| `TooManyRequestsError` | 429    | teto de requisicoes estourado                  |
+| `ServiceError`         | 503    | dependencia fora do ar (banco)                 |
+| `InternalServerError`  | 500    | qualquer erro inesperado                       |
 
 - **Erro esperado** → crie ou reutilize uma classe especifica com seu proprio
   `statusCode`, `message` e `action`. O `action` diz ao usuario **o que fazer a
@@ -174,6 +175,17 @@ afterAll(orchestrator.closeDatabase);
   o banco de desenvolvimento.
 - Vale a mesma regra de nao mockar. A unica excecao esta anotada em
   `form-validation.spec.js` e explicada la.
+
+## Protecoes HTTP
+
+`helmet()` com a politica padrao e dois limitadores em `/api`
+(`src/middlewares/rate-limit.js`): um geral e um so para escrita.
+
+- **Nao afrouxe a CSP.** Front e back estao sempre na mesma origem; se algo
+  quebrou sob `'self'`, o problema e o recurso externo, nao a politica.
+- O limitador e desligado em teste de proposito — a suite trombaria em
+  qualquer teto realista. Mudou algo nele? Confira manualmente com
+  `RATE_LIMIT_WRITE_MAX=5 npm start`.
 
 ## Ambientes
 
