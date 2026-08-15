@@ -402,25 +402,28 @@ textarea.field__input {
 
 /* ---------- dialogo de confirmacao ---------- */
 
-.overlay {
-  align-items: center;
-  background: rgba(1, 4, 9, 0.8);
-  display: flex;
-  inset: 0;
-  justify-content: center;
+/* O <dialog> em si so posiciona: o browser ja centraliza com margin auto.
+   A caixa visivel e o .dialog__box, para que o clique no backdrop chegue com
+   o proprio <dialog> como alvo. */
+.dialog {
+  background: transparent;
+  border: none;
+  color: inherit;
+  max-width: 440px;
   padding: 16px;
-  position: fixed;
-  z-index: 10;
+  width: 100%;
 }
 
-.dialog {
+.dialog::backdrop {
+  background: rgba(1, 4, 9, 0.8);
+}
+
+.dialog__box {
   background: var(--canvas-overlay);
   border: 1px solid var(--border-default);
   border-radius: var(--radius);
   box-shadow: var(--shadow-overlay);
-  max-width: 440px;
   padding: 16px;
-  width: 100%;
 }
 
 .dialog__title {

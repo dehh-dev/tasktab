@@ -213,9 +213,10 @@ estado vive no `App`. O CSS e proprio, sem framework externo.
 - **Formulario unico** para criar e editar, com contador de caracteres do
   titulo. Erros `422` do backend sao exibidos no campo correspondente,
   preservando o que foi digitado.
-- **Exclusao** passa por um dialogo de confirmacao: `Escape` e clique fora
-  cancelam, e o foco inicial fica no botao seguro para que um `Enter`
-  acidental nao delete nada.
+- **Exclusao** passa por um dialogo de confirmacao, na tag `<dialog>` nativa:
+  o foco fica preso dentro dele, comeca no botao seguro (para que um `Enter`
+  acidental nao delete nada) e volta ao botao que o abriu ao fechar. `Escape`
+  e clique fora cancelam.
 
 ### Paleta
 

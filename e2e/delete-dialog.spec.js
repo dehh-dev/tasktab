@@ -52,6 +52,43 @@ test('Escape cancela sem deletar', async ({ page }) => {
   await expect(page.locator('.task')).toHaveCount(1);
 });
 
+test('prende o foco dentro do dialogo', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Deletar' }).click();
+
+  const dialog = page.getByRole('dialog');
+
+  // Tab de sobra para dar a volta no ciclo mais de uma vez. O foco pode passar
+  // pelo <body> no ponto de virada — isso e normal em modal — mas nunca pode
+  // pousar num controle da pagina atras.
+  for (let i = 0; i < 6; i += 1) {
+    await page.keyboard.press('Tab');
+
+    const escaped = await dialog.evaluate((node) => {
+      const active = document.activeElement;
+      if (!active || active === document.body) {
+        return false;
+      }
+      return !node.contains(active);
+    });
+
+    expect(escaped).toBe(false);
+  }
+});
+
+test('devolve o foco ao botao que abriu', async ({ page }) => {
+  await page.goto('/');
+
+  const trigger = page.getByRole('button', { name: 'Deletar' });
+  await trigger.click();
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  // Quem navega por teclado precisa voltar de onde saiu.
+  await expect(trigger).toBeFocused();
+});
+
 test('clique fora cancela sem deletar', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Deletar' }).click();

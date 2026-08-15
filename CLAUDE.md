@@ -182,6 +182,10 @@ arquivo a sua propria copia de `process.env`.
   o banco de desenvolvimento.
 - Vale a mesma regra de nao mockar. A unica excecao esta anotada em
   `form-validation.spec.js` e explicada la.
+- O `ConfirmDialog` usa a tag `<dialog>` nativa com `showModal()`. **Nao volte
+  para uma `div` com `aria-modal`**: era uma promessa de isolamento que o
+  browser nao cumpria. O `close()` roda em `useLayoutEffect`, porque uma
+  limpeza tardia acontece com o no ja fora do DOM e o foco nao volta.
 
 ## Logs
 
