@@ -10,9 +10,13 @@ const { ServiceError } = require('../../infra/errors');
  * processo esta vivo mente justamente no cenario em que alguem o consulta —
  * banco fora do ar — e faz o load balancer seguir mandando trafego para ca.
  */
+// Curto de proposito: um health check que demora e tao inutil quanto um que
+// mente, porque o probe do orquestrador desiste antes da resposta.
+const DATABASE_TIMEOUT_MS = 2000;
+
 async function show(req, res) {
   try {
-    await db.query('SELECT 1');
+    await db.queryWithTimeout('SELECT 1', [], DATABASE_TIMEOUT_MS);
   } catch (error) {
     throw new ServiceError({
       message: 'Banco de dados indisponivel.',
