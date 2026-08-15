@@ -168,6 +168,20 @@ Codigos: `400` (id/JSON invalido), `404` (inexistente), `422` (falha de
 validacao), `429` (limite de requisicoes), `500` (erro interno), `503`
 (dependencia fora do ar).
 
+### Logs
+
+`pino` estruturado, uma linha por requisicao. Cada uma ganha um `request_id`
+(UUID) devolvido no header `x-request-id`; se a requisicao ja chegar com esse
+header, o valor e preservado, para que o rastro atravesse proxies.
+
+Nas respostas **5xx** o mesmo id sai no corpo, em `request_id` — e o que liga a
+reclamacao do usuario a linha de log, ja que a mensagem publica de um 500 e
+deliberadamente generica. Nos 4xx o corpo ja diz o que corrigir, entao o id
+nao entra.
+
+`LOG_LEVEL` controla o nivel (padrao `info`, e `silent` em teste). Em
+desenvolvimento a saida passa pelo `pino-pretty`; em producao sai em JSON.
+
 ### Protecoes HTTP
 
 O `helmet` aplica os headers de seguranca com a politica padrao — front e back
@@ -224,6 +238,27 @@ Em desenvolvimento o Vite serve a interface e encaminha `/api` para o Express.
 Em producao nao ha Vite: rode `npm run build` e o Express passa a servir
 `web/dist` na mesma origem, com fallback de SPA para rotas que nao comecem com
 `/api`. Nos dois casos front e back ficam na mesma origem, o que dispensa CORS.
+
+## Container
+
+```bash
+docker build -t tasktab .
+docker run -p 3000:3000 \
+  -e DB_HOST=... -e DB_USER=... -e DB_PASSWORD=... -e DB_NAME=... \
+  tasktab
+```
+
+Build multi-stage: um estagio instala so as dependencias de producao, outro
+gera o build da interface, e o runtime recebe apenas o resultado dos dois. A
+imagem roda como usuario `node`, sem devDependencies e sem nenhum arquivo de
+env — em producao as variaveis vem do ambiente.
+
+O `HEALTHCHECK` reaproveita o proprio `/api/health`, entao o container so se
+declara saudavel quando o Postgres responde. Ele respeita `PORT`.
+
+As **migrations ficam de fora da imagem**: o `node-pg-migrate` e uma
+devDependency, entao aplicar migration e um passo separado do pipeline, com o
+toolchain completo — nao algo que o container de runtime faca sozinho.
 
 ## Testes
 

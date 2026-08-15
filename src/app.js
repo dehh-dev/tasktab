@@ -7,11 +7,16 @@ const helmet = require('helmet');
 const env = require('./config/env');
 const routes = require('./routes');
 const controller = require('../infra/controller');
+const { httpLogger } = require('../infra/logger');
 const { readLimiter, writeLimiter } = require('./middlewares/rate-limit');
 
 const app = express();
 
 app.disable('x-powered-by');
+
+// Primeiro de todos: assim ate o que for barrado pelo limitador aparece no log
+// ja com um request id.
+app.use(httpLogger);
 
 // Front e back ficam sempre na mesma origem, entao a CSP padrao do helmet
 // ('self' para tudo) atende o build do Vite sem excecoes.
