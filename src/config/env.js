@@ -19,10 +19,19 @@ function required(name) {
   return value;
 }
 
+const MINUTE = 60 * 1000;
+
 module.exports = {
   nodeEnv,
   isTest: nodeEnv === 'test',
   port: Number(process.env.PORT || 3000),
+  rateLimit: {
+    windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * MINUTE),
+    // Leitura e generosa: a interface recarrega a lista a cada mutacao.
+    max: Number(process.env.RATE_LIMIT_MAX || 600),
+    // Escrita e o que interessa conter.
+    writeMax: Number(process.env.RATE_LIMIT_WRITE_MAX || 100),
+  },
   database: {
     host: required('DB_HOST'),
     port: Number(process.env.DB_PORT || 5432),

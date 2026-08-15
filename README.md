@@ -96,11 +96,17 @@ existencia do database, que e do que as migrations dependem. Ele respeita o
 em `process.env`, entao em producao basta injetar as variaveis reais pelo
 ambiente (nao existe `env.production` versionado).
 
-| Variavel                                              | Descricao                        |
-| ----------------------------------------------------- | -------------------------------- |
-| `PORT`                                                | Porta HTTP                       |
-| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | Conexao usada pela aplicacao     |
-| `DATABASE_URL`                                        | Consumida pelo `node-pg-migrate` |
+| Variavel                                              | Descricao                          |
+| ----------------------------------------------------- | ---------------------------------- |
+| `PORT`                                                | Porta HTTP                         |
+| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | Conexao usada pela aplicacao       |
+| `DATABASE_URL`                                        | Consumida pelo `node-pg-migrate`   |
+| `RATE_LIMIT_WINDOW_MS`                                | Janela do limitador (padrao 15min) |
+| `RATE_LIMIT_MAX`                                      | Teto de leitura (padrao 600)       |
+| `RATE_LIMIT_WRITE_MAX`                                | Teto de escrita (padrao 100)       |
+
+O `.npmrc` liga `engine-strict`: sem ele o campo `engines` seria so um aviso e a
+instalacao seguiria numa versao de Node incompativel.
 
 ## Endpoints
 
@@ -159,7 +165,26 @@ O `action` diz o que fazer a seguir, e o `details` (so em `422`) aponta o campo
 culpado — e o que permite a interface exibir o erro no campo certo.
 
 Codigos: `400` (id/JSON invalido), `404` (inexistente), `422` (falha de
-validacao), `500` (erro interno).
+validacao), `429` (limite de requisicoes), `500` (erro interno), `503`
+(dependencia fora do ar).
+
+### Protecoes HTTP
+
+O `helmet` aplica os headers de seguranca com a politica padrao — front e back
+ficam sempre na mesma origem, entao a CSP `'self'` atende o build do Vite sem
+excecoes.
+
+O limitador tem dois tetos sobrepostos: um geral, generoso porque a interface
+recarrega a lista a cada mutacao, e um mais apertado so para escrita. Ambos
+respondem `429` no mesmo formato dos demais erros.
+
+O limitador **fica desligado em `NODE_ENV=test`**: a suite dispara dezenas de
+requisicoes em segundos e trombaria em qualquer teto realista. Para conferir
+manualmente, suba com um teto baixo e repita uma escrita:
+
+```bash
+RATE_LIMIT_WRITE_MAX=5 npm start
+```
 
 ## Interface web
 

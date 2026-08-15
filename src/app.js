@@ -3,16 +3,23 @@
 const path = require('path');
 const fs = require('fs');
 const express = require('express');
+const helmet = require('helmet');
 const env = require('./config/env');
 const routes = require('./routes');
 const controller = require('../infra/controller');
+const { readLimiter, writeLimiter } = require('./middlewares/rate-limit');
 
 const app = express();
 
 app.disable('x-powered-by');
+
+// Front e back ficam sempre na mesma origem, entao a CSP padrao do helmet
+// ('self' para tudo) atende o build do Vite sem excecoes.
+app.use(helmet());
+
 app.use(express.json({ limit: '100kb' }));
 
-app.use('/api', routes);
+app.use('/api', readLimiter, writeLimiter, routes);
 
 // Em desenvolvimento o Vite serve a interface e encaminha /api para ca. Em
 // producao nao ha Vite: o Express entrega o build estatico na mesma origem,
