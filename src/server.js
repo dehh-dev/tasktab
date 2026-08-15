@@ -3,15 +3,17 @@
 const app = require('./app');
 const env = require('./config/env');
 const db = require('./config/database');
+const { logger } = require('../infra/logger');
 
 const server = app.listen(env.port, () => {
-  console.log(
-    `tasktab rodando em http://localhost:${env.port} (${env.nodeEnv})`,
+  logger.info(
+    { port: env.port, env: env.nodeEnv },
+    `tasktab rodando em http://localhost:${env.port}`,
   );
 });
 
 function shutdown(signal) {
-  console.log(`\n${signal} recebido, encerrando...`);
+  logger.info({ signal }, 'encerrando');
   server.close(async () => {
     await db.close();
     process.exit(0);

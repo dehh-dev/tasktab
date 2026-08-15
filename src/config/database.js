@@ -2,6 +2,7 @@
 
 const { Pool, types } = require('pg');
 const env = require('./env');
+const { logger } = require('../../infra/logger');
 
 // Colunas DATE (OID 1082) chegam como string 'YYYY-MM-DD'. Sem isso o driver
 // converte para Date na timezone local e a data pode "andar" um dia.
@@ -20,7 +21,7 @@ const pool = new Pool({
 });
 
 pool.on('error', (error) => {
-  console.error('Erro inesperado em cliente ocioso do pool:', error);
+  logger.error({ err: error }, 'erro inesperado em cliente ocioso do pool');
 });
 
 /**

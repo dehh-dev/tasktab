@@ -37,7 +37,7 @@ class InternalServerError extends BaseError {
   constructor({ cause } = {}) {
     super({
       message: 'Um erro interno nao esperado aconteceu.',
-      action: 'Entre em contato com o suporte informando o horario do erro.',
+      action: 'Entre em contato com o suporte informando o request_id.',
       statusCode: 500,
       cause,
     });
