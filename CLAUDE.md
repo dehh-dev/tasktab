@@ -134,26 +134,33 @@ problema e o desenho do codigo, nao o teste.
 testes falam **HTTP real** contra `http://localhost:3001`. Nao ha supertest e
 nao se importa `src/app` dentro de teste.
 
+Os arquivos espelham as rotas: `tests/api/tasks/get.test.js`,
+`post.test.js`, `put.test.js`, `delete.test.js`, mais `tests/api/health.test.js`
+e `tests/api/not-found.test.js`.
+
 Tudo que e infraestrutura de teste vive em **`tests/orchestrator.js`**:
 
-| Funcao                   | Para que                                     |
-| ------------------------ | -------------------------------------------- |
-| `waitForAllServices()`   | espera o `/api/health` responder 200         |
-| `runPendingMigrations()` | aplica as migrations no banco de teste       |
-| `clearDatabase()`        | trunca `tasks` reiniciando a identidade      |
-| `insertTask(overrides)`  | arranjo direto no banco, sem passar pela API |
-| `request(m, path, body)` | requisicao HTTP; `body` string vai cru       |
+| Funcao                    | Para que                                     |
+| ------------------------- | -------------------------------------------- |
+| `waitForAllServices()`    | espera o `/api/health` responder 200         |
+| `runPendingMigrations()`  | aplica as migrations no banco de teste       |
+| `clearDatabase()`         | trunca `tasks` reiniciando a identidade      |
+| `insertTask(overrides)`   | arranjo direto no banco, sem passar pela API |
+| `updateTaskTitleDirectly` | escrita crua, para provar garantia do banco  |
+| `request(m, path, body)`  | requisicao HTTP; `body` string vai cru       |
 
-O preambulo de toda suite:
+**Um arquivo de teste novo nao precisa de preambulo nenhum** — so `require` do
+orchestrator e os `describe`. O ciclo esta dividido em dois lugares:
 
-```js
-beforeAll(async () => {
-  await orchestrator.waitForAllServices();
-  orchestrator.runPendingMigrations();
-});
-beforeEach(orchestrator.clearDatabase);
-afterAll(orchestrator.closeDatabase);
-```
+| Onde                    | Quando roda          | O que faz                       |
+| ----------------------- | -------------------- | ------------------------------- |
+| `tests/global-setup.js` | uma vez por execucao | espera a API, aplica migrations |
+| `tests/setup.js`        | por arquivo de teste | trunca a tabela, fecha o pool   |
+
+O que e caro fica no `global-setup`: `runPendingMigrations()` custa um processo
+`npx`, e chama-lo por arquivo multiplicaria o custo a cada arquivo novo.
+Deduplicar com marca em `process.env` **nao** funciona — o Jest entrega a cada
+arquivo a sua propria copia de `process.env`.
 
 - Rodam com `--runInBand`: compartilham a mesma tabela e nao podem paralelizar.
 - Use `insertTask()` para preparar estado — arranjo fora da rota evita que um

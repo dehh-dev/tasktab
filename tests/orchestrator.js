@@ -51,7 +51,14 @@ async function waitForAllServices() {
   await waitForWebServer();
 }
 
-/** Aplica as migrations pendentes no banco de teste. */
+/**
+ * Aplica as migrations pendentes no banco de teste.
+ *
+ * Custa um processo `npx`, entao roda **uma vez por execucao**, chamada pelo
+ * `globalSetup` do Jest — nao por arquivo de teste. Deduplicar com uma marca
+ * em `process.env` nao funcionaria: o ambiente de teste do Jest entrega a cada
+ * arquivo a sua propria copia de `process.env`.
+ */
 function runPendingMigrations() {
   try {
     execSync('npx node-pg-migrate --envPath env.test up', {
@@ -105,6 +112,21 @@ async function insertTask(overrides = {}) {
 }
 
 /**
+ * Atualiza uma task direto no banco, sem passar pela API nem pelo model. Serve
+ * para provar o que e garantia do banco: repare que `updated_at` nao aparece
+ * no SQL abaixo.
+ */
+async function updateTaskTitleDirectly(id, title) {
+  const { rows } = await db.query(
+    `UPDATE tasks SET title = $1 WHERE id = $2
+     RETURNING id, title, updated_at`,
+    [title, id],
+  );
+
+  return rows[0];
+}
+
+/**
  * Requisicao HTTP real contra a API. Um `body` string e enviado cru, o que
  * permite testar payload malformado.
  */
@@ -136,5 +158,6 @@ module.exports = {
   clearDatabase,
   closeDatabase,
   insertTask,
+  updateTaskTitleDirectly,
   request,
 };
