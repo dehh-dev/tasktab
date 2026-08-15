@@ -1,15 +1,6 @@
 'use strict';
 
-const orchestrator = require('./orchestrator');
-
-const { request } = orchestrator;
-
-beforeAll(async () => {
-  await orchestrator.waitForAllServices();
-  orchestrator.runPendingMigrations();
-});
-
-afterAll(orchestrator.closeDatabase);
+const { request } = require('../orchestrator');
 
 describe('GET /api/health', () => {
   it('responde 200 quando o banco esta acessivel', async () => {
