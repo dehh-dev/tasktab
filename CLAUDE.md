@@ -101,6 +101,7 @@ Toda resposta de erro nasce de uma classe em `infra/errors.js` que estende
 | `BadRequestError`     | 400    | id invalido, JSON malformado, corpo nao-objeto |
 | `NotFoundError`       | 404    | recurso ou rota inexistente                    |
 | `ValidationError`     | 422    | falha de validacao; carrega `details`          |
+| `ServiceError`        | 503    | dependencia fora do ar (banco)                 |
 | `InternalServerError` | 500    | qualquer erro inesperado                       |
 
 - **Erro esperado** → crie ou reutilize uma classe especifica com seu proprio
@@ -108,6 +109,8 @@ Toda resposta de erro nasce de uma classe em `infra/errors.js` que estende
   seguir** — a interface o exibe abaixo da mensagem, entao nunca deixe vazio.
 - **Erro inesperado** → deixe estourar. O `onErrorHandler` converte em
   `InternalServerError` (500) para nao vazar detalhe interno.
+- Erro **nosso** com status 5xx (`ServiceError`) e repassado como esta e
+  logado; a mensagem publica dele ja nasce segura.
 - **Nunca** monte um objeto de erro na mao dentro do controller.
 - Sempre repasse a causa original: `new InternalServerError({ cause: error })`.
   E o que preserva o rastro no log quando a mensagem publica e generica.

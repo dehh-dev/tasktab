@@ -44,6 +44,21 @@ class InternalServerError extends BaseError {
   }
 }
 
+/**
+ * 503 — a aplicacao esta de pe, mas uma dependencia nao esta respondendo.
+ * Diferente do 500, comunica que o problema e transitorio e externo.
+ */
+class ServiceError extends BaseError {
+  constructor({ message, action, cause } = {}) {
+    super({
+      message: message || 'Servico indisponivel no momento.',
+      action: action || 'Verifique se as dependencias estao no ar.',
+      statusCode: 503,
+      cause,
+    });
+  }
+}
+
 /** 400 — a requisicao esta malformada antes mesmo de validar o dominio. */
 class BadRequestError extends BaseError {
   constructor({ message, action, cause } = {}) {
@@ -89,6 +104,7 @@ class ValidationError extends BaseError {
 module.exports = {
   BaseError,
   InternalServerError,
+  ServiceError,
   BadRequestError,
   NotFoundError,
   ValidationError,

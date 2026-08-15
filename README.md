@@ -115,7 +115,11 @@ Base: `/api/tasks`
 | `DELETE`      | `/:id` | Remove                      | 204     |
 
 Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
-`offset` (padrao 0). Ha tambem `GET /api/health`.
+`offset` (padrao 0).
+
+`GET /api/health` consulta o banco de verdade: devolve `200` com
+`{ "data": { "status": "ok", "uptime": ... } }` quando o Postgres responde e
+`503` (`ServiceError`) quando nao responde — nunca `200` com o banco fora.
 
 ### Campos
 
@@ -224,6 +228,18 @@ npm run format        # Prettier
 npm run format:check
 npm run commit        # commit guiado pelo Conventional Commits
 ```
+
+### Integracao continua
+
+O workflow `.github/workflows/ci.yml` roda a cada pull request e a cada push na
+`main`, em dois jobs paralelos: **qualidade** (lint, `format:check` e build da
+interface) e **testes de integracao** (`npm test`).
+
+O job de teste usa o mesmo `npm test` do desenvolvimento, com Docker de verdade.
+Um `services: postgres` do proprio Actions nao serviria: ele nao executa o
+`docker/initdb/`, entao o banco `tasktab_test` nunca existiria.
+
+O `npm audit` fica de fora de proposito — veja a secao sobre ele acima.
 
 ### Commits
 

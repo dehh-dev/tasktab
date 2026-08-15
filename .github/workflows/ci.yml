@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Um push novo na mesma branch cancela a execucao anterior.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, formato e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+      - run: npm run format:check
+
+      # Garante que a interface compila: o build nao entra na suite de testes.
+      - run: npm run build
+
+  test:
+    name: Testes de integracao
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # `npm test` cuida do ciclo inteiro (pretest sobe o Docker e espera o
+      # banco, posttest derruba). Usar os mesmos scripts do desenvolvimento
+      # evita que CI e maquina local divirjam.
+      #
+      # Um `services: postgres` do Actions nao serviria: ele nao executa o
+      # docker/initdb/, entao o banco tasktab_test nunca seria criado.
+      - run: npm test
+
+      - name: Logs do Postgres em caso de falha
+        if: failure()
+        run: docker compose logs postgres

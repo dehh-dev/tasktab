@@ -30,10 +30,28 @@ export default function TaskForm({
   );
   const [localErrors, setLocalErrors] = useState({});
 
-  const errors = { ...serverErrors, ...localErrors };
+  // Um erro do servidor vale ate o usuario mexer no campo: manter a mensagem
+  // enquanto ele digita a correcao acusa algo que ja nao e verdade. Cada novo
+  // 422 chega como objeto novo, o que reabilita todos os campos.
+  const [dismissed, setDismissed] = useState({});
+  const [lastServerErrors, setLastServerErrors] = useState(serverErrors);
+
+  if (lastServerErrors !== serverErrors) {
+    setLastServerErrors(serverErrors);
+    setDismissed({});
+  }
+
+  const visibleServerErrors = Object.fromEntries(
+    Object.entries(serverErrors).filter(([field]) => !dismissed[field]),
+  );
+
+  const errors = { ...visibleServerErrors, ...localErrors };
 
   function setField(field, value) {
     setValues((current) => ({ ...current, [field]: value }));
+    setDismissed((current) =>
+      current[field] ? current : { ...current, [field]: true },
+    );
     setLocalErrors((current) => {
       if (!current[field]) {
         return current;

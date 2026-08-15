@@ -27,7 +27,13 @@ function onNoMatchHandler(req, res) {
 // eslint-disable-next-line no-unused-vars
 function onErrorHandler(error, req, res, next) {
   // Erro esperado: ja nasceu com statusCode, action e serializacao propria.
-  if (error instanceof BaseError && error.statusCode < 500) {
+  // Inclui os 5xx deliberados (ServiceError), cuja mensagem publica ja foi
+  // escrita para nao vazar detalhe interno — por isso so eles sao logados.
+  if (error instanceof BaseError) {
+    if (error.statusCode >= 500 && !env.isTest) {
+      console.error(error);
+    }
+
     return res.status(error.statusCode).json(error.toJSON());
   }
 
