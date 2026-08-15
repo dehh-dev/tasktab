@@ -5,10 +5,7 @@ const fs = require('fs');
 const express = require('express');
 const env = require('./config/env');
 const routes = require('./routes');
-const {
-  notFoundHandler,
-  errorHandler,
-} = require('./middlewares/error-handler');
+const controller = require('../infra/controller');
 
 const app = express();
 
@@ -39,7 +36,7 @@ if (serveWeb) {
   });
 }
 
-app.use(notFoundHandler);
-app.use(errorHandler);
+app.use(controller.errorHandlers.onNoMatch);
+app.use(controller.errorHandlers.onError);
 
 module.exports = app;

@@ -1,8 +1,15 @@
 'use strict';
 
 const Task = require('../models/task.model');
-const ApiError = require('../errors/api-error');
+const { NotFoundError } = require('../../infra/errors');
 const validator = require('../validators/task.validator');
+
+function taskNotFound(id) {
+  return new NotFoundError({
+    message: `Task ${id} nao encontrada.`,
+    action: 'Verifique o id informado ou liste as tarefas disponiveis.',
+  });
+}
 
 /** GET /api/tasks */
 async function index(req, res) {
@@ -21,7 +28,7 @@ async function show(req, res) {
   const task = await Task.findById(id);
 
   if (!task) {
-    throw ApiError.notFound(`Task ${id} nao encontrada`);
+    throw taskNotFound(id);
   }
 
   res.json({ data: task });
@@ -42,7 +49,7 @@ async function update(req, res) {
   const task = await Task.update(id, data);
 
   if (!task) {
-    throw ApiError.notFound(`Task ${id} nao encontrada`);
+    throw taskNotFound(id);
   }
 
   res.json({ data: task });
@@ -54,7 +61,7 @@ async function destroy(req, res) {
   const deleted = await Task.remove(id);
 
   if (!deleted) {
-    throw ApiError.notFound(`Task ${id} nao encontrada`);
+    throw taskNotFound(id);
   }
 
   res.status(204).send();
