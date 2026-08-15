@@ -229,6 +229,18 @@ npm run format:check
 npm run commit        # commit guiado pelo Conventional Commits
 ```
 
+### Integracao continua
+
+O workflow `.github/workflows/ci.yml` roda a cada pull request e a cada push na
+`main`, em dois jobs paralelos: **qualidade** (lint, `format:check` e build da
+interface) e **testes de integracao** (`npm test`).
+
+O job de teste usa o mesmo `npm test` do desenvolvimento, com Docker de verdade.
+Um `services: postgres` do proprio Actions nao serviria: ele nao executa o
+`docker/initdb/`, entao o banco `tasktab_test` nunca existiria.
+
+O `npm audit` fica de fora de proposito — veja a secao sobre ele acima.
+
 ### Commits
 
 O historico segue **Conventional Commits**, validado pelo commitlint no hook
