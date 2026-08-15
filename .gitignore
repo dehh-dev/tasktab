@@ -1,6 +1,11 @@
 node_modules/
 coverage/
 web/dist/
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
 *.log
 .DS_Store
 

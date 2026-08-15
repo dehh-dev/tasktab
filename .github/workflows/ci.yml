@@ -56,3 +56,31 @@ jobs:
       - name: Logs do Postgres em caso de falha
         if: failure()
         run: docker compose logs postgres
+
+  e2e:
+    name: E2E da interface
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Só o Chromium: a suite roda em um projeto so, e baixar os tres
+      # navegadores triplicaria o tempo de setup sem cobrir nada a mais.
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:e2e
+
+      - name: Relatorio do Playwright em caso de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

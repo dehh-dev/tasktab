@@ -7,7 +7,13 @@ const reactHooks = require('eslint-plugin-react-hooks');
 
 module.exports = [
   {
-    ignores: ['node_modules/**', 'coverage/**', 'web/dist/**'],
+    ignores: [
+      'node_modules/**',
+      'coverage/**',
+      'web/dist/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
   // Backend: CommonJS rodando no Node.
   {

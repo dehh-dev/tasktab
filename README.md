@@ -202,9 +202,15 @@ Em producao nao ha Vite: rode `npm run build` e o Express passa a servir
 
 ## Testes
 
+Duas suites, ambas de integracao e ambas contra o sistema de verdade: a da
+**API** fala HTTP com o Express, e a **E2E** dirige um navegador contra a
+interface.
+
 ```bash
-npm test          # sobe os servicos, roda a suite e para os containers
-npm run test:watch  # sem subir/parar servicos, para iterar
+npm test              # API: sobe os servicos, roda a suite e para os containers
+npm run test:watch    # API: sem subir/parar servicos, para iterar
+npm run test:e2e      # interface: Playwright contra API + Vite
+npm run test:e2e:ui   # interface: modo interativo do Playwright
 ```
 
 Roda contra `tasktab_test` com `NODE_ENV=test`. Nao e preciso preparar nada
@@ -215,6 +221,18 @@ API em `:3001` em paralelo ao Jest, e o `tests/orchestrator.js` espera o
 
 Os testes falam **HTTP de verdade** com a API, como qualquer outro cliente —
 nao importam `src/app` nem usam supertest.
+
+### E2E da interface
+
+O `npm run test:e2e` sobe a API em `:3001` (banco de teste) e o Vite em `:5173`,
+e roda o Playwright contra o navegador. O proxy do Vite aponta para a API de
+teste via `API_URL`, entao o E2E **nunca toca no banco de desenvolvimento**.
+
+O arranjo de cada teste passa pela API publica, nao pelo banco: manter um pool
+do `pg` vivo dentro do worker do Playwright prenderia o processo no fim da
+suite. Aqui quem esta sob teste e a interface.
+
+Na primeira execucao, instale o navegador: `npx playwright install chromium`.
 
 Como o `posttest` derruba os servicos, use `test:watch` (com os containers ja
 no ar) enquanto estiver iterando.

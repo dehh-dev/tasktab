@@ -160,6 +160,21 @@ afterAll(orchestrator.closeDatabase);
 - Asserte o **contrato**: status HTTP e o shape do JSON. Em erro, asserte `name`
   e `status_code`; em 422, tambem o `field` dentro de `details`.
 
+### E2E da interface
+
+`npm run test:e2e` (Playwright, em `e2e/`) sobe API e Vite pelo `webServer` do
+`playwright.config.js` e dirige o navegador. Regras:
+
+- O arranjo passa pela **API publica** (`e2e/helpers.js`), nunca pelo banco: um
+  pool do `pg` no worker do Playwright prende o processo no fim da suite.
+- Locators acessiveis (`getByRole`, `getByLabel`) — de quebra, cobrem a11y.
+  Escope ao formulario (`page.locator('form.form')`): "Status" tambem casa com
+  o `aria-label` do grupo de filtros, e "Cancelar" existe no form e no dialogo.
+- O E2E aponta para a API de teste via `API_URL`. **Nunca** deixe a suite tocar
+  o banco de desenvolvimento.
+- Vale a mesma regra de nao mockar. A unica excecao esta anotada em
+  `form-validation.spec.js` e explicada la.
+
 ## Ambientes
 
 `src/config/env.js` carrega `env.<NODE_ENV>` — **sem ponto no inicio**:
