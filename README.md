@@ -115,7 +115,11 @@ Base: `/api/tasks`
 | `DELETE`      | `/:id` | Remove                      | 204     |
 
 Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
-`offset` (padrao 0). Ha tambem `GET /api/health`.
+`offset` (padrao 0).
+
+`GET /api/health` consulta o banco de verdade: devolve `200` com
+`{ "data": { "status": "ok", "uptime": ... } }` quando o Postgres responde e
+`503` (`ServiceError`) quando nao responde — nunca `200` com o banco fora.
 
 ### Campos
 
