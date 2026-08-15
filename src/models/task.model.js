@@ -72,7 +72,8 @@ async function update(id, data) {
     return findById(id);
   }
 
-  assignments.push('updated_at = now()');
+  // `updated_at` fica por conta do trigger tasks_set_updated_at: assim vale
+  // tambem para escrita que nao passa por aqui.
   params.push(id);
 
   const { rows } = await db.query(

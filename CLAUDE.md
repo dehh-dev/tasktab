@@ -225,6 +225,15 @@ Dev usa `tasktab_development`; testes usam `tasktab_test`, criado pelo
 `docker/initdb/` apenas na **primeira** subida do volume — se o banco de teste
 sumir, e `npm run services:down -- -v` e subir de novo.
 
+## Garantias no banco
+
+O que precisa valer para **toda** escrita mora no banco, nao no model:
+
+- `updated_at` e mantido pelo trigger `tasks_set_updated_at`. Nao volte a
+  setar a coluna no `task.model.js` — o ponto e cobrir tambem seed, psql e
+  migration.
+- `tasks_title_not_blank` complementa a validacao da aplicacao.
+
 ## Datas
 
 Dois pontos ja resolvidos, pela mesma razao (a data "andar" um dia):
