@@ -80,8 +80,12 @@ function runPendingMigrations() {
   }
 }
 
+// CASCADE porque receipts referencia reports e merchants; sem ele o TRUNCATE
+// recusa a tabela que tem dependente.
 function clearDatabase() {
-  return db.query('TRUNCATE TABLE tasks RESTART IDENTITY');
+  return db.query(
+    'TRUNCATE TABLE tasks, receipts, reports, merchants RESTART IDENTITY CASCADE',
+  );
 }
 
 function closeDatabase() {
@@ -106,6 +110,34 @@ async function insertTask(overrides = {}) {
      VALUES ($1, $2, $3, $4)
      RETURNING id, title, description, status, due_date, created_at, updated_at`,
     [task.title, task.description, task.status, task.due_date],
+  );
+
+  return rows[0];
+}
+
+/** Insere um relatorio direto no banco, sem passar pela API. */
+async function insertReport(overrides = {}) {
+  const report = {
+    title: 'Viagem de teste',
+    period_start: '2026-06-01',
+    period_end: '2026-06-30',
+    advance_cents: 0,
+    status: 'open',
+    ...overrides,
+  };
+
+  const { rows } = await db.query(
+    `INSERT INTO reports (title, period_start, period_end, advance_cents, status)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, title, period_start, period_end, advance_cents, status,
+               created_at, updated_at`,
+    [
+      report.title,
+      report.period_start,
+      report.period_end,
+      report.advance_cents,
+      report.status,
+    ],
   );
 
   return rows[0];
@@ -158,6 +190,7 @@ module.exports = {
   clearDatabase,
   closeDatabase,
   insertTask,
+  insertReport,
   updateTaskTitleDirectly,
   request,
 };
