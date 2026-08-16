@@ -9,6 +9,11 @@ WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY web/package.json web/package.json
 
+# --ignore-scripts vale tambem para as dependencias nativas da extracao:
+# sharp, @napi-rs/canvas e zxing-wasm distribuem binario pre-compilado para
+# musl como dependencia opcional, entao nao precisam de postinstall. Medido:
+# as quatro (com tesseract.js do M4) carregam nesta imagem, o que dispensou
+# trocar a base para Debian. Custo: +115 MB.
 RUN npm ci --omit=dev --ignore-scripts
 
 # ---- build da interface -----------------------------------------------------

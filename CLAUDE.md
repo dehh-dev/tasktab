@@ -207,6 +207,11 @@ nao carrega arquivo de env. O `HEALTHCHECK` usa `/api/health` e respeita `PORT`.
 Migrations **nao** rodam a partir dessa imagem: `node-pg-migrate` e
 devDependency. Aplicar migration e passo separado do pipeline.
 
+As dependencias nativas da extracao (`sharp`, `@napi-rs/canvas`,
+`zxing-wasm`, e o `tesseract.js` do M4) foram verificadas nesta base Alpine e
+funcionam com `--ignore-scripts` — todas trazem binario musl pre-compilado.
+**Nao troque a base para Debian sem medir**: a troca foi avaliada e dispensada.
+
 ## Protecoes HTTP
 
 `helmet()` com a politica padrao e dois limitadores em `/api`
