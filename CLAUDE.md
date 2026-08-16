@@ -235,6 +235,23 @@ Dev usa `tasktab_development`; testes usam `tasktab_test`, criado pelo
 `docker/initdb/` apenas na **primeira** subida do volume — se o banco de teste
 sumir, e `npm run services:down -- -v` e subir de novo.
 
+## Prestacao de contas
+
+Segunda area do backend, em `reports` / `receipts` / `merchants`. O backlog
+completo esta em `docs/backlog-prestacao-de-contas.md`.
+
+- **Dinheiro e `integer` em centavos, sempre.** Nao introduza `numeric` nem
+  float: somar float produziu `219.98000000000002` no caso que originou o
+  projeto. Converter para reais e coisa da exportacao.
+- O upload confere **magic bytes** (`%PDF`), nao extensao, e grava o arquivo
+  com o proprio SHA-256 como nome. Reenviar o mesmo arquivo responde `200` com
+  o que ja existe — e operacao idempotente, nao erro de unique.
+- PDF ilegivel vira uma linha em `failed` com o motivo em `raw_text`. **Nao**
+  deixe um arquivo ruim derrubar o lote.
+- Confirmar exige `issued_at`, `amount_cents` e `category`, conferidos sobre o
+  registro ja gravado. Duplicata continua listada e **fora do somatorio**.
+- As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
+
 ## Garantias no banco
 
 O que precisa valer para **toda** escrita mora no banco, nao no model:
