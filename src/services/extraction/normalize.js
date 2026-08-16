@@ -224,10 +224,38 @@ function extractCnpj(text) {
   return match[0].replace(/\D/g, '');
 }
 
+// Linha de item de cupom: codigo, descricao, quantidade, unidade e o valor no
+// fim. A ancora e a unidade (UN, KG, PC...), que separa item de qualquer outra
+// linha que por acaso termine em numero.
+const ITEM_LINE =
+  /^\s*\d{1,4}\s+.+?\s+\d+(?:[.,]\d+)?\s*(?:UN|KG|PC|LT|CX|DZ|MT)\b.*?(\d{1,3}(?:\.\d{3})*(?:,\d{2})|\d+,\d{2})\s*$/i;
+
+/**
+ * Valores dos itens listados no cupom, em centavos.
+ *
+ * Conservador de proposito: so reconhece linha com unidade de medida. Um
+ * alarme falso na conferencia destroi a confianca mais rapido do que um erro
+ * nao detectado — e quem usa a ferramenta ja vem de uma planilha em que nao
+ * confiava.
+ */
+function extractItemTotals(text) {
+  if (typeof text !== 'string') {
+    return [];
+  }
+
+  return text
+    .split('\n')
+    .map((line) => line.match(ITEM_LINE))
+    .filter(Boolean)
+    .map((match) => parseAmountToCents(match[1]))
+    .filter((cents) => cents !== null);
+}
+
 module.exports = {
   parseAmountToCents,
   parseDate,
   extractTotal,
   extractDate,
   extractCnpj,
+  extractItemTotals,
 };

@@ -292,6 +292,19 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   parsing nao cabe em 48 PDFs. Leitura de PDF continua coberta por integracao —
   o `unpdf` usa import dinamico, que a VM do Jest recusa sem flag.
 
+## Conferencia e duplicatas
+
+- **Alerta nao bloqueia.** `GET /api/reports/:id/validation` aponta; quem
+  decide e a pessoa que assina.
+- So **mesma chave de acesso** colapsa como duplicata automatica. Mesma data
+  com mesmo valor e **suspeita**, e vira alerta.
+- Regra agressiva demais recria o erro que a ferramenta existe para evitar: ha
+  teste do contraexemplo (dois almocos iguais em dias diferentes **nao** sao
+  duplicata). **Nao afrouxe esse teste.**
+- Regra de conferencia so dispara com evidencia suficiente — a de itens exige
+  ao menos dois itens legiveis, a de faixa exige historico minimo. Alarme falso
+  destroi a confianca mais rapido que um erro nao detectado.
+
 ## Garantias no banco
 
 O que precisa valer para **toda** escrita mora no banco, nao no model:

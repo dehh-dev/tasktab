@@ -194,6 +194,33 @@ para trocar por BullMQ e **uso concorrente** — hoje um segundo processo nao ve
 esta fila, e um reinicio perde o que estava na memoria. Como a unidade de
 trabalho ja e "uma pagina, um registro", a migracao e local.
 
+### Conferencia
+
+`GET /api/reports/:id/validation` devolve alertas com severidade (`erro` ou
+`aviso`). **Alerta nao bloqueia nada** — quem assina a prestacao de contas
+decide; a ferramenta aponta, nao veta.
+
+Regras: soma dos itens contra o total impresso, digito verificador da chave,
+data dentro do periodo, valor fora da faixa historica do emitente,
+comprovante incompleto, despesas acima do adiantamento e suspeita de
+duplicata.
+
+Fora de escopo hoje, registrado para nao parecer esquecimento: **coerencia
+geografica e horaria** (jantar numa cidade e corrida em outra no mesmo
+horario) depende de extrair cidade e hora, que nenhum parser faz ainda.
+
+### Duplicatas
+
+Duas notas com a **mesma chave de acesso** sao o mesmo documento e a segunda
+colapsa sozinha, marcada com `duplicate_of_id`. Ela continua listada e vai no
+PDF consolidado — so nao soma.
+
+Mesma data com mesmo valor vira **alerta**, nunca exclusao. O risco e
+assimetrico: deixar passar uma duplicata infla o total e a conferencia pega,
+mas marcar como duplicata o que nao e some com uma despesa legitima. Foi assim
+que R$ 48,60 sumiram da planilha que originou este projeto — dois almocos do
+mesmo restaurante, mesmo valor, dias diferentes. Ha teste desse contraexemplo.
+
 Nada e confirmado sozinho: a extracao troca digitar por conferir.
 
 Confirmar um comprovante exige data, valor e categoria — a checagem considera o
