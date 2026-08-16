@@ -61,6 +61,34 @@ function makeReceiptPdf(options = {}) {
   return makePdf({ pages, lines: receiptLines(rest) });
 }
 
+/**
+ * Cupom com QR Code de verdade, como os NFC-e impressos.
+ *
+ * O QR carrega a URL de consulta da SEFAZ com a chave embutida — e o formato
+ * real, e nao a chave solta, para que o teste exercite a extracao da chave de
+ * dentro da URL.
+ */
+async function makeQrReceiptPdf({ accessKey, ...rest } = {}) {
+  const { writeBarcode } = require('zxing-wasm');
+
+  const url = `https://nfe.sefaz.go.gov.br/nfeweb/consulta?p=${accessKey}|2|1|1`;
+  const { image } = await writeBarcode(url, { format: 'QRCode', scale: 8 });
+  const png = Buffer.from(await image.arrayBuffer());
+
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const page = document.addPage([300, 400]);
+
+  receiptLines(rest).forEach((line, row) => {
+    page.drawText(String(line), { x: 20, y: 370 - row * 14, size: 8, font });
+  });
+
+  const embedded = await document.embedPng(png);
+  page.drawImage(embedded, { x: 20, y: 60, width: 160, height: 160 });
+
+  return Buffer.from(await document.save());
+}
+
 /** Bytes que comecam com %PDF- mas nao formam um documento valido. */
 function makeCorruptPdf() {
   return Buffer.from('%PDF-1.7\nisto nao e um PDF de verdade\n%%EOF');
@@ -74,6 +102,7 @@ function makeNonPdf() {
 module.exports = {
   makePdf,
   makeReceiptPdf,
+  makeQrReceiptPdf,
   receiptLines,
   makeCorruptPdf,
   makeNonPdf,
