@@ -2,6 +2,7 @@
 
 const Receipt = require('../../models/receipt.model');
 const textService = require('./text.service');
+const parsers = require('./parsers');
 
 /**
  * Roda a extracao sobre as paginas ja criadas de um arquivo.
@@ -51,11 +52,34 @@ async function processPage(receipt, page) {
     return;
   }
 
+  const { fields } = parsers.parse(page.text);
+
   await Receipt.applyExtraction(receipt.id, {
     raw_text: page.text,
+    // Nada e confirmado sozinho. O ganho da extracao e o humano deixar de
+    // digitar e passar a conferir — nao deixar de olhar.
     status: 'needs_review',
     extraction_source: 'text',
+    issued_at: fields.issued_at?.value ?? null,
+    amount_cents: fields.amount_cents?.value ?? null,
+    access_key: fields.access_key?.value ?? null,
+    confidence: lowestConfidence(fields),
   });
+}
+
+/**
+ * A confianca gravada e a do campo menos confiavel entre os preenchidos.
+ *
+ * A tela de revisao usa esse numero para destacar o que merece atencao, e um
+ * documento so e tao confiavel quanto o seu pior campo — usar a media
+ * esconderia justamente o campo que precisa ser olhado.
+ */
+function lowestConfidence(fields) {
+  const values = Object.values(fields)
+    .map((field) => field.confidence)
+    .filter((confidence) => typeof confidence === 'number');
+
+  return values.length > 0 ? Math.min(...values) : null;
 }
 
 module.exports = { processFile };

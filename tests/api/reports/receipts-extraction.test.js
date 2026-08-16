@@ -80,6 +80,53 @@ describe('extracao no upload', () => {
     expect(receipt.raw_text).toMatch(/Falha ao ler o PDF/);
   });
 
+  it('preenche data e valor sozinho, a partir do texto', async () => {
+    const report = await insertReport();
+
+    await upload(report.id, [
+      {
+        buffer: await makeReceiptPdf({ total: '37,60', date: '19/06/2026' }),
+        filename: 'cupom.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    // O ganho do M2: a pessoa deixa de digitar e passa a conferir.
+    expect(receipt.issued_at).toBe('2026-06-19');
+    expect(receipt.amount_cents).toBe(3760);
+    expect(Number(receipt.confidence)).toBeGreaterThan(0);
+  });
+
+  it('nao confirma nada sozinho, mesmo tendo lido tudo', async () => {
+    const report = await insertReport();
+
+    await upload(report.id, [
+      { buffer: await makeReceiptPdf(), filename: 'cupom.pdf' },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    // Extrair nao e conferir. Confirmar continua sendo ato humano.
+    expect(receipt.status).toBe('needs_review');
+    expect(receipt.category).toBeNull();
+  });
+
+  it('nao soma no total o que ainda nao foi confirmado', async () => {
+    const report = await insertReport();
+
+    await upload(report.id, [
+      { buffer: await makeReceiptPdf({ total: '37,60' }), filename: 'a.pdf' },
+    ]);
+
+    const response = await request('GET', `/api/reports/${report.id}/receipts`);
+
+    // O valor ja esta na linha, mas sem categoria nao entra em subtotal
+    // nenhum — a classificacao chega no M3, por CNPJ do emitente.
+    expect(response.body.data[0].amount_cents).toBe(3760);
+    expect(response.body.meta.by_category).toEqual({});
+  });
+
   it('extrai cada arquivo do lote independentemente', async () => {
     const report = await insertReport();
 
