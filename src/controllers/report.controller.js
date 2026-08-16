@@ -1,9 +1,11 @@
 'use strict';
 
 const Report = require('../models/report.model');
+const Receipt = require('../models/receipt.model');
 const { NotFoundError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const validation = require('../services/validation');
+const xlsxResumo = require('../services/export/xlsx-resumo.service');
 
 function reportNotFound(id) {
   return new NotFoundError({
@@ -85,4 +87,36 @@ async function validate(req, res) {
   res.json({ data: result.alerts, meta: result.meta });
 }
 
-module.exports = { index, show, create, update, destroy, validate };
+/** GET /api/reports/:id/export.xlsx */
+async function exportXlsx(req, res) {
+  const id = validator.validateId(req.params.id);
+  const report = await Report.findById(id);
+
+  if (!report) {
+    throw reportNotFound(id);
+  }
+
+  const receipts = await Receipt.findForExport(id);
+  const workbook = await xlsxResumo.buildResumoWorkbook(report, receipts);
+
+  res
+    .status(200)
+    .set(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    .set('Content-Disposition', `attachment; filename="relatorio-${id}.xlsx"`);
+
+  await workbook.xlsx.write(res);
+  res.end();
+}
+
+module.exports = {
+  index,
+  show,
+  create,
+  update,
+  destroy,
+  validate,
+  exportXlsx,
+};

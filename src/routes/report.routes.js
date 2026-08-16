@@ -17,6 +17,8 @@ router.post(
 router.get('/:id/receipts', asyncHandler(receiptController.index));
 router.get('/:id/validation', asyncHandler(controller.validate));
 
+router.get('/:id/export.xlsx', asyncHandler(controller.exportXlsx));
+
 router.get('/', asyncHandler(controller.index));
 router.post('/', asyncHandler(controller.create));
 router.get('/:id', asyncHandler(controller.show));

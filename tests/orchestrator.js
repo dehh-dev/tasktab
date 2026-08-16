@@ -328,6 +328,17 @@ async function waitForProcessing(reportId, { timeoutMs = 30000 } = {}) {
   );
 }
 
+/**
+ * Requisicao HTTP para resposta binaria (xlsx, pdf). `request()` sempre faz
+ * `JSON.parse` no corpo, o que quebra para esses content-types.
+ */
+async function requestBinary(method, pathname) {
+  const response = await fetch(apiUrl(pathname), { method });
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  return { status: response.status, headers: response.headers, buffer };
+}
+
 /** Le os receipts de um relatorio direto do banco, na ordem de pagina. */
 async function findReceipts(reportId) {
   const { rows } = await db.query(
@@ -355,4 +366,5 @@ module.exports = {
   waitForQueue,
   request,
   requestUpload,
+  requestBinary,
 };

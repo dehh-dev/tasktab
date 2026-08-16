@@ -23,6 +23,7 @@
     "migrations:down": "node-pg-migrate --envPath env.development down",
     "migrations:create": "node-pg-migrate create",
     "seed": "npm run services:up && npm run services:wait:database && npm run migrations:up && node seeds/seed.js",
+    "generate:anexo-i-template": "node scripts/generate-anexo-i-template.js",
     "pretest": "npm run services:up && cross-env NODE_ENV=test npm run services:wait:database",
     "test": "cross-env NODE_ENV=test concurrently -n api,jest -c blue,magenta --hide api -k -s command-jest \"node src/server.js\" \"jest --runInBand --verbose\"",
     "posttest": "npm run services:stop",
@@ -63,6 +64,7 @@
   "dependencies": {
     "@napi-rs/canvas": "^1.0.6",
     "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
     "express": "^4.21.2",
     "express-rate-limit": "^8.6.2",
     "helmet": "^8.3.0",
