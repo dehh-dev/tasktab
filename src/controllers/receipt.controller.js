@@ -9,11 +9,19 @@ const env = require('../config/env');
 const pdf = require('../services/pdf.service');
 const { NotFoundError, ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
+const receiptValidator = require('../validators/receipt.validator');
 
 function reportNotFound(id) {
   return new NotFoundError({
     message: `Report ${id} nao encontrado.`,
     action: 'Verifique o id informado ou liste os relatorios disponiveis.',
+  });
+}
+
+function receiptNotFound(id) {
+  return new NotFoundError({
+    message: `Receipt ${id} nao encontrado.`,
+    action: 'Verifique o id informado ou liste os comprovantes do relatorio.',
   });
 }
 
@@ -126,4 +134,64 @@ async function upload(req, res) {
   });
 }
 
-module.exports = { upload };
+/** GET /api/reports/:id/receipts */
+async function index(req, res) {
+  const reportId = validator.validateId(req.params.id);
+  const report = await Report.findById(reportId);
+
+  if (!report) {
+    throw reportNotFound(reportId);
+  }
+
+  const filters = receiptValidator.validateListQuery(req.query);
+  const [data, meta] = await Promise.all([
+    Receipt.findByReport(reportId, filters),
+    Receipt.summarizeByReport(reportId, filters),
+  ]);
+
+  res.json({ data, meta });
+}
+
+/** GET /api/receipts/:id */
+async function show(req, res) {
+  const id = receiptValidator.validateId(req.params.id);
+  const receipt = await Receipt.findById(id);
+
+  if (!receipt) {
+    throw receiptNotFound(id);
+  }
+
+  res.json({ data: receipt });
+}
+
+/** PATCH /api/receipts/:id */
+async function update(req, res) {
+  const id = receiptValidator.validateId(req.params.id);
+
+  // O registro atual entra na validacao: confirmar depende do conjunto final,
+  // e nao so do que veio no corpo.
+  const current = await Receipt.findById(id);
+
+  if (!current) {
+    throw receiptNotFound(id);
+  }
+
+  const data = receiptValidator.validateUpdate(req.body, current);
+  const receipt = await Receipt.update(id, data);
+
+  res.json({ data: receipt });
+}
+
+/** DELETE /api/receipts/:id */
+async function destroy(req, res) {
+  const id = receiptValidator.validateId(req.params.id);
+  const deleted = await Receipt.remove(id);
+
+  if (!deleted) {
+    throw receiptNotFound(id);
+  }
+
+  res.status(204).send();
+}
+
+module.exports = { upload, index, show, update, destroy };

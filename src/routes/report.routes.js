@@ -14,6 +14,8 @@ router.post(
   asyncHandler(receiptController.upload),
 );
 
+router.get('/:id/receipts', asyncHandler(receiptController.index));
+
 router.get('/', asyncHandler(controller.index));
 router.post('/', asyncHandler(controller.create));
 router.get('/:id', asyncHandler(controller.show));

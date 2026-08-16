@@ -143,6 +143,41 @@ async function insertReport(overrides = {}) {
   return rows[0];
 }
 
+/** Insere um comprovante direto no banco, sem passar pela API. */
+async function insertReceipt(reportId, overrides = {}) {
+  const receipt = {
+    file_path: 'fixture.pdf',
+    file_hash: 'a'.repeat(64),
+    page_number: 1,
+    issued_at: null,
+    amount_cents: null,
+    category: null,
+    status: 'pending',
+    ...overrides,
+  };
+
+  const { rows } = await db.query(
+    `INSERT INTO receipts
+       (report_id, file_path, file_hash, page_number, issued_at, amount_cents,
+        category, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, report_id, file_path, file_hash, page_number, issued_at,
+               amount_cents, category, status, extraction_source, updated_at`,
+    [
+      reportId,
+      receipt.file_path,
+      receipt.file_hash,
+      receipt.page_number,
+      receipt.issued_at,
+      receipt.amount_cents,
+      receipt.category,
+      receipt.status,
+    ],
+  );
+
+  return rows[0];
+}
+
 /**
  * Atualiza uma task direto no banco, sem passar pela API nem pelo model. Serve
  * para provar o que e garantia do banco: repare que `updated_at` nao aparece
@@ -230,6 +265,7 @@ module.exports = {
   closeDatabase,
   insertTask,
   insertReport,
+  insertReceipt,
   updateTaskTitleDirectly,
   findReceipts,
   request,
