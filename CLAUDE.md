@@ -305,6 +305,44 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   ao menos dois itens legiveis, a de faixa exige historico minimo. Alarme falso
   destroi a confianca mais rapido que um erro nao detectado.
 
+## Exportacao
+
+`src/services/export/` — resumo proprio, Anexo I oficial e PDF consolidado.
+
+- **O template em `assets/anexo-i-template.xlsx` e SINTETICO.** Nao existe
+  neste projeto o arquivo real do Anexo I. Antes de qualquer uso em producao,
+  troque pelo formulario oficial e revise `CATEGORY_COLUMN` em
+  `anexo-i.service.js` — o mapa de 8 categorias para 3 colunas (S/W/X) e
+  placeholder, criado sem o layout real.
+- **Nunca abra-e-regrave o `.xlsx` do Anexo I com exceljs (ou qualquer lib
+  parse-and-rebuild).** Foi assim que a validacao de dados (lista suspensa) de
+  um template oficial se perdeu, na conferencia manual que originou este
+  projeto. `xlsx-cell-patch.js` troca celula por manipulacao de string direto
+  no XML — estilo, formula, `dataValidations`, `mergeCells` nunca sao lidos
+  para memoria como objeto, entao sobrevivem intocados.
+- O regex de `setCell` usa quantificador **preguicoso** nos atributos da
+  celula (`[^>]*?`, nao `[^>]*`). Guloso consome o `/` de uma celula
+  autofechada (`<c .../>`) e a substituicao apaga a celula seguinte inteira.
+  Ja aconteceu uma vez — **nao volte para guloso**.
+- So `receipts.status === 'confirmed'` entra no Anexo I. O resumo proprio
+  (issue 16) mostra tudo; o Anexo I e o que vai assinado.
+- Totais do resumo proprio sao **`SUMIFS`** contra uma coluna auxiliar oculta
+  (`0`/`1` de duplicata), nao comparacao de texto de status. Verificado com um
+  motor de formulas independente durante o desenvolvimento — nao faz parte da
+  suite, mas o resultado (110,56 batendo com a soma manual) confirmou a
+  semantica antes de escrever os testes de contrato.
+- O carimbo do PDF fica numa faixa **nova**, criada ao embutir a pagina
+  original numa pagina maior — nunca um retangulo desenhado por cima.
+  Fisicamente nao ha como cobrir o cupom.
+- Ordem cronologica do PDF usa `id` como desempate, nao hora: nenhum parser de
+  extracao le hora do comprovante ainda.
+- Bookmarks (outlines) do PDF usam a API de baixo nivel do pdf-lib
+  (`doc.context`) — nao ha metodo de alto nivel para isso na biblioteca.
+- Teste de PDF gerado **nao pode chamar `unpdf` direto de dentro do Jest**: o
+  mesmo problema do `text.service.js` (import dinamico, VM do Jest recusa sem
+  `--experimental-vm-modules`). `tests/helpers/pdf-text.js` roda a extracao
+  num subprocesso `node` puro, no mesmo espirito do `runPendingMigrations()`.
+
 ## Garantias no banco
 
 O que precisa valer para **toda** escrita mora no banco, nao no model:

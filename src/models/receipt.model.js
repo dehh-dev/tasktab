@@ -95,6 +95,28 @@ async function summarizeByReport(reportId, { status, category } = {}) {
   return totals;
 }
 
+/**
+ * Comprovantes de um relatorio para exportacao, com nome e cidade do
+ * emitente ja resolvidos.
+ *
+ * Ordem cronologica com `id` como desempate — nenhum parser extrai hora do
+ * comprovante ainda, entao nao ha como desempatar por hora como o backlog
+ * pede. Registrado como limitacao conhecida, nao como o comportamento ideal.
+ */
+async function findForExport(reportId) {
+  const { rows } = await db.query(
+    `SELECT r.id, r.issued_at, r.amount_cents, r.category, r.status,
+            r.duplicate_of_id, r.access_key, r.file_path, r.page_number,
+            m.name AS merchant_name, m.city AS merchant_city
+     FROM receipts r
+     LEFT JOIN merchants m ON m.id = r.merchant_id
+     WHERE r.report_id = $1
+     ORDER BY r.issued_at NULLS LAST, r.id`,
+    [reportId],
+  );
+  return rows;
+}
+
 async function findById(id) {
   const { rows } = await db.query(
     `SELECT ${COLUMNS} FROM receipts WHERE id = $1`,
@@ -217,6 +239,7 @@ module.exports = {
   UPDATABLE_COLUMNS,
   findByReport,
   summarizeByReport,
+  findForExport,
   findById,
   findByReportAndHash,
   createPages,

@@ -70,19 +70,20 @@ O `compose.yaml` cria dois bancos: `tasktab_development` e `tasktab_test`
 
 ### Scripts
 
-| Script                    | O que faz                                             |
-| ------------------------- | ----------------------------------------------------- |
-| `dev`                     | Servicos + espera + migrations + API e interface      |
-| `dev:api` / `dev:web`     | Sobe apenas um dos dois, sem preparar o banco         |
-| `build`                   | Gera o build de producao da interface em `web/dist`   |
-| `start`                   | So o servidor (assume banco pronto — uso em producao) |
-| `seed`                    | Servicos + espera + migrations + 5 tarefas de exemplo |
-| `services:up`             | Sobe os containers em background                      |
-| `services:stop`           | Para os containers, preservando os dados              |
-| `services:down`           | Remove os containers (`-v` tambem apaga o volume)     |
-| `services:wait:database`  | Bloqueia ate o Postgres aceitar conexoes              |
-| `migrations:up` / `:down` | Aplica / reverte migrations                           |
-| `migrations:create`       | Gera um novo arquivo de migration                     |
+| Script                      | O que faz                                             |
+| --------------------------- | ----------------------------------------------------- |
+| `dev`                       | Servicos + espera + migrations + API e interface      |
+| `dev:api` / `dev:web`       | Sobe apenas um dos dois, sem preparar o banco         |
+| `build`                     | Gera o build de producao da interface em `web/dist`   |
+| `start`                     | So o servidor (assume banco pronto — uso em producao) |
+| `seed`                      | Servicos + espera + migrations + 5 tarefas de exemplo |
+| `services:up`               | Sobe os containers em background                      |
+| `services:stop`             | Para os containers, preservando os dados              |
+| `services:down`             | Remove os containers (`-v` tambem apaga o volume)     |
+| `services:wait:database`    | Bloqueia ate o Postgres aceitar conexoes              |
+| `migrations:up` / `:down`   | Aplica / reverte migrations                           |
+| `migrations:create`         | Gera um novo arquivo de migration                     |
+| `generate:anexo-i-template` | Regera o template SINTETICO em `assets/` (dev only)   |
 
 O `services:wait:database` abre uma conexao real com o banco da aplicacao em
 vez de so checar se o container subiu — assim valida tambem as credenciais e a
@@ -131,18 +132,21 @@ Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
 
 Base: `/api/reports` e `/api/receipts`
 
-| Metodo   | Rota                        | Descricao                     |
-| -------- | --------------------------- | ----------------------------- |
-| `GET`    | `/api/reports`              | Lista (filtro por `status`)   |
-| `POST`   | `/api/reports`              | Cria                          |
-| `GET`    | `/api/reports/:id`          | Detalhe                       |
-| `PATCH`  | `/api/reports/:id`          | Atualiza                      |
-| `DELETE` | `/api/reports/:id`          | Remove (leva os comprovantes) |
-| `POST`   | `/api/reports/:id/receipts` | Envia 1..N PDFs               |
-| `GET`    | `/api/reports/:id/receipts` | Lista comprovantes com totais |
-| `GET`    | `/api/receipts/:id`         | Detalhe                       |
-| `PATCH`  | `/api/receipts/:id`         | Corrige campos na revisao     |
-| `DELETE` | `/api/receipts/:id`         | Remove                        |
+| Metodo   | Rota                                   | Descricao                     |
+| -------- | -------------------------------------- | ----------------------------- |
+| `GET`    | `/api/reports`                         | Lista (filtro por `status`)   |
+| `POST`   | `/api/reports`                         | Cria                          |
+| `GET`    | `/api/reports/:id`                     | Detalhe                       |
+| `PATCH`  | `/api/reports/:id`                     | Atualiza                      |
+| `DELETE` | `/api/reports/:id`                     | Remove (leva os comprovantes) |
+| `POST`   | `/api/reports/:id/receipts`            | Envia 1..N PDFs               |
+| `GET`    | `/api/reports/:id/receipts`            | Lista comprovantes com totais |
+| `GET`    | `/api/receipts/:id`                    | Detalhe                       |
+| `PATCH`  | `/api/receipts/:id`                    | Corrige campos na revisao     |
+| `DELETE` | `/api/receipts/:id`                    | Remove                        |
+| `GET`    | `/api/reports/:id/export.xlsx`         | Resumo proprio (Excel)        |
+| `GET`    | `/api/reports/:id/export/anexo-i.xlsx` | Anexo I oficial (Excel)       |
+| `GET`    | `/api/reports/:id/export.pdf`          | PDF consolidado               |
 
 O upload aceita multipart no campo `files`, confere os **magic bytes** (`%PDF`)
 em vez da extensao, e separa o arquivo em uma linha por pagina. O arquivo e
@@ -226,6 +230,54 @@ Nada e confirmado sozinho: a extracao troca digitar por conferir.
 Confirmar um comprovante exige data, valor e categoria — a checagem considera o
 que ja esta gravado, nao so o que veio no corpo. Comprovante marcado como
 duplicata continua listado, mas fica **fora do somatorio**.
+
+### Exportacao
+
+Tres saidas, cada uma com um proposito diferente:
+
+| Rota                                       | Para que                                            |
+| ------------------------------------------ | --------------------------------------------------- |
+| `GET /api/reports/:id/export.xlsx`         | Resumo proprio: todos os comprovantes, com formulas |
+| `GET /api/reports/:id/export/anexo-i.xlsx` | O formulario oficial preenchido                     |
+| `GET /api/reports/:id/export.pdf`          | Todos os cupons num PDF so, com indice e carimbo    |
+
+O **resumo proprio** (`exceljs`, gerado do zero) traz todo comprovante, com o
+`Status` a vista. Total geral e subtotal por categoria sao **formula**
+(`SUMIFS`), nao valor fixo — o conferente edita uma linha e ve o total mudar
+sozinho. Uma coluna auxiliar oculta marca duplicata (`1`/`0`) para a formula
+excluir do somatorio sem depender de comparar texto de status.
+
+O **Anexo I** e outra historia: **so entram comprovantes `confirmed`** — e o
+unico status que significa "revisado por uma pessoa". O relatorio nao e
+gerado do zero: o template `.xlsx` e **remendado**, nao reconstruido.
+Bibliotecas que abrem-e-regravam um `.xlsx` perdem o que nao sabem
+representar — foi assim que a validacao de dados (lista suspensa) de um
+template oficial sumiu, na conferencia manual que originou este projeto. Aqui
+`src/services/export/xlsx-cell-patch.js` troca so as celulas de dado por
+manipulacao de string direto no XML da planilha; estilo, formula,
+`dataValidations` e `mergeCells` nunca sao lidos para memoria, entao
+sobrevivem byte a byte.
+
+> **O template em `assets/anexo-i-template.xlsx` e SINTETICO, nao o
+> formulario oficial.** Nao existe, neste projeto, o arquivo real do Anexo I
+> — decisao tomada com o usuario ao iniciar o marco de exportacao. O
+> sintetico (gerado por `npm run generate:anexo-i-template`) reproduz a mesma
+> estrutura que o processo manual descreve — formulas, celula mesclada, lista
+> suspensa, linha de totais cobrindo o intervalo — para provar a tecnica.
+> **Antes de qualquer uso real, troque o arquivo pelo formulario oficial** e
+> confira se `CATEGORY_COLUMN` em `anexo-i.service.js` ainda bate: o mapa de
+> oito categorias para tres colunas (S/W/X) e um placeholder.
+
+O **PDF consolidado** (`pdf-lib`) junta a pagina original de cada comprovante
+— nunca gera imagem nova do cupom — em ordem cronologica, com um carimbo no
+rodape (`Item 07 | 19/06/2026 | Franguinho na Panela | R$ 37,60`) e uma pagina
+de indice no inicio, com bookmarks por categoria e por data. O carimbo fica
+numa faixa **nova**, adicionada abaixo do conteudo original ao embutir a
+pagina — fisicamente nao ha como cobrir o cupom, porque a faixa nao existia
+antes. Duplicata entra no PDF e no indice, marcada com `[DUPLICATA]`.
+
+A ordem cronologica usa `id` como desempate, nao hora do comprovante: nenhum
+parser de extracao le hora ainda. Registrado como limitacao conhecida.
 
 `GET /api/health` consulta o banco de verdade: devolve `200` com
 `{ "data": { "status": "ok", "uptime": ... } }` quando o Postgres responde e
