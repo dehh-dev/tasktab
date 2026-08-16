@@ -209,6 +209,10 @@ use `logger` (fora de requisicao) ou `req.log` (dentro dela, que ja vem com o
 - Em teste o logger e `silent`, para nao poluir a saida da suite.
 - Os serializers sao enxutos de proposito: o padrao do `pino-http` despeja
   todos os headers em cada linha.
+- **Nunca logue `raw_text`, `access_key` ou o comprovante inteiro.** Os
+  serializers nao despejam corpo de requisicao, mas log manual escreve o que
+  mandarem — e um cupom traz CNPJ e as vezes CPF de terceiros. Para investigar
+  uma extracao, logue o `id` do comprovante e consulte o banco.
 
 ## Container
 
@@ -267,6 +271,27 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - Confirmar exige `issued_at`, `amount_cents` e `category`, conferidos sobre o
   registro ja gravado. Duplicata continua listada e **fora do somatorio**.
 - As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
+
+### Retencao dos arquivos
+
+- **Arquivo enviado morre junto com a linha que o referencia.** Apagar
+  comprovante ou relatorio apaga o PDF do disco, via
+  `src/services/retention.service.js`. Nao existe TTL nem varredura por idade:
+  expirar sozinho destruiria evidencia de um relatorio ainda questionavel.
+- A exclusao e **contada por referencia** (`Receipt.countByHash`), nunca
+  direta. O nome do arquivo e o SHA-256 do conteudo, entao um PDF atende todas
+  as paginas dele e ainda e reaproveitado por outro relatorio com o mesmo
+  upload. **Nao troque por um `unlink` direto** — levaria embora o cupom das
+  outras linhas. Ha teste dos dois lados.
+- Chame `discardOrphans` **depois** de a linha sair do banco: e o que faz a
+  contagem refletir so referencias vivas. No `report.destroy` os arquivos
+  precisam ser levantados **antes**, porque a cascata da FK apaga os
+  comprovantes e leva a informacao junto.
+- Falha ao apagar o arquivo nao derruba a resposta: a linha ja saiu, e o erro
+  nao a traz de volta. Fica um `warn`; `ENOENT` e silencioso.
+- **`raw_text` nao e anonimizado na confirmacao** — decisao consciente. A regra
+  de conferencia que soma itens le dele, e confirmar e reversivel: anonimizar
+  ali calaria a checagem justamente nos comprovantes que vao assinados.
 
 ### Extracao
 

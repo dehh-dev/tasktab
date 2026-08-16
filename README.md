@@ -109,6 +109,11 @@ ambiente (nao existe `env.production` versionado).
 | `UPLOAD_DIR`                                          | Onde os PDFs sao gravados           |
 | `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo          |
 | `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao             |
+| `OCR_ENABLED`                                         | `false` desliga o degrau de OCR     |
+| `OCR_LANGUAGE`                                        | Idioma do tesseract (padrao `por`)  |
+| `OCR_CACHE_DIR`                                       | Cache dos dados de idioma           |
+| `OCR_TIMEOUT_MS`                                      | Teto por pagina (padrao 20s)        |
+| `LOG_LEVEL`                                           | Nivel do `pino` (padrao `info`)     |
 
 O `.npmrc` liga `engine-strict`: sem ele o campo `engines` seria so um aviso e a
 instalacao seguiria numa versao de Node incompativel.
@@ -151,6 +156,15 @@ Base: `/api/reports` e `/api/receipts`
 | `GET`    | `/api/reports/:id/export/anexo-i.xlsx` | Anexo I oficial (Excel)       |
 | `GET`    | `/api/reports/:id/export.pdf`          | PDF consolidado               |
 
+Base: `/api/merchants` — o cadastro que da categoria ao comprovante.
+
+| Metodo  | Rota                           | Descricao                       |
+| ------- | ------------------------------ | ------------------------------- |
+| `GET`   | `/api/merchants`               | Lista os emitentes cadastrados  |
+| `POST`  | `/api/merchants`               | Cadastra um emitente            |
+| `PATCH` | `/api/merchants/:id`           | Atualiza (e a categoria padrao) |
+| `GET`   | `/api/merchants/by-cnpj/:cnpj` | Busca pelo CNPJ lido da chave   |
+
 O upload aceita multipart no campo `files`, confere os **magic bytes** (`%PDF`)
 em vez da extensao, e separa o arquivo em uma linha por pagina. O arquivo e
 gravado com o proprio SHA-256 como nome, entao o mesmo PDF ocupa um lugar so no
@@ -163,8 +177,8 @@ conversao para reais so acontece na exportacao.
 ### Extracao automatica
 
 PDF com camada de texto tem data e valor preenchidos no proprio upload, e o
-texto original fica em `raw_text` para auditoria. Pagina sem texto util (cupom
-escaneado) fica marcada para a rota de imagem, que chega com o OCR.
+texto original fica em `raw_text` para auditoria. Pagina sem texto util desce
+para o proximo degrau da cascata — QR Code, e depois OCR.
 
 A busca do total e **ancorada em palavra-chave** (`VALOR TOTAL`, `Total a
 pagar`, ...). Pegar "o maior numero da pagina" acharia a chave de acesso, o
@@ -361,6 +375,53 @@ manualmente, suba com um teto baixo e repita uma escrita:
 ```bash
 RATE_LIMIT_WRITE_MAX=5 npm start
 ```
+
+### Retencao e privacidade
+
+Um cupom fiscal nao e um arquivo qualquer: traz CNPJ do emitente, e as vezes
+CPF na nota, de gente que nao e usuaria deste sistema. As decisoes abaixo
+valem para qualquer deploy.
+
+**O arquivo vive enquanto o comprovante existir, e nao mais que isso.** Apagar
+um comprovante ou um relatorio apaga tambem o PDF do disco. Nao ha varredura
+por idade nem TTL: o dono da prestacao de contas decide quando ela deixa de ser
+necessaria — expirar sozinho destruiria a evidencia de um relatorio que ainda
+pode ser questionado meses depois.
+
+A exclusao e **contada por referencia**, nunca direta. O PDF e gravado com o
+proprio SHA-256 como nome, entao um arquivo atende todas as paginas dele e
+ainda e reaproveitado por outro relatorio que receba o mesmo upload; apagar
+junto com a primeira linha removida levaria embora o cupom das outras.
+`src/services/retention.service.js` so chama o `unlink` quando nenhuma linha
+aponta mais para aquele hash. Ha teste dos dois lados: o arquivo some quando a
+ultima referencia sai, e sobrevive enquanto houver outra.
+
+Falha ao apagar o arquivo **nao derruba a resposta**: a linha ja saiu do banco
+e o erro nao a traz de volta. Fica um `warn` no log, que e o que permite varrer
+o diretorio depois. O caso comum — arquivo que ja nao estava la (`ENOENT`) — e
+silencioso de proposito.
+
+O diretorio de upload esta fora do versionamento (`.gitignore`) **e fora da
+imagem** (`.dockerignore`): em container ele e um volume, e a imagem nunca
+carrega arquivo de usuario.
+
+**`raw_text` nao e anonimizado apos a confirmacao** — decisao consciente, nao
+esquecimento. O campo nao e so trilha de auditoria: a regra de conferencia que
+soma os itens contra o total impresso le dele, e confirmar um comprovante e
+reversivel. Anonimizar na confirmacao silenciaria a checagem exatamente nos
+comprovantes ja revisados, que sao os que vao assinados. O texto nasce e morre
+junto com a linha do comprovante.
+
+O que protege o `raw_text`, entao, e o cerco em volta dele:
+
+- Nao e editavel por `PATCH`. As colunas que a revisao pode corrigir
+  (`UPDATABLE_COLUMNS`) sao deliberadamente separadas das que a extracao
+  escreve (`EXTRACTION_COLUMNS`) — juntar as duas deixaria a trilha de
+  auditoria apagavel pelo cliente.
+- **Nunca vai para o log.** Os serializers do `pino-http` sao enxutos e nao
+  despejam corpo de requisicao, mas log manual escreve o que mandarem: nao
+  passe `raw_text`, `access_key` nem o comprovante inteiro para o `req.log`.
+  Para investigar uma extracao, logue o `id` do comprovante e consulte o banco.
 
 ## Interface web
 
