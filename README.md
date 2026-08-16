@@ -153,6 +153,20 @@ disco; reenviar responde `200` com o que ja existe, e nao erro.
 `219.98000000000002` na conferencia manual que originou este projeto, e a
 conversao para reais so acontece na exportacao.
 
+### Extracao automatica
+
+PDF com camada de texto tem data e valor preenchidos no proprio upload, e o
+texto original fica em `raw_text` para auditoria. Pagina sem texto util (cupom
+escaneado) fica marcada para a rota de imagem, que chega com o OCR.
+
+A busca do total e **ancorada em palavra-chave** (`VALOR TOTAL`, `Total a
+pagar`, ...). Pegar "o maior numero da pagina" acharia a chave de acesso, o
+CNPJ ou o telefone — todos maiores que qualquer refeicao.
+
+Nada e confirmado sozinho: a extracao troca digitar por conferir. A
+classificacao por categoria depende do cadastro de emitentes, que ainda nao
+existe.
+
 Confirmar um comprovante exige data, valor e categoria — a checagem considera o
 que ja esta gravado, nao so o que veio no corpo. Comprovante marcado como
 duplicata continua listado, mas fica **fora do somatorio**.

@@ -252,6 +252,27 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   registro ja gravado. Duplicata continua listada e **fora do somatorio**.
 - As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
 
+### Extracao
+
+`src/services/extraction/` — cascata: texto (M2) → QR (M3) → OCR (M4).
+
+- `normalize.js` devolve **`null`** quando nao reconhece a entrada. Nunca
+  `NaN`, nunca `0`: zero e um valor plausivel e passaria despercebido ate a
+  conferencia.
+- `extractTotal` e **ancorado em palavra-chave**. Nao volte a usar "o maior
+  numero da pagina": chave de acesso (44 digitos), CNPJ (14) e telefone (11)
+  sao todos maiores que qualquer refeicao.
+- **Nada e confirmado automaticamente.** A extracao troca digitar por
+  conferir, nao por deixar de olhar.
+- Categoria **nunca** e adivinhada por nome ou palavra-chave — vem do CNPJ do
+  emitente (M3).
+- Pagina sem texto util fica com `extraction_source` nulo e `needs_review`:
+  esse par e a fila da rota de imagem.
+- Os testes puros de extracao vivem em `tests/services/`. E excecao estreita a
+  regra de so integracao, e vale so para funcao pura: uma tabela de 48 casos de
+  parsing nao cabe em 48 PDFs. Leitura de PDF continua coberta por integracao —
+  o `unpdf` usa import dinamico, que a VM do Jest recusa sem flag.
+
 ## Garantias no banco
 
 O que precisa valer para **toda** escrita mora no banco, nao no model:
