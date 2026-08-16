@@ -163,9 +163,18 @@ A busca do total e **ancorada em palavra-chave** (`VALOR TOTAL`, `Total a
 pagar`, ...). Pegar "o maior numero da pagina" acharia a chave de acesso, o
 CNPJ ou o telefone — todos maiores que qualquer refeicao.
 
-Nada e confirmado sozinho: a extracao troca digitar por conferir. A
-classificacao por categoria depende do cadastro de emitentes, que ainda nao
-existe.
+Cupom com QR Code tem a **chave de acesso** lida do codigo — o dado mais
+confiavel que a extracao produz, porque o QR tem correcao de erro e a chave
+ainda passa pelo digito verificador mod-11. Sem QR legivel, a chave e buscada
+no texto impresso; em qualquer caso, chave que nao fecha o DV e descartada.
+
+A **categoria vem do CNPJ do emitente**, nunca do nome. Emitente conhecido
+aplica a sua categoria padrao; desconhecido e cadastrado como
+`nao_classificado` e o comprovante vai para revisao. Classificado o emitente
+uma vez, todo cupom seguinte daquele CNPJ ja entra classificado — e a
+ferramenta "aprendendo" por cadastro, sem nenhuma IA.
+
+Nada e confirmado sozinho: a extracao troca digitar por conferir.
 
 Confirmar um comprovante exige data, valor e categoria — a checagem considera o
 que ja esta gravado, nao so o que veio no corpo. Comprovante marcado como

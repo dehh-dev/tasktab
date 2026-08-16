@@ -1,8 +1,16 @@
 'use strict';
 
 const Receipt = require('../../models/receipt.model');
+const Merchant = require('../../models/merchant.model');
+const cnpjRules = require('../../validators/cnpj');
 const textService = require('./text.service');
 const parsers = require('./parsers');
+const accessKey = require('./access-key');
+const qrService = require('./qr.service');
+
+// Chave lida do QR e o dado mais confiavel que a extracao produz: o codigo tem
+// correcao de erro propria e a chave ainda passa pelo DV.
+const QR_CONFIDENCE = 0.99;
 
 /**
  * Roda a extracao sobre as paginas ja criadas de um arquivo.
@@ -33,7 +41,7 @@ async function processFile({ buffer, receipts, log }) {
     const page = byNumber.get(receipt.page_number);
 
     try {
-      await processPage(receipt, page);
+      await processPage(receipt, page, { buffer, log });
     } catch (error) {
       log?.warn(
         { err: error, receipt_id: receipt.id },
@@ -43,28 +51,124 @@ async function processFile({ buffer, receipts, log }) {
   }
 }
 
-async function processPage(receipt, page) {
-  // Sem camada de texto util a pagina fica para a rota de imagem (M4). O par
-  // `extraction_source IS NULL` com `status = 'needs_review'` e o marcador
+/**
+ * Chave de acesso da pagina: QR primeiro, texto impresso como reserva.
+ *
+ * O numero aparece nos dois lugares, mas o QR carrega correcao de erro, entao
+ * vale mais. Uma chave que nao fecha o DV e descartada nos dois casos — nao ha
+ * meio termo entre confiar e nao confiar num identificador com verificador.
+ */
+async function findAccessKey({ buffer, pageNumber, text, log }) {
+  try {
+    const fromQr = await qrService.readAccessKey(buffer, pageNumber);
+
+    if (fromQr) {
+      return { value: fromQr, source: 'qr', confidence: QR_CONFIDENCE };
+    }
+  } catch (error) {
+    // QR ilegivel nao e falha: a maioria das paginas nao tem QR nenhum.
+    log?.debug({ err: error, page: pageNumber }, 'nao foi possivel ler o QR');
+  }
+
+  const fromText = parsers.parse(text).fields.access_key;
+
+  if (fromText && accessKey.isValid(fromText.value)) {
+    return fromText;
+  }
+
+  return null;
+}
+
+async function processPage(receipt, page, { buffer, log }) {
+  const text = page?.useful ? page.text : null;
+
+  const key = await findAccessKey({
+    buffer,
+    pageNumber: receipt.page_number,
+    text: text ?? '',
+    log,
+  });
+
+  // Sem camada de texto util e sem QR, a pagina fica para a rota de imagem
+  // (M4). O par `extraction_source IS NULL` com `needs_review` e o marcador
   // dessa fila — enquanto o OCR nao existe, quem resolve e uma pessoa.
-  if (!page || !page.useful) {
+  if (!text && !key) {
     await Receipt.applyExtraction(receipt.id, { status: 'needs_review' });
     return;
   }
 
-  const { fields } = parsers.parse(page.text);
+  const { fields } = parsers.parse(text ?? '');
+
+  if (key) {
+    fields.access_key = key;
+    // O CNPJ da chave vale mais que o do texto: o cupom costuma trazer tambem
+    // o da credenciadora do cartao, e a chave e verificada pelo DV.
+    fields.cnpj = {
+      value: key.value.slice(6, 20),
+      source: key.source,
+      confidence: key.confidence,
+    };
+  }
+
+  const { merchant_id, category } = await classify(
+    fields.cnpj?.value,
+    parsers.merchantName(text ?? ''),
+  );
 
   await Receipt.applyExtraction(receipt.id, {
-    raw_text: page.text,
+    raw_text: text,
     // Nada e confirmado sozinho. O ganho da extracao e o humano deixar de
     // digitar e passar a conferir — nao deixar de olhar.
     status: 'needs_review',
-    extraction_source: 'text',
+    // O QR vale mais que o texto na hora de dizer de onde veio o dado.
+    extraction_source: key?.source === 'qr' ? 'qr' : 'text',
     issued_at: fields.issued_at?.value ?? null,
     amount_cents: fields.amount_cents?.value ?? null,
-    access_key: fields.access_key?.value ?? null,
+    access_key: key?.value ?? null,
+    merchant_id,
+    category,
     confidence: lowestConfidence(fields),
   });
+}
+
+/**
+ * Vincula o comprovante ao emitente e aplica a categoria padrao dele.
+ *
+ * E assim que a classificacao vira automatica **sem nenhuma IA**: a ferramenta
+ * aprende por cadastro. Confirmada a categoria de um cupom, todo cupom
+ * seguinte daquele CNPJ ja entra classificado — no caso-base, 7 dos 28
+ * lancamentos eram do mesmo emitente.
+ *
+ * Categoria **nunca** e adivinhada por nome ou palavra-chave. Sem CNPJ
+ * conhecido o comprovante vai para revisao, e e uma pessoa que decide. Chutar
+ * por nome acertaria a maioria e erraria em silencio a minoria — que e
+ * exatamente o tipo de erro que so aparece na conferencia.
+ */
+async function classify(cnpj, name) {
+  const normalized = cnpjRules.normalize(cnpj);
+
+  if (normalized === null || !cnpjRules.isValid(normalized)) {
+    return { merchant_id: null, category: null };
+  }
+
+  const merchant = await Merchant.findOrCreate({
+    cnpj: normalized,
+    name: name || `Emitente ${normalized}`,
+  });
+
+  if (!merchant) {
+    return { merchant_id: null, category: null };
+  }
+
+  return {
+    merchant_id: merchant.id,
+    // `nao_classificado` e a ausencia de decisao, nao uma categoria: gravar
+    // isso deixaria o comprovante parecendo classificado na listagem.
+    category:
+      merchant.default_category === 'nao_classificado'
+        ? null
+        : merchant.default_category,
+  };
 }
 
 /**

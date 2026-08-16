@@ -178,6 +178,26 @@ async function insertReceipt(reportId, overrides = {}) {
   return rows[0];
 }
 
+/** Insere um emitente direto no banco, sem passar pela API. */
+async function insertMerchant(overrides = {}) {
+  const merchant = {
+    cnpj: '26048802000165',
+    name: 'Franguinho na Panela',
+    default_category: 'nao_classificado',
+    city: null,
+    ...overrides,
+  };
+
+  const { rows } = await db.query(
+    `INSERT INTO merchants (cnpj, name, default_category, city)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, cnpj, name, default_category, city, updated_at`,
+    [merchant.cnpj, merchant.name, merchant.default_category, merchant.city],
+  );
+
+  return rows[0];
+}
+
 /**
  * Atualiza uma task direto no banco, sem passar pela API nem pelo model. Serve
  * para provar o que e garantia do banco: repare que `updated_at` nao aparece
@@ -266,6 +286,7 @@ module.exports = {
   insertTask,
   insertReport,
   insertReceipt,
+  insertMerchant,
   updateTaskTitleDirectly,
   findReceipts,
   request,

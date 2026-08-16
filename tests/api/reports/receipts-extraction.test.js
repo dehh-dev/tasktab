@@ -4,6 +4,7 @@ const { requestUpload, request, insertReport } = require('../../orchestrator');
 const {
   makePdf,
   makeReceiptPdf,
+  makeQrReceiptPdf,
   makeCorruptPdf,
 } = require('../../fixtures/pdf');
 
@@ -140,5 +141,83 @@ describe('extracao no upload', () => {
       .sort();
 
     expect(sources).toEqual([null, 'text', 'text']);
+  });
+});
+
+describe('chave de acesso', () => {
+  const CHAVE = '52260626048802000165650010001631601303284889';
+
+  it('le a chave do QR Code do cupom', async () => {
+    const report = await insertReport();
+
+    await upload(report.id, [
+      {
+        buffer: await makeQrReceiptPdf({ accessKey: CHAVE, total: '37,60' }),
+        filename: 'nfce.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    expect(receipt.access_key).toBe(CHAVE);
+    // O QR tem correcao de erro propria: vale mais que o texto impresso.
+    expect(receipt.extraction_source).toBe('qr');
+  });
+
+  it('cai para a chave impressa quando nao ha QR legivel', async () => {
+    const report = await insertReport();
+
+    await upload(report.id, [
+      {
+        buffer: await makeReceiptPdf({ extra: [`Chave de acesso ${CHAVE}`] }),
+        filename: 'sem-qr.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    expect(receipt.access_key).toBe(CHAVE);
+    expect(receipt.extraction_source).toBe('text');
+  });
+
+  it('descarta chave impressa que nao fecha o digito verificador', async () => {
+    const report = await insertReport();
+    const quebrada = `${CHAVE.slice(0, 43)}${(Number(CHAVE[43]) + 1) % 10}`;
+
+    await upload(report.id, [
+      {
+        buffer: await makeReceiptPdf({
+          extra: [`Chave de acesso ${quebrada}`],
+        }),
+        filename: 'chave-ruim.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    // Aceitar uma chave que a propria norma diz estar errada seria pior que
+    // nao ter chave: o vinculo com o emitente sairia errado.
+    expect(receipt.access_key).toBeNull();
+    expect(receipt.status).toBe('needs_review');
+  });
+
+  it('nao contamina a pagina seguinte com a chave da anterior', async () => {
+    const report = await insertReport();
+
+    await upload(report.id, [
+      {
+        buffer: await makeQrReceiptPdf({ accessKey: CHAVE }),
+        filename: 'a.pdf',
+      },
+      { buffer: await makeReceiptPdf(), filename: 'b.pdf' },
+    ]);
+
+    const chaves = (await listReceipts(report.id)).map(
+      (receipt) => receipt.access_key,
+    );
+
+    // Sem ordenar: `sort()` compara como texto e poria null depois da chave.
+    expect(chaves).toHaveLength(2);
+    expect(chaves).toEqual(expect.arrayContaining([null, CHAVE]));
   });
 });
