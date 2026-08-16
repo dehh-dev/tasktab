@@ -144,6 +144,9 @@ Base: `/api/reports` e `/api/receipts`
 | `GET`    | `/api/receipts/:id`                    | Detalhe                       |
 | `PATCH`  | `/api/receipts/:id`                    | Corrige campos na revisao     |
 | `DELETE` | `/api/receipts/:id`                    | Remove                        |
+| `GET`    | `/api/receipts/:id/image`              | Pagina do comprovante em PNG  |
+| `POST`   | `/api/receipts/:id/reprocess`          | Reenvia para a fila           |
+| `GET`    | `/api/reports/:id/validation`          | Alertas de conferencia        |
 | `GET`    | `/api/reports/:id/export.xlsx`         | Resumo proprio (Excel)        |
 | `GET`    | `/api/reports/:id/export/anexo-i.xlsx` | Anexo I oficial (Excel)       |
 | `GET`    | `/api/reports/:id/export.pdf`          | PDF consolidado               |
@@ -364,8 +367,18 @@ RATE_LIMIT_WRITE_MAX=5 npm start
 React 19 com Vite, sem router e sem biblioteca de estado — a tela e unica e o
 estado vive no `App`. O CSS e proprio, sem framework externo.
 
-- **Listagem** com filtro por status (Todas / Pendente / Em andamento /
-  Concluida) e contagem total vinda do `meta` da API.
+Duas abas dividem a interface: **Tarefas** e **Prestacao de Contas**
+(`TabNav.jsx`), no padrao WAI-ARIA de `tablist` com tabindex circulante — seta
+esquerda/direita move o foco **e** ja seleciona a aba (ativacao automatica),
+com retorno ao inicio/fim nas pontas. A aba inativa e **desmontada**, nao so
+escondida com `hidden`: as duas telas reusavam nomes de classe parecidos
+(`.task`), e manter as duas sempre no DOM vazava linha de uma aba para o
+contador de elementos da outra em teste E2E. Por isso tambem `ReportList` e
+`ReceiptList` usam `.list-item*`, e nao `.task*` — namespace proprio para nao
+repetir o problema.
+
+- **Listagem de tarefas** com filtro por status (Todas / Pendente / Em
+  andamento / Concluida) e contagem total vinda do `meta` da API.
 - **Formulario unico** para criar e editar, com contador de caracteres do
   titulo. Erros `422` do backend sao exibidos no campo correspondente,
   preservando o que foi digitado.
@@ -373,6 +386,36 @@ estado vive no `App`. O CSS e proprio, sem framework externo.
   o foco fica preso dentro dele, comeca no botao seguro (para que um `Enter`
   acidental nao delete nada) e volta ao botao que o abriu ao fechar. `Escape`
   e clique fora cancelam.
+
+### Prestacao de contas
+
+- **Lista de relatorios** com criacao (`ReportForm`) e abertura de detalhe.
+  Valor em reais digitado com separador de milhar (`1.500,00`) passa por
+  `parseMoneyToCents`, que remove o ponto antes de trocar a virgula — o parse
+  ingenuo (`replace(',', '.')` puro) virava `NaN` nesse caso e o adiantamento
+  entrava como `0` **sem erro nenhum**, silenciosamente.
+- **Upload de PDF** por clique ou arrastar-e-soltar (`ReceiptUpload`), sem
+  filtrar extensao no cliente: o servidor ja confere os magic bytes, filtrar
+  de novo so duplicaria a regra e esconderia a mensagem de erro especifica
+  que a API devolve.
+- **Fila de revisao** (`ReceiptReview`): imagem do comprovante pelo endpoint
+  proprio (`GET /api/receipts/:id/image`, mesma origem), com zoom por botao
+  ou roda do mouse, e formulario de data/valor/categoria ao lado. O badge de
+  origem/confianca e **um so por comprovante** — o pipeline grava a confianca
+  do campo mais fraco, nao uma por campo, entao nao ha dado para destacar um
+  campo especifico sem mudar o schema.
+  - Alertas de validacao e de duplicata aparecem no topo, com "Marcar como
+    duplicata" (so na regra `possivel_duplicata`) e "Dispensar" — dispensar e
+    **local**, nao persiste no servidor, so tira o alerta da vista naquela
+    sessao.
+  - Confirmar recarrega a fila e avanca para o proximo pendente **sem sair da
+    tela nem recarregar a pagina**; some a fila, a revisao fecha sozinha.
+  - Atalhos: `Escape` volta a lista, `Alt+seta` navega entre pendentes. Os
+    dois ficam num `addEventListener` no `document` (mesmo padrao do
+    `ConfirmDialog`), nao num `onKeyDown` de `div`: apos navegar para outro
+    comprovante o componente remonta (via `key={receipt.id}`, necessario para
+    nao vazar zoom e valores digitados de um comprovante para o proximo) e o
+    foco pode ficar fora da subarvore da div, calando o atalho em silencio.
 
 ### Paleta
 

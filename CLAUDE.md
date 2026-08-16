@@ -186,6 +186,17 @@ arquivo a sua propria copia de `process.env`.
   para uma `div` com `aria-modal`**: era uma promessa de isolamento que o
   browser nao cumpria. O `close()` roda em `useLayoutEffect`, porque uma
   limpeza tardia acontece com o no ja fora do DOM e o foco nao volta.
+- Atalho de teclado que precisa funcionar independente de onde o foco esta
+  (`ReceiptReview`: `Escape`, `Alt+seta`) vai em `document.addEventListener`
+  dentro de `useEffect`, nunca em `onKeyDown` de uma `div` nao-focavel — o
+  evento so borbulha ate a div se o foco estiver dentro da subarvore dela, e
+  apos uma remontagem (troca de `key`) o foco pode ficar fora sem aviso
+  nenhum, calando o atalho em silencio.
+- Componente que mostra "um item de cada vez" dentro de uma lista/fila
+  (`ReceiptReview` por `receipt.id`, `TaskForm` por `editing.id`) leva
+  `key={item.id}` no elemento pai. Sem isso o React reaproveita a mesma
+  instancia ao trocar de item, vazando estado local (zoom, valor digitado,
+  flag de imagem carregada) de um item para o proximo.
 
 ## Logs
 
