@@ -26,4 +26,29 @@ async function createTask(request, overrides = {}) {
   return data;
 }
 
-module.exports = { clearTasks, createTask };
+/** Remove todos os relatorios (e os comprovantes, via cascade). */
+async function clearReports(request) {
+  const response = await request.get('/api/reports?limit=100');
+  const { data } = await response.json();
+
+  for (const report of data) {
+    await request.delete(`/api/reports/${report.id}`);
+  }
+}
+
+/** Cria um relatorio e devolve o corpo devolvido pela API. */
+async function createReport(request, overrides = {}) {
+  const response = await request.post('/api/reports', {
+    data: {
+      title: 'Relatorio existente',
+      period_start: '2026-06-01',
+      period_end: '2026-06-30',
+      ...overrides,
+    },
+  });
+
+  const { data } = await response.json();
+  return data;
+}
+
+module.exports = { clearTasks, createTask, clearReports, createReport };
