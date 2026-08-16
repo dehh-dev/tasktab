@@ -183,6 +183,45 @@ async function request(method, pathname, body) {
   };
 }
 
+/**
+ * Envio multipart, para as rotas de upload. O `fetch` monta o boundary sozinho
+ * a partir do FormData — definir Content-Type na mao quebraria isso.
+ */
+async function requestUpload(pathname, files) {
+  const form = new FormData();
+
+  for (const { buffer, filename } of files) {
+    form.append(
+      'files',
+      new Blob([buffer], { type: 'application/pdf' }),
+      filename,
+    );
+  }
+
+  const response = await fetch(apiUrl(pathname), {
+    method: 'POST',
+    body: form,
+  });
+  const text = await response.text();
+
+  return {
+    status: response.status,
+    headers: response.headers,
+    body: text ? JSON.parse(text) : null,
+  };
+}
+
+/** Le os receipts de um relatorio direto do banco, na ordem de pagina. */
+async function findReceipts(reportId) {
+  const { rows } = await db.query(
+    `SELECT id, report_id, file_path, file_hash, page_number, status, raw_text
+     FROM receipts WHERE report_id = $1
+     ORDER BY file_hash, page_number`,
+    [reportId],
+  );
+  return rows;
+}
+
 module.exports = {
   apiUrl,
   waitForAllServices,
@@ -192,5 +231,7 @@ module.exports = {
   insertTask,
   insertReport,
   updateTaskTitleDirectly,
+  findReceipts,
   request,
+  requestUpload,
 };

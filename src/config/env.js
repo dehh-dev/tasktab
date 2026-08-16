@@ -35,6 +35,13 @@ module.exports = {
     // dezenas de escritas seguidas, feitas por uma pessoa so.
     batchWriteMax: Number(process.env.RATE_LIMIT_BATCH_WRITE_MAX || 600),
   },
+  upload: {
+    // Relativo a raiz do projeto quando nao absoluto. Em container e um volume:
+    // a imagem nao carrega arquivo de usuario.
+    dir: path.resolve(__dirname, '../..', process.env.UPLOAD_DIR || 'uploads'),
+    maxBytes: Number(process.env.UPLOAD_MAX_BYTES || 20 * 1024 * 1024),
+    maxFiles: Number(process.env.UPLOAD_MAX_FILES || 20),
+  },
   database: {
     host: required('DB_HOST'),
     port: Number(process.env.DB_PORT || 5432),
