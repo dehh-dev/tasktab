@@ -120,12 +120,10 @@ async function upload(req, res) {
 
   // 201 so quando algo novo entrou. Reenviar o mesmo arquivo e uma operacao
   // valida e idempotente, nao um erro.
-  res
-    .status(created.length > 0 ? 201 : 200)
-    .json({
-      data: created,
-      meta: { created: created.length, existing: existing.length },
-    });
+  res.status(created.length > 0 ? 201 : 200).json({
+    data: created,
+    meta: { created: created.length, existing: existing.length },
+  });
 }
 
 module.exports = { upload };
