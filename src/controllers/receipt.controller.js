@@ -7,6 +7,7 @@ const Receipt = require('../models/receipt.model');
 const Report = require('../models/report.model');
 const env = require('../config/env');
 const pdf = require('../services/pdf.service');
+const pipeline = require('../services/extraction/pipeline.service');
 const { NotFoundError, ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const receiptValidator = require('../validators/receipt.validator');
@@ -123,7 +124,12 @@ async function upload(req, res) {
       status,
     });
 
-    created.push(...rows);
+    // Um PDF que nem abriu nao tem camada de texto para ler.
+    if (status !== 'failed') {
+      await pipeline.processFile({ buffer, receipts: rows, log: req.log });
+    }
+
+    created.push(...(await Receipt.findByReportAndHash(reportId, hash)));
   }
 
   // 201 so quando algo novo entrou. Reenviar o mesmo arquivo e uma operacao

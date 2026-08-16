@@ -10,22 +10,55 @@ const { PDFDocument, StandardFonts } = require('pdf-lib');
  * estrutura — numero de paginas, camada de texto, arquivo ilegivel — e isso se
  * gera em memoria, sem pesar o repositorio.
  */
-async function makePdf({ pages = 1, text } = {}) {
+async function makePdf({ pages = 1, text, lines } = {}) {
   const document = await PDFDocument.create();
   const font = await document.embedFont(StandardFonts.Helvetica);
 
   for (let index = 0; index < pages; index += 1) {
     const page = document.addPage([300, 400]);
+    const content = lines ?? [text ?? `Pagina ${index + 1}`];
 
-    page.drawText(text || `Pagina ${index + 1}`, {
-      x: 20,
-      y: 350,
-      size: 12,
-      font,
+    // Uma linha por vez: um texto longo desenhado de uma vez so transborda a
+    // largura da pagina e some da camada de texto.
+    content.forEach((line, row) => {
+      page.drawText(String(line), {
+        x: 20,
+        y: 370 - row * 14,
+        size: 8,
+        font,
+      });
     });
   }
 
   return Buffer.from(await document.save());
+}
+
+/** Linhas de um cupom fiscal, no formato que a extracao vai encontrar. */
+function receiptLines({
+  name = 'MERCEARIA FRANGUINHO NA PANELA LTDA',
+  cnpj = '26.048.802/0001-65',
+  date = '19/06/2026',
+  total = '37,60',
+  extra = [],
+} = {}) {
+  return [
+    name,
+    `CNPJ ${cnpj}`,
+    'Rua das Flores, 120 - Centro - Abadiania/GO',
+    'CUPOM FISCAL ELETRONICO - NFC-e',
+    'Documento auxiliar da Nota Fiscal de Consumidor Eletronica',
+    `Emissao: ${date} 12:34:56`,
+    'ITEM 001 REFEICAO COMERCIAL 1 UN',
+    `VALOR TOTAL R$ ${total}`,
+    'FORMA DE PAGAMENTO: CARTAO DE CREDITO',
+    ...extra,
+  ];
+}
+
+/** PDF de um cupom com camada de texto, como os PDFs digitais reais. */
+function makeReceiptPdf(options = {}) {
+  const { pages, ...rest } = options;
+  return makePdf({ pages, lines: receiptLines(rest) });
 }
 
 /** Bytes que comecam com %PDF- mas nao formam um documento valido. */
@@ -35,7 +68,13 @@ function makeCorruptPdf() {
 
 /** Arquivo que nao e PDF nenhum, para o teste de magic bytes. */
 function makeNonPdf() {
-  return Buffer.from('PK isto parece um zip');
+  return Buffer.from('PK isto parece um zip');
 }
 
-module.exports = { makePdf, makeCorruptPdf, makeNonPdf };
+module.exports = {
+  makePdf,
+  makeReceiptPdf,
+  receiptLines,
+  makeCorruptPdf,
+  makeNonPdf,
+};
