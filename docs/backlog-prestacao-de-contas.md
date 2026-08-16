@@ -844,21 +844,32 @@ Podem entrar a qualquer momento depois do M1.
 
 `infra`
 
-- [ ] Seção da aba, no tom das existentes (explica o **porquê** das decisões,
+- [x] Seção da aba, no tom das existentes (explica o **porquê** das decisões,
       não só o que faz)
-- [ ] Novas variáveis de ambiente na tabela existente
-- [ ] Endpoints na tabela de endpoints
-- [ ] Registrar as três decisões que mais custam a redescobrir: cascata de
+- [x] Novas variáveis de ambiente na tabela existente — as quatro de `OCR_*` e
+      `LOG_LEVEL` faltavam
+- [x] Endpoints na tabela de endpoints — `/api/merchants` faltava inteiro
+- [x] Registrar as três decisões que mais custam a redescobrir: cascata de
       extração, dinheiro em centavos, remendo do XML no Anexo I
-- [ ] `CLAUDE.md` atualizado com o que for regra para quem escrever código novo
+- [x] `CLAUDE.md` atualizado com o que for regra para quem escrever código novo
 
 ## Issue 24 — Retenção e privacidade
 
 `infra`
 
-- [ ] Política de retenção dos arquivos enviados
-- [ ] Diretório de upload fora do versionamento (coberto pela #0, confirmar)
-- [ ] Decisão sobre anonimizar `raw_text` após confirmação
-- [ ] Conferir que `raw_text` não vai parar no log — os serializers do
-      `pino-http` são enxutos, mas log manual pode vazar CPF/CNPJ de terceiros
-- [ ] Registrar a decisão antes de qualquer deploy em produção
+- [x] Política de retenção dos arquivos enviados — o arquivo vive enquanto o
+      comprovante existir; sem TTL, para não destruir evidência ainda
+      questionável. Exclusão **contada por referência**
+      (`src/services/retention.service.js`), porque o nome do arquivo é o
+      SHA-256 e um PDF atende várias páginas e vários relatórios
+- [x] Diretório de upload fora do versionamento (coberto pela #0, confirmar) —
+      confirmado no `.gitignore` **e** no `.dockerignore`
+- [x] Decisão sobre anonimizar `raw_text` após confirmação — **não anonimizar**.
+      A regra de conferência que soma itens lê dele e confirmar é reversível:
+      anonimizar ali calaria a checagem nos comprovantes que vão assinados. A
+      proteção é o cerco: fora de `UPDATABLE_COLUMNS` e fora do log
+- [x] Conferir que `raw_text` não vai parar no log — os serializers do
+      `pino-http` são enxutos, mas log manual pode vazar CPF/CNPJ de terceiros.
+      Nenhuma chamada atual loga o campo; a regra ficou no `CLAUDE.md`
+- [x] Registrar a decisão antes de qualquer deploy em produção — seção
+      "Retencao e privacidade" no `README.md`
