@@ -88,3 +88,26 @@ export function formatMoney(cents) {
   const sign = cents < 0 ? '-' : '';
   return `${sign}R$ ${withThousands},${centavos}`;
 }
+
+/**
+ * '37,60' ou '37.60' para 3760 centavos. Devolve `null` para entrada vazia
+ * ou nao numerica — nunca `NaN`, para o campo poder distinguir "sem valor"
+ * de "valor invalido digitado".
+ */
+export function parseMoneyToCents(text) {
+  const trimmed = (text ?? '').trim();
+  if (trimmed === '') {
+    return null;
+  }
+  const normalized = trimmed.replace(/\./g, '').replace(',', '.');
+  const value = Number(normalized);
+  return Number.isFinite(value) ? Math.round(value * 100) : null;
+}
+
+/** Centavos para string de edicao em campo de texto, ex.: 3760 -> '37,60'. */
+export function centsToInputValue(cents) {
+  if (cents === null || cents === undefined) {
+    return '';
+  }
+  return (cents / 100).toFixed(2).replace('.', ',');
+}

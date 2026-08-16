@@ -5,15 +5,19 @@ import {
   receiptStatusLabel,
 } from '../constants';
 
-function ReceiptRow({ receipt }) {
+function ReceiptRow({ receipt, onOpen }) {
   const issuedAt = formatDate(receipt.issued_at);
 
   return (
     <li className="list-item">
       <div className="list-item__main">
-        <div className="list-item__title">
+        <button
+          type="button"
+          className="link-button"
+          onClick={() => onOpen(receipt.id)}
+        >
           {receipt.merchant_name || `Comprovante #${receipt.id}`}
-        </div>
+        </button>
         <div className="list-item__meta">
           <span className={`badge badge--${receipt.status}`}>
             {receiptStatusLabel(receipt.status)}
@@ -29,7 +33,7 @@ function ReceiptRow({ receipt }) {
   );
 }
 
-export default function ReceiptList({ receipts }) {
+export default function ReceiptList({ receipts, onOpen }) {
   if (receipts.length === 0) {
     return (
       <p className="state">
@@ -41,7 +45,7 @@ export default function ReceiptList({ receipts }) {
   return (
     <ul className="list">
       {receipts.map((receipt) => (
-        <ReceiptRow key={receipt.id} receipt={receipt} />
+        <ReceiptRow key={receipt.id} receipt={receipt} onOpen={onOpen} />
       ))}
     </ul>
   );

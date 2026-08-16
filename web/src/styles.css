@@ -487,6 +487,82 @@ textarea.field__input {
   font-weight: 600;
 }
 
+/* Aviso (severidade "aviso" da conferencia) segue a mesma logica do badge de
+   pendente: amarelo, nao laranja — laranja fica reservado para erro/perigo. */
+.alert[data-severity='aviso'] {
+  background: var(--attention-subtle);
+  border-color: var(--attention-muted);
+}
+
+.alert[data-severity='aviso'] .alert__title {
+  color: var(--attention-fg);
+}
+
+.alert__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.alerts .alert {
+  margin-bottom: 0;
+}
+
+/* ---------- revisao de comprovante ---------- */
+
+.review__grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr);
+}
+
+@media (max-width: 700px) {
+  .review__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.review__image-pane {
+  background: var(--canvas-inset);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.review__zoom-controls {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.review__image-scroll {
+  display: flex;
+  justify-content: center;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.review__image {
+  max-width: 100%;
+  transform-origin: top center;
+}
+
+.review__fields {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 0;
+}
+
 /* ---------- dialogo de confirmacao ---------- */
 
 /* O <dialog> em si so posiciona: o browser ja centraliza com margin auto.

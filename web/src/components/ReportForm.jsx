@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { parseMoneyToCents } from '../constants';
 
 const EMPTY = {
   title: '',
@@ -55,14 +56,14 @@ export default function ReportForm({
       return;
     }
 
-    const reais = values.advance_cents.trim().replace(',', '.');
-    const cents = reais ? Math.round(Number(reais) * 100) : 0;
-
     onSubmit({
       title: values.title.trim(),
       period_start: values.period_start,
       period_end: values.period_end,
-      advance_cents: Number.isFinite(cents) ? cents : 0,
+      // Entrada vazia ou invalida vira 0 aqui, e nao no parser: o parser
+      // devolve null para "nao sei o que e isto", e 0 e uma decisao de
+      // produto ("sem adiantamento informado"), nao a mesma coisa.
+      advance_cents: parseMoneyToCents(values.advance_cents) ?? 0,
     });
   }
 
