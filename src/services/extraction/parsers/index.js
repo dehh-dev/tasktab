@@ -47,4 +47,24 @@ function parse(text) {
   return { parser: parser.name, fields: { ...fields, ...parser.parse(text) } };
 }
 
-module.exports = { parse, resolve, PARSERS };
+/**
+ * Nome provavel do emitente: a primeira linha nao vazia do cupom.
+ *
+ * Serve apenas para dar um rotulo legivel ao emitente recem-cadastrado, e
+ * **nunca** para decidir categoria. Errar o nome custa uma edicao; errar a
+ * categoria por palavra-chave produz planilha errada em silencio.
+ */
+function merchantName(text) {
+  if (typeof text !== 'string') {
+    return null;
+  }
+
+  const first = text
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.length > 3);
+
+  return first ? first.slice(0, 255) : null;
+}
+
+module.exports = { parse, resolve, merchantName, PARSERS };

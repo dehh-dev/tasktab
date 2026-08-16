@@ -1,6 +1,8 @@
 'use strict';
 
 const Receipt = require('../../models/receipt.model');
+const Merchant = require('../../models/merchant.model');
+const cnpjRules = require('../../validators/cnpj');
 const textService = require('./text.service');
 const parsers = require('./parsers');
 const accessKey = require('./access-key');
@@ -99,7 +101,19 @@ async function processPage(receipt, page, { buffer, log }) {
 
   if (key) {
     fields.access_key = key;
+    // O CNPJ da chave vale mais que o do texto: o cupom costuma trazer tambem
+    // o da credenciadora do cartao, e a chave e verificada pelo DV.
+    fields.cnpj = {
+      value: key.value.slice(6, 20),
+      source: key.source,
+      confidence: key.confidence,
+    };
   }
+
+  const { merchant_id, category } = await classify(
+    fields.cnpj?.value,
+    parsers.merchantName(text ?? ''),
+  );
 
   await Receipt.applyExtraction(receipt.id, {
     raw_text: text,
@@ -111,8 +125,50 @@ async function processPage(receipt, page, { buffer, log }) {
     issued_at: fields.issued_at?.value ?? null,
     amount_cents: fields.amount_cents?.value ?? null,
     access_key: key?.value ?? null,
+    merchant_id,
+    category,
     confidence: lowestConfidence(fields),
   });
+}
+
+/**
+ * Vincula o comprovante ao emitente e aplica a categoria padrao dele.
+ *
+ * E assim que a classificacao vira automatica **sem nenhuma IA**: a ferramenta
+ * aprende por cadastro. Confirmada a categoria de um cupom, todo cupom
+ * seguinte daquele CNPJ ja entra classificado — no caso-base, 7 dos 28
+ * lancamentos eram do mesmo emitente.
+ *
+ * Categoria **nunca** e adivinhada por nome ou palavra-chave. Sem CNPJ
+ * conhecido o comprovante vai para revisao, e e uma pessoa que decide. Chutar
+ * por nome acertaria a maioria e erraria em silencio a minoria — que e
+ * exatamente o tipo de erro que so aparece na conferencia.
+ */
+async function classify(cnpj, name) {
+  const normalized = cnpjRules.normalize(cnpj);
+
+  if (normalized === null || !cnpjRules.isValid(normalized)) {
+    return { merchant_id: null, category: null };
+  }
+
+  const merchant = await Merchant.findOrCreate({
+    cnpj: normalized,
+    name: name || `Emitente ${normalized}`,
+  });
+
+  if (!merchant) {
+    return { merchant_id: null, category: null };
+  }
+
+  return {
+    merchant_id: merchant.id,
+    // `nao_classificado` e a ausencia de decisao, nao uma categoria: gravar
+    // isso deixaria o comprovante parecendo classificado na listagem.
+    category:
+      merchant.default_category === 'nao_classificado'
+        ? null
+        : merchant.default_category,
+  };
 }
 
 /**
