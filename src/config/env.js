@@ -31,6 +31,9 @@ module.exports = {
     max: Number(process.env.RATE_LIMIT_MAX || 600),
     // Escrita e o que interessa conter.
     writeMax: Number(process.env.RATE_LIMIT_WRITE_MAX || 100),
+    // Prestacao de contas trabalha em lote: um relatorio de 30 cupons sao
+    // dezenas de escritas seguidas, feitas por uma pessoa so.
+    batchWriteMax: Number(process.env.RATE_LIMIT_BATCH_WRITE_MAX || 600),
   },
   database: {
     host: required('DB_HOST'),

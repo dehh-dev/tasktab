@@ -2,6 +2,9 @@ node_modules/
 coverage/
 web/dist/
 
+# Arquivos enviados pelos usuarios
+uploads/
+
 # Playwright
 playwright-report/
 test-results/

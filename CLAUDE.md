@@ -214,9 +214,15 @@ devDependency. Aplicar migration e passo separado do pipeline.
 
 - **Nao afrouxe a CSP.** Front e back estao sempre na mesma origem; se algo
   quebrou sob `'self'`, o problema e o recurso externo, nao a politica.
+  Decisao ja tomada para a aba de prestacao de contas: a imagem do cupom e
+  servida por endpoint proprio, que cabe em `'self'` — **nao** liberar `blob:`
+  so para exibir preview gerado no cliente.
 - O limitador e desligado em teste de proposito — a suite trombaria em
   qualquer teto realista. Mudou algo nele? Confira manualmente com
   `RATE_LIMIT_WRITE_MAX=5 npm start`.
+- As rotas de prestacao de contas usam o `batchWriteLimiter`, com teto proprio:
+  revisar um lote de 30 cupons sao dezenas de escritas seguidas de uma pessoa
+  so, e o teto geral cortaria no meio do trabalho.
 
 ## Ambientes
 

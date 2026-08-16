@@ -38,4 +38,19 @@ function build({ max, skipRead = false }) {
 const readLimiter = build({ max: env.rateLimit.max });
 const writeLimiter = build({ max: env.rateLimit.writeMax, skipRead: true });
 
-module.exports = { readLimiter, writeLimiter, TooManyRequestsError };
+/**
+ * Teto proprio das rotas de prestacao de contas. Revisar um lote de 30 cupons
+ * sao 30 PATCH em poucos minutos, mais o upload — o teto geral de escrita
+ * cortaria o usuario no meio do trabalho.
+ */
+const batchWriteLimiter = build({
+  max: env.rateLimit.batchWriteMax,
+  skipRead: true,
+});
+
+module.exports = {
+  readLimiter,
+  writeLimiter,
+  batchWriteLimiter,
+  TooManyRequestsError,
+};

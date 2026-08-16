@@ -13,6 +13,13 @@ const SCOPES = [
   'validation',
   'lint',
   'deps',
+  // Aba de prestacao de contas
+  'reports',
+  'receipts',
+  'merchants',
+  'extracao',
+  'export',
+  'upload',
 ];
 
 module.exports = {
