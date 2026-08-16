@@ -19,6 +19,7 @@ router.get('/:id/validation', asyncHandler(controller.validate));
 
 router.get('/:id/export.xlsx', asyncHandler(controller.exportXlsx));
 router.get('/:id/export/anexo-i.xlsx', asyncHandler(controller.exportAnexoI));
+router.get('/:id/export.pdf', asyncHandler(controller.exportPdf));
 
 router.get('/', asyncHandler(controller.index));
 router.post('/', asyncHandler(controller.create));

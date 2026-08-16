@@ -7,6 +7,7 @@ const validator = require('../validators/report.validator');
 const validation = require('../services/validation');
 const xlsxResumo = require('../services/export/xlsx-resumo.service');
 const anexoI = require('../services/export/anexo-i.service');
+const pdfConsolidado = require('../services/export/pdf-consolidado.service');
 
 function reportNotFound(id) {
   return new NotFoundError({
@@ -134,6 +135,25 @@ async function exportAnexoI(req, res) {
     .send(buffer);
 }
 
+/** GET /api/reports/:id/export.pdf */
+async function exportPdf(req, res) {
+  const id = validator.validateId(req.params.id);
+  const report = await Report.findById(id);
+
+  if (!report) {
+    throw reportNotFound(id);
+  }
+
+  const receipts = await Receipt.findForExport(id);
+  const { bytes } = await pdfConsolidado.buildConsolidatedPdf(report, receipts);
+
+  res
+    .status(200)
+    .set('Content-Type', 'application/pdf')
+    .set('Content-Disposition', `attachment; filename="relatorio-${id}.pdf"`)
+    .send(Buffer.from(bytes));
+}
+
 module.exports = {
   index,
   show,
@@ -143,4 +163,5 @@ module.exports = {
   validate,
   exportXlsx,
   exportAnexoI,
+  exportPdf,
 };
