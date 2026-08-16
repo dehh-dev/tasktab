@@ -72,6 +72,7 @@
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "sharp": "^0.35.3",
+    "tesseract.js": "^7.0.0",
     "unpdf": "^1.8.1",
     "zxing-wasm": "^3.1.3"
   },

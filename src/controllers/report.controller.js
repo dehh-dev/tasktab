@@ -3,6 +3,7 @@
 const Report = require('../models/report.model');
 const { NotFoundError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
+const validation = require('../services/validation');
 
 function reportNotFound(id) {
   return new NotFoundError({
@@ -72,4 +73,16 @@ async function destroy(req, res) {
   res.status(204).send();
 }
 
-module.exports = { index, show, create, update, destroy };
+/** GET /api/reports/:id/validation */
+async function validate(req, res) {
+  const id = validator.validateId(req.params.id);
+  const result = await validation.validateReport(id);
+
+  if (!result) {
+    throw reportNotFound(id);
+  }
+
+  res.json({ data: result.alerts, meta: result.meta });
+}
+
+module.exports = { index, show, create, update, destroy, validate };

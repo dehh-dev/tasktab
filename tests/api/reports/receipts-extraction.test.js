@@ -1,6 +1,11 @@
 'use strict';
 
-const { requestUpload, request, insertReport } = require('../../orchestrator');
+const {
+  requestUpload,
+  request,
+  insertReport,
+  waitForProcessing,
+} = require('../../orchestrator');
 const {
   makePdf,
   makeReceiptPdf,
@@ -13,6 +18,8 @@ async function upload(reportId, files) {
 }
 
 async function listReceipts(reportId) {
+  // O upload responde 202: o conteudo so existe depois que a fila roda.
+  await waitForProcessing(reportId);
   const response = await request('GET', `/api/reports/${reportId}/receipts`);
   return response.body.data;
 }
@@ -52,7 +59,7 @@ describe('extracao no upload', () => {
     ).toBe(true);
   });
 
-  it('manda pagina sem texto util para a fila da rota de imagem', async () => {
+  it('desce para o OCR quando nao ha camada de texto util', async () => {
     const report = await insertReport();
 
     await upload(report.id, [
@@ -61,10 +68,9 @@ describe('extracao no upload', () => {
 
     const [receipt] = await listReceipts(report.id);
 
-    // `extraction_source` nulo com `needs_review` e o marcador dessa fila —
-    // e o que o OCR (M4) vai procurar.
-    expect(receipt.extraction_source).toBeNull();
-    expect(receipt.raw_text).toBeNull();
+    // Ate o M3 a pagina parava aqui com extraction_source nulo. Com o OCR no
+    // fim da cascata, ela passa a ser lida como imagem.
+    expect(receipt.extraction_source).toBe('ocr');
     expect(receipt.status).toBe('needs_review');
   });
 
@@ -120,10 +126,11 @@ describe('extracao no upload', () => {
       { buffer: await makeReceiptPdf({ total: '37,60' }), filename: 'a.pdf' },
     ]);
 
+    await waitForProcessing(report.id);
     const response = await request('GET', `/api/reports/${report.id}/receipts`);
 
-    // O valor ja esta na linha, mas sem categoria nao entra em subtotal
-    // nenhum — a classificacao chega no M3, por CNPJ do emitente.
+    // O valor ja esta na linha, mas o emitente ainda nao foi classificado,
+    // entao nao ha subtotal por categoria.
     expect(response.body.data[0].amount_cents).toBe(3760);
     expect(response.body.meta.by_category).toEqual({});
   });
@@ -140,7 +147,7 @@ describe('extracao no upload', () => {
       .map((receipt) => receipt.extraction_source)
       .sort();
 
-    expect(sources).toEqual([null, 'text', 'text']);
+    expect(sources).toEqual(['ocr', 'text', 'text']);
   });
 });
 

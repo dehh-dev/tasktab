@@ -42,6 +42,21 @@ module.exports = {
     maxBytes: Number(process.env.UPLOAD_MAX_BYTES || 20 * 1024 * 1024),
     maxFiles: Number(process.env.UPLOAD_MAX_FILES || 20),
   },
+  ocr: {
+    // Desligavel para quem so processa PDF digital e nao quer o custo do
+    // idioma nem do reconhecimento.
+    enabled: process.env.OCR_ENABLED !== 'false',
+    language: process.env.OCR_LANGUAGE || 'por',
+    // O tesseract baixa ~2,4 MB de dados de idioma na primeira execucao e
+    // guarda aqui. Fora do versionamento.
+    cachePath: path.resolve(
+      __dirname,
+      '../..',
+      process.env.OCR_CACHE_DIR || '.cache/tesseract',
+    ),
+    // Teto por pagina: uma imagem ruim nao pode travar o lote inteiro.
+    timeoutMs: Number(process.env.OCR_TIMEOUT_MS || 20000),
+  },
   database: {
     host: required('DB_HOST'),
     port: Number(process.env.DB_PORT || 5432),

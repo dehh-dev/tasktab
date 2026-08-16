@@ -80,6 +80,33 @@ function runPendingMigrations() {
   }
 }
 
+/**
+ * Espera a fila de extracao do servidor esvaziar.
+ *
+ * A fila vive no processo da API, nao no do Jest: sem esperar, o trabalho
+ * enfileirado por um teste continua rodando depois do TRUNCATE do proximo e
+ * reinsere emitentes no meio da execucao seguinte. Foi assim que apareceu.
+ */
+async function waitForQueue({ timeoutMs = 30000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const response = await fetch(apiUrl('/api/health')).catch(() => null);
+
+    if (response && response.status === 200) {
+      const { data } = await response.json();
+
+      if (!data.queue || data.queue.pending === 0) {
+        return;
+      }
+    }
+
+    await sleep(50);
+  }
+
+  throw new Error(`A fila de extracao nao esvaziou em ${timeoutMs}ms.`);
+}
+
 // CASCADE porque receipts referencia reports e merchants; sem ele o TRUNCATE
 // recusa a tabela que tem dependente.
 function clearDatabase() {
@@ -153,16 +180,20 @@ async function insertReceipt(reportId, overrides = {}) {
     amount_cents: null,
     category: null,
     status: 'pending',
+    access_key: null,
+    raw_text: null,
+    merchant_id: null,
     ...overrides,
   };
 
   const { rows } = await db.query(
     `INSERT INTO receipts
        (report_id, file_path, file_hash, page_number, issued_at, amount_cents,
-        category, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        category, status, access_key, raw_text, merchant_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING id, report_id, file_path, file_hash, page_number, issued_at,
-               amount_cents, category, status, extraction_source, updated_at`,
+               amount_cents, category, status, access_key, extraction_source,
+               updated_at`,
     [
       reportId,
       receipt.file_path,
@@ -172,6 +203,9 @@ async function insertReceipt(reportId, overrides = {}) {
       receipt.amount_cents,
       receipt.category,
       receipt.status,
+      receipt.access_key,
+      receipt.raw_text,
+      receipt.merchant_id,
     ],
   );
 
@@ -266,6 +300,34 @@ async function requestUpload(pathname, files) {
   };
 }
 
+/**
+ * Espera a fila de extracao terminar com as paginas do relatorio.
+ *
+ * O upload responde 202 e o processamento segue em segundo plano, entao todo
+ * teste que afirma algo sobre o conteudo extraido precisa passar por aqui.
+ */
+async function waitForProcessing(reportId, { timeoutMs = 30000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const { rows } = await db.query(
+      `SELECT COUNT(*)::int AS pendentes FROM receipts
+       WHERE report_id = $1 AND status IN ('pending', 'processing')`,
+      [reportId],
+    );
+
+    if (rows[0].pendentes === 0) {
+      return;
+    }
+
+    await sleep(50);
+  }
+
+  throw new Error(
+    `A extracao do relatorio ${reportId} nao terminou em ${timeoutMs}ms.`,
+  );
+}
+
 /** Le os receipts de um relatorio direto do banco, na ordem de pagina. */
 async function findReceipts(reportId) {
   const { rows } = await db.query(
@@ -289,6 +351,8 @@ module.exports = {
   insertMerchant,
   updateTaskTitleDirectly,
   findReceipts,
+  waitForProcessing,
+  waitForQueue,
   request,
   requestUpload,
 };

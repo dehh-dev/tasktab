@@ -5,6 +5,9 @@ web/dist/
 # Arquivos enviados pelos usuarios
 uploads/
 
+# Dados de idioma do tesseract
+.cache/
+
 # Playwright
 playwright-report/
 test-results/

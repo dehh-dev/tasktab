@@ -15,6 +15,7 @@ router.post(
 );
 
 router.get('/:id/receipts', asyncHandler(receiptController.index));
+router.get('/:id/validation', asyncHandler(controller.validate));
 
 router.get('/', asyncHandler(controller.index));
 router.post('/', asyncHandler(controller.create));

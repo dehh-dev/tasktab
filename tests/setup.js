@@ -9,5 +9,10 @@ const orchestrator = require('./orchestrator');
  *
  * O que e caro e roda uma vez so fica no `global-setup.js`.
  */
-beforeEach(orchestrator.clearDatabase);
+// Drenar antes de truncar: trabalho assincrono de um teste anterior escreveria
+// no banco ja limpo do teste seguinte.
+beforeEach(async () => {
+  await orchestrator.waitForQueue();
+  await orchestrator.clearDatabase();
+});
 afterAll(orchestrator.closeDatabase);

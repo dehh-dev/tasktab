@@ -2,6 +2,7 @@
 
 const db = require('../config/database');
 const { ServiceError } = require('../../infra/errors');
+const queue = require('../services/extraction/queue');
 
 /**
  * GET /api/health
@@ -25,7 +26,15 @@ async function show(req, res) {
     });
   }
 
-  res.json({ data: { status: 'ok', uptime: process.uptime() } });
+  res.json({
+    data: {
+      status: 'ok',
+      uptime: process.uptime(),
+      // Trabalho de extracao ainda na fila. Serve para diagnostico e para a
+      // suite saber quando o processamento terminou.
+      queue: { pending: queue.size() },
+    },
+  });
 }
 
 module.exports = { show };

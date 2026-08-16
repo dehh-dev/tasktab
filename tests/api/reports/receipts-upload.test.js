@@ -4,6 +4,7 @@ const {
   requestUpload,
   insertReport,
   findReceipts,
+  waitForProcessing,
 } = require('../../orchestrator');
 const { makePdf, makeCorruptPdf, makeNonPdf } = require('../../fixtures/pdf');
 
@@ -16,14 +17,17 @@ describe('POST /api/reports/:id/receipts', () => {
       { buffer, filename: 'cupons.pdf' },
     ]);
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
     expect(response.body.data).toHaveLength(3);
     expect(response.body.meta).toEqual({ created: 3, existing: 0 });
 
+    // As linhas ja existem; o conteudo delas ainda esta sendo lido.
+    expect(await findReceipts(report.id)).toHaveLength(3);
+
+    await waitForProcessing(report.id);
     const receipts = await findReceipts(report.id);
 
     expect(receipts.map((receipt) => receipt.page_number)).toEqual([1, 2, 3]);
-    // A extracao roda no proprio upload, entao a pagina ja sai de `pending`.
     expect(receipts.every((receipt) => receipt.status === 'needs_review')).toBe(
       true,
     );
@@ -43,7 +47,7 @@ describe('POST /api/reports/:id/receipts', () => {
       },
     ]);
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
     expect(response.body.data).toHaveLength(3);
   });
 
@@ -56,7 +60,7 @@ describe('POST /api/reports/:id/receipts', () => {
       `/api/reports/${report.id}/receipts`,
       files,
     );
-    expect(first.status).toBe(201);
+    expect(first.status).toBe(202);
 
     const second = await requestUpload(
       `/api/reports/${report.id}/receipts`,
@@ -81,7 +85,7 @@ describe('POST /api/reports/:id/receipts', () => {
       files,
     );
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
     expect(await findReceipts(outro.id)).toHaveLength(1);
   });
 
@@ -119,7 +123,7 @@ describe('POST /api/reports/:id/receipts', () => {
       { buffer: makeCorruptPdf(), filename: 'corrompido.pdf' },
     ]);
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
 
     const receipts = await findReceipts(report.id);
 
@@ -135,6 +139,8 @@ describe('POST /api/reports/:id/receipts', () => {
       { buffer: makeCorruptPdf(), filename: 'corrompido.pdf' },
       { buffer: await makePdf({ pages: 2 }), filename: 'bom.pdf' },
     ]);
+
+    await waitForProcessing(report.id);
 
     const receipts = await findReceipts(report.id);
     const status = receipts.map((receipt) => receipt.status).sort();
