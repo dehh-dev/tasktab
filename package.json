@@ -69,7 +69,8 @@
     "pdf-lib": "^1.17.1",
     "pg": "^8.13.1",
     "pino": "^10.3.1",
-    "pino-http": "^11.0.0"
+    "pino-http": "^11.0.0",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

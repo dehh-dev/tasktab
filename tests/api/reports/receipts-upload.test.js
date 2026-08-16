@@ -23,7 +23,8 @@ describe('POST /api/reports/:id/receipts', () => {
     const receipts = await findReceipts(report.id);
 
     expect(receipts.map((receipt) => receipt.page_number)).toEqual([1, 2, 3]);
-    expect(receipts.every((receipt) => receipt.status === 'pending')).toBe(
+    // A extracao roda no proprio upload, entao a pagina ja sai de `pending`.
+    expect(receipts.every((receipt) => receipt.status === 'needs_review')).toBe(
       true,
     );
   });
@@ -139,7 +140,7 @@ describe('POST /api/reports/:id/receipts', () => {
     const status = receipts.map((receipt) => receipt.status).sort();
 
     expect(receipts).toHaveLength(3);
-    expect(status).toEqual(['failed', 'pending', 'pending']);
+    expect(status).toEqual(['failed', 'needs_review', 'needs_review']);
   });
 
   it('retorna 404 para relatorio inexistente', async () => {

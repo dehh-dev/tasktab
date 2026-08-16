@@ -133,6 +133,49 @@ async function createPages({ reportId, filePath, fileHash, pages, status }) {
   return rows;
 }
 
+// Colunas que a extracao escreve. Separadas de UPDATABLE_COLUMNS de proposito:
+// aquela lista e a superficie que o cliente pode tocar na revisao, esta e a
+// que o pipeline preenche. Misturar as duas deixaria `raw_text` editavel por
+// PATCH, o que apagaria a trilha de auditoria.
+const EXTRACTION_COLUMNS = [
+  'raw_text',
+  'status',
+  'extraction_source',
+  'issued_at',
+  'amount_cents',
+  'category',
+  'access_key',
+  'confidence',
+  'merchant_id',
+];
+
+async function applyExtraction(id, data) {
+  const assignments = [];
+  const params = [];
+
+  for (const column of EXTRACTION_COLUMNS) {
+    if (Object.prototype.hasOwnProperty.call(data, column)) {
+      params.push(data[column]);
+      assignments.push(`${column} = $${params.length}`);
+    }
+  }
+
+  if (assignments.length === 0) {
+    return findById(id);
+  }
+
+  params.push(id);
+
+  const { rows } = await db.query(
+    `UPDATE receipts SET ${assignments.join(', ')}
+     WHERE id = $${params.length}
+     RETURNING ${COLUMNS}`,
+    params,
+  );
+
+  return rows[0] || null;
+}
+
 async function update(id, data) {
   const assignments = [];
   const params = [];
@@ -177,6 +220,7 @@ module.exports = {
   findById,
   findByReportAndHash,
   createPages,
+  applyExtraction,
   update,
   remove,
 };
