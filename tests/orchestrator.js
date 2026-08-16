@@ -1,6 +1,7 @@
 'use strict';
 
 const { execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const db = require('../src/config/database');
 const env = require('../src/config/env');
@@ -350,6 +351,14 @@ async function findReceipts(reportId) {
   return rows;
 }
 
+/**
+ * O PDF enviado e gravado com o proprio SHA-256 como nome. Olhar o disco e a
+ * unica forma de provar a retencao: a API nao expoe o diretorio de upload.
+ */
+function uploadedFileExists(fileHash) {
+  return fs.existsSync(path.join(env.upload.dir, `${fileHash}.pdf`));
+}
+
 module.exports = {
   apiUrl,
   waitForAllServices,
@@ -362,6 +371,7 @@ module.exports = {
   insertMerchant,
   updateTaskTitleDirectly,
   findReceipts,
+  uploadedFileExists,
   waitForProcessing,
   waitForQueue,
   request,

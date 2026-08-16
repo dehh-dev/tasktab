@@ -5,6 +5,7 @@ const Receipt = require('../models/receipt.model');
 const { NotFoundError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const validation = require('../services/validation');
+const retention = require('../services/retention.service');
 const xlsxResumo = require('../services/export/xlsx-resumo.service');
 const anexoI = require('../services/export/anexo-i.service');
 const pdfConsolidado = require('../services/export/pdf-consolidado.service');
@@ -68,11 +69,16 @@ async function update(req, res) {
 /** DELETE /api/reports/:id */
 async function destroy(req, res) {
   const id = validator.validateId(req.params.id);
+  // Levantar os arquivos antes: a cascata da FK leva os comprovantes junto e
+  // depois nao ha mais como saber o que estava anexado ao relatorio.
+  const files = await Receipt.findFilesByReport(id);
   const deleted = await Report.remove(id);
 
   if (!deleted) {
     throw reportNotFound(id);
   }
+
+  await retention.discardOrphans(files, req.log);
 
   res.status(204).send();
 }

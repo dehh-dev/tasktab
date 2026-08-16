@@ -9,6 +9,7 @@ const env = require('../config/env');
 const pdf = require('../services/pdf.service');
 const pipeline = require('../services/extraction/pipeline.service');
 const queue = require('../services/extraction/queue');
+const retention = require('../services/retention.service');
 const qrService = require('../services/extraction/qr.service');
 const { NotFoundError, ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
@@ -202,6 +203,10 @@ async function destroy(req, res) {
   if (!deleted) {
     throw receiptNotFound(id);
   }
+
+  // Apagar a linha sem apagar o PDF deixaria no disco um documento com CPF e
+  // CNPJ de terceiros que ninguem mais consegue alcancar pela API.
+  await retention.discardOrphans([deleted], req.log);
 
   res.status(204).send();
 }

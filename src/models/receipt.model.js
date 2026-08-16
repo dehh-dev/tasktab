@@ -226,12 +226,39 @@ async function update(id, data) {
   return rows[0] || null;
 }
 
+/**
+ * Arquivos referenciados por um relatorio, sem repetir: o PDF e gravado uma vez
+ * por hash e todas as paginas dele apontam para o mesmo nome.
+ *
+ * Levantar isso antes de apagar o relatorio e o que permite limpar o disco — a
+ * cascata da FK leva os comprovantes junto e depois nao ha mais como saber o
+ * que estava anexado.
+ */
+async function findFilesByReport(reportId) {
+  const { rows } = await db.query(
+    'SELECT DISTINCT file_hash, file_path FROM receipts WHERE report_id = $1',
+    [reportId],
+  );
+  return rows;
+}
+
+/** Quantas linhas ainda apontam para o arquivo — em qualquer relatorio. */
+async function countByHash(fileHash) {
+  const { rows } = await db.query(
+    'SELECT COUNT(*)::int AS total FROM receipts WHERE file_hash = $1',
+    [fileHash],
+  );
+  return rows[0].total;
+}
+
+// Devolve a linha, nao um booleano: quem chama precisa do arquivo que ela
+// referenciava para decidir se o PDF ainda tem dono no disco.
 async function remove(id) {
   const { rows } = await db.query(
-    'DELETE FROM receipts WHERE id = $1 RETURNING id',
+    'DELETE FROM receipts WHERE id = $1 RETURNING id, file_hash, file_path',
     [id],
   );
-  return rows.length > 0;
+  return rows[0] || null;
 }
 
 module.exports = {
@@ -242,6 +269,8 @@ module.exports = {
   findForExport,
   findById,
   findByReportAndHash,
+  findFilesByReport,
+  countByHash,
   createPages,
   applyExtraction,
   update,
