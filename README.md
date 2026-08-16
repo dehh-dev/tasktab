@@ -174,6 +174,26 @@ aplica a sua categoria padrao; desconhecido e cadastrado como
 uma vez, todo cupom seguinte daquele CNPJ ja entra classificado — e a
 ferramenta "aprendendo" por cadastro, sem nenhuma IA.
 
+Pagina **sem camada de texto** (cupom escaneado) desce para o **OCR**, o
+degrau mais caro e menos confiavel da cascata. Custo observado: cerca de
+0,2 a 0,5 s por pagina depois do primeiro reconhecimento, mais uns 400 ms na
+primeira execucao, que baixa 2,4 MB de dados de idioma para `OCR_CACHE_DIR`.
+
+**Recibo manuscrito fica de fora, por decisao consciente.** O Tesseract nao le
+caneta sobre formulario, e insistir nisso e onde este tipo de projeto costuma
+travar — esses vao direto para a fila manual.
+
+O upload responde **202**: as linhas ja existem, o conteudo delas ainda esta
+sendo lido por uma fila em processo. O `status` progride
+`pending → processing → needs_review | failed`, e `GET /api/health` informa
+quantas tarefas ainda faltam. Um comprovante preso pode ser reenviado para a
+fila com `POST /api/receipts/:id/reprocess`.
+
+A fila e **em processo** de proposito: sem servico novo, sem Redis. O gatilho
+para trocar por BullMQ e **uso concorrente** — hoje um segundo processo nao ve
+esta fila, e um reinicio perde o que estava na memoria. Como a unidade de
+trabalho ja e "uma pagina, um registro", a migracao e local.
+
 Nada e confirmado sozinho: a extracao troca digitar por conferir.
 
 Confirmar um comprovante exige data, valor e categoria — a checagem considera o

@@ -278,8 +278,15 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   confiar e nao confiar num identificador com verificador.
 - `nao_classificado` vira `NULL` no comprovante: e ausencia de decisao, nao
   categoria. Gravar o enum faria a linha parecer classificada nos subtotais.
-- Pagina sem texto util fica com `extraction_source` nulo e `needs_review`:
-  esse par e a fila da rota de imagem.
+- Cascata: **texto → QR → OCR**. Pagina sem camada de texto util desce para o
+  OCR; o que nem o OCR le fica em `needs_review` sem origem.
+- **Manuscrito fica de fora**, por decisao consciente: o Tesseract nao le
+  caneta sobre formulario.
+- O processamento e **assincrono**, numa fila em processo. Upload responde
+  `202`. Todo teste que afirme algo sobre conteudo extraido precisa passar por
+  `orchestrator.waitForProcessing`, e o `tests/setup.js` drena a fila antes de
+  truncar — sem isso, trabalho de um teste escreve no banco ja limpo do
+  seguinte. Aconteceu.
 - Os testes puros de extracao vivem em `tests/services/`. E excecao estreita a
   regra de so integracao, e vale so para funcao pura: uma tabela de 48 casos de
   parsing nao cabe em 48 PDFs. Leitura de PDF continua coberta por integracao —

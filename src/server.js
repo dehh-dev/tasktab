@@ -4,6 +4,7 @@ const app = require('./app');
 const env = require('./config/env');
 const db = require('./config/database');
 const { logger } = require('../infra/logger');
+const ocr = require('./services/extraction/ocr.service');
 
 const server = app.listen(env.port, () => {
   logger.info(
@@ -15,6 +16,8 @@ const server = app.listen(env.port, () => {
 function shutdown(signal) {
   logger.info({ signal }, 'encerrando');
   server.close(async () => {
+    // O worker do tesseract e um processo filho: sem encerrar, o node nao sai.
+    await ocr.shutdown();
     await db.close();
     process.exit(0);
   });

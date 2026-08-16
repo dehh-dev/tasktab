@@ -89,6 +89,74 @@ async function makeQrReceiptPdf({ accessKey, ...rest } = {}) {
   return Buffer.from(await document.save());
 }
 
+const SCAN_FONTS = ['DejaVu Sans', 'Liberation Sans', 'Noto Sans', 'Arial'];
+
+/**
+ * Cupom **sem camada de texto**, como um escaneado — a entrada da rota de OCR.
+ *
+ * O desenho vai direto no canvas, e nao rasterizando um PDF de texto: o pdf.js
+ * nao renderiza as fontes padrao nao-embutidas do PDF, e a pagina sairia so
+ * com os digitos. Descoberto olhando a imagem gerada, depois de o OCR "perder"
+ * todas as letras.
+ *
+ * A quantidade de tinta e conferida antes de devolver. Sem isso, um ambiente
+ * sem a fonte produziria uma pagina quase em branco e os testes de OCR
+ * passariam a nao afirmar nada — falha silenciosa, que e o que este projeto
+ * evita.
+ */
+async function makeScannedReceiptPdf(options = {}) {
+  const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
+  const sharp = require('sharp');
+
+  const available = GlobalFonts.families.map((entry) => entry.family);
+  const family = SCAN_FONTS.find((name) => available.includes(name));
+
+  if (!family) {
+    throw new Error(
+      `Nenhuma fonte utilizavel para a fixture escaneada. Procuradas: ${SCAN_FONTS.join(', ')}`,
+    );
+  }
+
+  const canvas = createCanvas(1000, 1300);
+  const context = canvas.getContext('2d');
+
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#111111';
+  context.font = `30px '${family}'`;
+
+  receiptLines(options).forEach((line, row) => {
+    context.fillText(String(line), 40, 90 + row * 70);
+  });
+
+  const png = canvas.toBuffer('image/png');
+
+  const { data } = await sharp(png)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const ink = data.reduce((total, tone) => total + (tone < 128 ? 1 : 0), 0);
+
+  if (ink < 2000) {
+    throw new Error(
+      `A fixture escaneada saiu quase em branco (${ink} pixels): a fonte "${family}" nao desenhou.`,
+    );
+  }
+
+  const document = await PDFDocument.create();
+  const page = document.addPage([300, 400]);
+
+  page.drawImage(await document.embedPng(png), {
+    x: 0,
+    y: 0,
+    width: 300,
+    height: 400,
+  });
+
+  return Buffer.from(await document.save());
+}
+
 /** Bytes que comecam com %PDF- mas nao formam um documento valido. */
 function makeCorruptPdf() {
   return Buffer.from('%PDF-1.7\nisto nao e um PDF de verdade\n%%EOF');
@@ -103,6 +171,7 @@ module.exports = {
   makePdf,
   makeReceiptPdf,
   makeQrReceiptPdf,
+  makeScannedReceiptPdf,
   receiptLines,
   makeCorruptPdf,
   makeNonPdf,

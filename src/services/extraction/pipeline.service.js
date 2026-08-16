@@ -7,6 +7,7 @@ const textService = require('./text.service');
 const parsers = require('./parsers');
 const accessKey = require('./access-key');
 const qrService = require('./qr.service');
+const ocrService = require('./ocr.service');
 
 // Chave lida do QR e o dado mais confiavel que a extracao produz: o codigo tem
 // correcao de erro propria e a chave ainda passa pelo DV.
@@ -15,24 +16,22 @@ const QR_CONFIDENCE = 0.99;
 /**
  * Roda a extracao sobre as paginas ja criadas de um arquivo.
  *
- * Hoje e chamado de dentro da requisicao de upload: ler a camada de texto de
- * um PDF digital custa milissegundos. Quando o OCR entrar (M4) isso muda de
- * figura e o processamento vai para segundo plano — a issue 13 trata disso, e
- * a unidade de trabalho ja e "uma pagina, um registro", entao a mudanca e
- * local.
+ * Chamado pela fila, fora do ciclo de request: com OCR uma pagina custa
+ * centenas de milissegundos, e 30 delas nao cabem numa resposta HTTP.
  *
  * Uma pagina que falha nao derruba as outras: o lote de 30 cupons e o caso de
  * uso, e perder o lote inteiro por causa de uma pagina seria pior que a
  * planilha manual que este projeto substitui.
  */
 async function processFile({ buffer, receipts, log }) {
-  let pages;
+  let pages = [];
 
   try {
     pages = await textService.extractPages(buffer);
   } catch (error) {
+    // Sem camada de texto legivel ainda resta o OCR: seguir com paginas vazias
+    // deixa cada uma cair na rota de imagem.
     log?.warn({ err: error }, 'falha ao ler a camada de texto do PDF');
-    return;
   }
 
   const byNumber = new Map(pages.map((page) => [page.pageNumber, page]));
@@ -41,12 +40,18 @@ async function processFile({ buffer, receipts, log }) {
     const page = byNumber.get(receipt.page_number);
 
     try {
+      await Receipt.applyExtraction(receipt.id, { status: 'processing' });
       await processPage(receipt, page, { buffer, log });
     } catch (error) {
       log?.warn(
         { err: error, receipt_id: receipt.id },
         'falha ao processar pagina',
       );
+
+      await Receipt.applyExtraction(receipt.id, {
+        status: 'failed',
+        raw_text: `Falha ao processar a pagina: ${error.message}`,
+      }).catch(() => {});
     }
   }
 }
@@ -80,7 +85,9 @@ async function findAccessKey({ buffer, pageNumber, text, log }) {
 }
 
 async function processPage(receipt, page, { buffer, log }) {
-  const text = page?.useful ? page.text : null;
+  let text = page?.useful ? page.text : null;
+  let source = text ? 'text' : null;
+  let ocrConfidence = null;
 
   const key = await findAccessKey({
     buffer,
@@ -89,9 +96,28 @@ async function processPage(receipt, page, { buffer, log }) {
     log,
   });
 
-  // Sem camada de texto util e sem QR, a pagina fica para a rota de imagem
-  // (M4). O par `extraction_source IS NULL` com `needs_review` e o marcador
-  // dessa fila — enquanto o OCR nao existe, quem resolve e uma pessoa.
+  // Ultimo degrau da cascata: sem camada de texto, tenta ler a imagem.
+  if (!text) {
+    const scanned = await ocrService
+      .readPage(buffer, receipt.page_number)
+      .catch((error) => {
+        log?.warn(
+          { err: error, receipt_id: receipt.id },
+          'OCR nao conseguiu ler a pagina',
+        );
+        return null;
+      });
+
+    if (scanned) {
+      text = scanned.text;
+      source = 'ocr';
+      ocrConfidence = scanned.confidence;
+    }
+  }
+
+  // Nem texto, nem QR, nem OCR: so uma pessoa resolve. Recibo manuscrito cai
+  // aqui de proposito — o Tesseract nao le caneta, e insistir nisso e onde
+  // este tipo de projeto costuma travar.
   if (!text && !key) {
     await Receipt.applyExtraction(receipt.id, { status: 'needs_review' });
     return;
@@ -117,17 +143,23 @@ async function processPage(receipt, page, { buffer, log }) {
 
   await Receipt.applyExtraction(receipt.id, {
     raw_text: text,
-    // Nada e confirmado sozinho. O ganho da extracao e o humano deixar de
-    // digitar e passar a conferir — nao deixar de olhar.
+    // Nada e confirmado sozinho, e o que veio de OCR menos ainda. O ganho da
+    // extracao e o humano deixar de digitar e passar a conferir.
     status: 'needs_review',
-    // O QR vale mais que o texto na hora de dizer de onde veio o dado.
-    extraction_source: key?.source === 'qr' ? 'qr' : 'text',
+    // O QR vale mais que o texto, que vale mais que o OCR.
+    extraction_source: key?.source === 'qr' ? 'qr' : (source ?? 'text'),
     issued_at: fields.issued_at?.value ?? null,
     amount_cents: fields.amount_cents?.value ?? null,
     access_key: key?.value ?? null,
     merchant_id,
     category,
-    confidence: lowestConfidence(fields),
+    // O OCR entra no calculo como mais um campo: se ele leu mal, a linha
+    // inteira merece atencao na revisao.
+    confidence: lowestConfidence(
+      ocrConfidence === null
+        ? fields
+        : { ...fields, ocr: { confidence: ocrConfidence } },
+    ),
   });
 }
 

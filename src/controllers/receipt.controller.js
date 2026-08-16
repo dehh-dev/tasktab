@@ -8,6 +8,7 @@ const Report = require('../models/report.model');
 const env = require('../config/env');
 const pdf = require('../services/pdf.service');
 const pipeline = require('../services/extraction/pipeline.service');
+const queue = require('../services/extraction/queue');
 const { NotFoundError, ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const receiptValidator = require('../validators/receipt.validator');
@@ -124,17 +125,21 @@ async function upload(req, res) {
       status,
     });
 
-    // Um PDF que nem abriu nao tem camada de texto para ler.
+    // Um PDF que nem abriu nao tem o que extrair. Os demais vao para a fila:
+    // com OCR, processar aqui deixaria a requisicao aberta por minutos.
     if (status !== 'failed') {
-      await pipeline.processFile({ buffer, receipts: rows, log: req.log });
+      queue.enqueue(`extracao:${hash.slice(0, 8)}`, () =>
+        pipeline.processFile({ buffer, receipts: rows, log: req.log }),
+      );
     }
 
-    created.push(...(await Receipt.findByReportAndHash(reportId, hash)));
+    created.push(...rows);
   }
 
-  // 201 so quando algo novo entrou. Reenviar o mesmo arquivo e uma operacao
-  // valida e idempotente, nao um erro.
-  res.status(created.length > 0 ? 201 : 200).json({
+  // 202: os registros existem, o conteudo deles ainda esta sendo lido. Quem
+  // acompanha o progresso faz polling na listagem, pelo `status`.
+  // Reenviar o mesmo arquivo e operacao valida e idempotente, nao um erro.
+  res.status(created.length > 0 ? 202 : 200).json({
     data: created,
     meta: { created: created.length, existing: existing.length },
   });
@@ -200,4 +205,40 @@ async function destroy(req, res) {
   res.status(204).send();
 }
 
-module.exports = { upload, index, show, update, destroy };
+/**
+ * POST /api/receipts/:id/reprocess
+ *
+ * Reenfileira uma pagina. Serve para o comprovante que ficou preso em
+ * `processing` — a fila vive na memoria do processo, entao um reinicio no meio
+ * do lote deixa registros nesse estado — e para tentar de novo depois de
+ * ajustar o cadastro do emitente.
+ */
+async function reprocess(req, res) {
+  const id = receiptValidator.validateId(req.params.id);
+  const receipt = await Receipt.findById(id);
+
+  if (!receipt) {
+    throw receiptNotFound(id);
+  }
+
+  const filePath = path.join(env.upload.dir, receipt.file_path);
+  const buffer = await fs.readFile(filePath).catch(() => null);
+
+  if (!buffer) {
+    throw new ValidationError({
+      message: 'O arquivo original nao esta mais disponivel.',
+      action: 'Envie o PDF novamente para reprocessar este comprovante.',
+      details: [{ field: 'file_path', message: 'arquivo ausente' }],
+    });
+  }
+
+  await Receipt.applyExtraction(id, { status: 'pending' });
+
+  queue.enqueue(`reprocesso:${id}`, () =>
+    pipeline.processFile({ buffer, receipts: [receipt], log: req.log }),
+  );
+
+  res.status(202).json({ data: await Receipt.findById(id) });
+}
+
+module.exports = { upload, index, show, update, destroy, reprocess };

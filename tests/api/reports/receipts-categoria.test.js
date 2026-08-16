@@ -5,6 +5,7 @@ const {
   request,
   insertReport,
   insertMerchant,
+  waitForProcessing,
 } = require('../../orchestrator');
 const { makeReceiptPdf, makeQrReceiptPdf } = require('../../fixtures/pdf');
 
@@ -16,6 +17,8 @@ async function upload(reportId, files) {
 }
 
 async function listReceipts(reportId) {
+  // O upload responde 202: o conteudo so existe depois que a fila roda.
+  await waitForProcessing(reportId);
   const response = await request('GET', `/api/reports/${reportId}/receipts`);
   return response.body.data;
 }
@@ -70,6 +73,9 @@ describe('categorizacao por emitente', () => {
         filename: 'a.pdf',
       },
     ]);
+
+    // O emitente so existe depois que a fila processa o primeiro cupom.
+    await waitForProcessing(report.id);
 
     // O humano classifica o emitente uma vez.
     const merchant = await request('GET', `/api/merchants/by-cnpj/${CNPJ}`);
