@@ -9,6 +9,7 @@ const env = require('../config/env');
 const pdf = require('../services/pdf.service');
 const pipeline = require('../services/extraction/pipeline.service');
 const queue = require('../services/extraction/queue');
+const qrService = require('../services/extraction/qr.service');
 const { NotFoundError, ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const receiptValidator = require('../validators/receipt.validator');
@@ -241,4 +242,58 @@ async function reprocess(req, res) {
   res.status(202).json({ data: await Receipt.findById(id) });
 }
 
-module.exports = { upload, index, show, update, destroy, reprocess };
+/**
+ * GET /api/receipts/:id/image
+ *
+ * Renderiza a pagina original como PNG, para a tela de revisao mostrar o
+ * cupom. Serve por endpoint proprio (mesma origem) de proposito: a CSP e
+ * `img-src 'self'`, e liberar `blob:` so para isto seria afrouxar a politica
+ * por conveniencia — decisao ja registrada desde a Issue 0.
+ *
+ * O ETag e o par (hash do arquivo, pagina): o conteudo nunca muda depois de
+ * gravado, entao o navegador para de pedir de novo a cada volta a tela.
+ */
+async function image(req, res) {
+  const id = receiptValidator.validateId(req.params.id);
+  const receipt = await Receipt.findById(id);
+
+  if (!receipt) {
+    throw receiptNotFound(id);
+  }
+
+  const etag = `"${receipt.file_hash}-${receipt.page_number}"`;
+
+  if (req.headers['if-none-match'] === etag) {
+    return res.status(304).end();
+  }
+
+  const filePath = path.join(env.upload.dir, receipt.file_path);
+  const buffer = await fs.readFile(filePath).catch(() => null);
+
+  if (!buffer) {
+    throw new ValidationError({
+      message: 'O arquivo original nao esta mais disponivel.',
+      action: 'Envie o PDF novamente para poder revisar este comprovante.',
+      details: [{ field: 'file_path', message: 'arquivo ausente' }],
+    });
+  }
+
+  const png = await qrService
+    .renderPageToPng(buffer, receipt.page_number)
+    .catch((error) => {
+      throw new ValidationError({
+        message: 'Nao foi possivel gerar a imagem deste comprovante.',
+        action: 'O PDF pode estar corrompido — tente reenviar o arquivo.',
+        details: [{ field: 'file_path', message: error.message }],
+      });
+    });
+
+  res
+    .status(200)
+    .set('Content-Type', 'image/png')
+    .set('Cache-Control', 'private, max-age=86400')
+    .set('ETag', etag)
+    .send(png);
+}
+
+module.exports = { upload, index, show, update, destroy, reprocess, image };
