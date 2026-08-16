@@ -214,9 +214,15 @@ devDependency. Aplicar migration e passo separado do pipeline.
 
 - **Nao afrouxe a CSP.** Front e back estao sempre na mesma origem; se algo
   quebrou sob `'self'`, o problema e o recurso externo, nao a politica.
+  Decisao ja tomada para a aba de prestacao de contas: a imagem do cupom e
+  servida por endpoint proprio, que cabe em `'self'` — **nao** liberar `blob:`
+  so para exibir preview gerado no cliente.
 - O limitador e desligado em teste de proposito — a suite trombaria em
   qualquer teto realista. Mudou algo nele? Confira manualmente com
   `RATE_LIMIT_WRITE_MAX=5 npm start`.
+- As rotas de prestacao de contas usam o `batchWriteLimiter`, com teto proprio:
+  revisar um lote de 30 cupons sao dezenas de escritas seguidas de uma pessoa
+  so, e o teto geral cortaria no meio do trabalho.
 
 ## Ambientes
 
@@ -228,6 +234,23 @@ producao basta injetar as reais pelo ambiente. Nao existe `env.production`.
 Dev usa `tasktab_development`; testes usam `tasktab_test`, criado pelo
 `docker/initdb/` apenas na **primeira** subida do volume — se o banco de teste
 sumir, e `npm run services:down -- -v` e subir de novo.
+
+## Prestacao de contas
+
+Segunda area do backend, em `reports` / `receipts` / `merchants`. O backlog
+completo esta em `docs/backlog-prestacao-de-contas.md`.
+
+- **Dinheiro e `integer` em centavos, sempre.** Nao introduza `numeric` nem
+  float: somar float produziu `219.98000000000002` no caso que originou o
+  projeto. Converter para reais e coisa da exportacao.
+- O upload confere **magic bytes** (`%PDF`), nao extensao, e grava o arquivo
+  com o proprio SHA-256 como nome. Reenviar o mesmo arquivo responde `200` com
+  o que ja existe — e operacao idempotente, nao erro de unique.
+- PDF ilegivel vira uma linha em `failed` com o motivo em `raw_text`. **Nao**
+  deixe um arquivo ruim derrubar o lote.
+- Confirmar exige `issued_at`, `amount_cents` e `category`, conferidos sobre o
+  registro ja gravado. Duplicata continua listada e **fora do somatorio**.
+- As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
 
 ## Garantias no banco
 

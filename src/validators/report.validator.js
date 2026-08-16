@@ -1,19 +1,19 @@
 'use strict';
 
 const { BadRequestError, ValidationError } = require('../../infra/errors');
-const { isBlank, isValidIsoDate } = require('./rules');
+const { isBlank, isValidIsoDate, isoDateNotAfter } = require('./rules');
 
 const BODY_NOT_OBJECT = {
   message: 'Corpo da requisicao deve ser um objeto JSON.',
-  action: 'Envie um objeto com os campos da tarefa.',
+  action: 'Envie um objeto com os campos do relatorio.',
 };
 
 const INVALID_ID = {
   message: 'id deve ser um inteiro positivo.',
-  action: 'Use o id numerico devolvido pela listagem de tarefas.',
+  action: 'Use o id numerico devolvido pela listagem de relatorios.',
 };
 
-const TASK_STATUSES = ['pending', 'in_progress', 'done'];
+const REPORT_STATUSES = ['open', 'closed'];
 const TITLE_MAX_LENGTH = 255;
 
 function validateTitle(value, errors) {
@@ -21,11 +21,14 @@ function validateTitle(value, errors) {
     errors.push({ field: 'title', message: 'title deve ser uma string' });
     return undefined;
   }
+
   const title = value.trim();
+
   if (title === '') {
     errors.push({ field: 'title', message: 'title e obrigatorio' });
     return undefined;
   }
+
   if (title.length > TITLE_MAX_LENGTH) {
     errors.push({
       field: 'title',
@@ -33,42 +36,43 @@ function validateTitle(value, errors) {
     });
     return undefined;
   }
+
   return title;
 }
 
-function validateDescription(value, errors) {
-  if (value === null || value === '') {
-    return null;
-  }
-  if (typeof value !== 'string') {
+function validateDate(field, value, errors) {
+  if (typeof value !== 'string' || !isValidIsoDate(value)) {
     errors.push({
-      field: 'description',
-      message: 'description deve ser uma string ou null',
-    });
-    return undefined;
-  }
-  return value.trim();
-}
-
-function validateStatus(value, errors) {
-  if (typeof value !== 'string' || !TASK_STATUSES.includes(value)) {
-    errors.push({
-      field: 'status',
-      message: `status deve ser um de: ${TASK_STATUSES.join(', ')}`,
+      field,
+      message: `${field} deve ser uma data valida no formato YYYY-MM-DD`,
     });
     return undefined;
   }
   return value;
 }
 
-function validateDueDate(value, errors) {
-  if (value === null || value === '') {
-    return null;
-  }
-  if (typeof value !== 'string' || !isValidIsoDate(value)) {
+function validateStatus(value, errors) {
+  if (typeof value !== 'string' || !REPORT_STATUSES.includes(value)) {
     errors.push({
-      field: 'due_date',
-      message: 'due_date deve ser uma data valida no formato YYYY-MM-DD',
+      field: 'status',
+      message: `status deve ser um de: ${REPORT_STATUSES.join(', ')}`,
+    });
+    return undefined;
+  }
+  return value;
+}
+
+/**
+ * Adiantamento entra em **centavos**, sempre inteiro. Aceitar reais aqui
+ * abriria a porta para float em dinheiro, que foi o que produziu
+ * 219.98000000000002 na conferencia manual que originou este projeto.
+ */
+function validateAdvanceCents(value, errors) {
+  if (!Number.isInteger(value) || value < 0) {
+    errors.push({
+      field: 'advance_cents',
+      message:
+        'advance_cents deve ser um inteiro de centavos maior ou igual a 0',
     });
     return undefined;
   }
@@ -78,6 +82,24 @@ function validateDueDate(value, errors) {
 function assertValid(errors) {
   if (errors.length > 0) {
     throw new ValidationError({ details: errors });
+  }
+}
+
+/**
+ * O periodo so faz sentido conferido em conjunto. Num update parcial o valor
+ * que falta vem do registro atual — sem isso um PATCH de uma data so cairia
+ * na constraint do banco e viraria 500 em vez de 422.
+ */
+function assertPeriodInOrder({ period_start, period_end }, errors) {
+  if (!period_start || !period_end) {
+    return;
+  }
+
+  if (!isoDateNotAfter(period_start, period_end)) {
+    errors.push({
+      field: 'period_end',
+      message: 'period_end deve ser maior ou igual a period_start',
+    });
   }
 }
 
@@ -95,23 +117,29 @@ function validateCreate(body) {
     data.title = validateTitle(body.title, errors);
   }
 
-  if (body.description !== undefined) {
-    data.description = validateDescription(body.description, errors);
+  for (const field of ['period_start', 'period_end']) {
+    if (isBlank(body[field])) {
+      errors.push({ field, message: `${field} e obrigatorio` });
+    } else {
+      data[field] = validateDate(field, body[field], errors);
+    }
+  }
+
+  if (body.advance_cents !== undefined) {
+    data.advance_cents = validateAdvanceCents(body.advance_cents, errors);
   }
 
   if (body.status !== undefined) {
     data.status = validateStatus(body.status, errors);
   }
 
-  if (body.due_date !== undefined) {
-    data.due_date = validateDueDate(body.due_date, errors);
-  }
-
+  assertPeriodInOrder(data, errors);
   assertValid(errors);
+
   return data;
 }
 
-function validateUpdate(body) {
+function validateUpdate(body, current = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new BadRequestError(BODY_NOT_OBJECT);
   }
@@ -123,17 +151,27 @@ function validateUpdate(body) {
     data.title = validateTitle(body.title, errors);
   }
 
-  if (body.description !== undefined) {
-    data.description = validateDescription(body.description, errors);
+  for (const field of ['period_start', 'period_end']) {
+    if (body[field] !== undefined) {
+      data[field] = validateDate(field, body[field], errors);
+    }
+  }
+
+  if (body.advance_cents !== undefined) {
+    data.advance_cents = validateAdvanceCents(body.advance_cents, errors);
   }
 
   if (body.status !== undefined) {
     data.status = validateStatus(body.status, errors);
   }
 
-  if (body.due_date !== undefined) {
-    data.due_date = validateDueDate(body.due_date, errors);
-  }
+  assertPeriodInOrder(
+    {
+      period_start: data.period_start ?? current.period_start,
+      period_end: data.period_end ?? current.period_end,
+    },
+    errors,
+  );
 
   assertValid(errors);
 
@@ -143,7 +181,8 @@ function validateUpdate(body) {
       details: [
         {
           field: 'body',
-          message: 'campos aceitos: title, description, status, due_date',
+          message:
+            'campos aceitos: title, period_start, period_end, advance_cents, status',
         },
       ],
     });
@@ -157,10 +196,13 @@ function validateId(rawId) {
   if (!/^\d+$/.test(String(rawId))) {
     throw new BadRequestError(INVALID_ID);
   }
+
   const id = Number(rawId);
+
   if (!Number.isSafeInteger(id) || id < 1) {
     throw new BadRequestError(INVALID_ID);
   }
+
   return id;
 }
 
@@ -202,7 +244,7 @@ function validateListQuery(query = {}) {
 }
 
 module.exports = {
-  TASK_STATUSES,
+  REPORT_STATUSES,
   TITLE_MAX_LENGTH,
   validateCreate,
   validateUpdate,

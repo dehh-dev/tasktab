@@ -1,0 +1,75 @@
+'use strict';
+
+const Report = require('../models/report.model');
+const { NotFoundError } = require('../../infra/errors');
+const validator = require('../validators/report.validator');
+
+function reportNotFound(id) {
+  return new NotFoundError({
+    message: `Report ${id} nao encontrado.`,
+    action: 'Verifique o id informado ou liste os relatorios disponiveis.',
+  });
+}
+
+/** GET /api/reports */
+async function index(req, res) {
+  const { status, limit, offset } = validator.validateListQuery(req.query);
+  const [data, total] = await Promise.all([
+    Report.findAll({ status, limit, offset }),
+    Report.count({ status }),
+  ]);
+
+  res.json({ data, meta: { total, limit, offset } });
+}
+
+/** GET /api/reports/:id */
+async function show(req, res) {
+  const id = validator.validateId(req.params.id);
+  const report = await Report.findById(id);
+
+  if (!report) {
+    throw reportNotFound(id);
+  }
+
+  res.json({ data: report });
+}
+
+/** POST /api/reports */
+async function create(req, res) {
+  const data = validator.validateCreate(req.body);
+  const report = await Report.create(data);
+
+  res.status(201).location(`/api/reports/${report.id}`).json({ data: report });
+}
+
+/** PATCH /api/reports/:id */
+async function update(req, res) {
+  const id = validator.validateId(req.params.id);
+
+  // O registro atual entra na validacao: o periodo so pode ser conferido em
+  // conjunto, e num update parcial metade dele vem do que ja esta gravado.
+  const current = await Report.findById(id);
+
+  if (!current) {
+    throw reportNotFound(id);
+  }
+
+  const data = validator.validateUpdate(req.body, current);
+  const report = await Report.update(id, data);
+
+  res.json({ data: report });
+}
+
+/** DELETE /api/reports/:id */
+async function destroy(req, res) {
+  const id = validator.validateId(req.params.id);
+  const deleted = await Report.remove(id);
+
+  if (!deleted) {
+    throw reportNotFound(id);
+  }
+
+  res.status(204).send();
+}
+
+module.exports = { index, show, create, update, destroy };

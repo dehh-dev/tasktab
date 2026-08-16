@@ -96,14 +96,18 @@ existencia do database, que e do que as migrations dependem. Ele respeita o
 em `process.env`, entao em producao basta injetar as variaveis reais pelo
 ambiente (nao existe `env.production` versionado).
 
-| Variavel                                              | Descricao                          |
-| ----------------------------------------------------- | ---------------------------------- |
-| `PORT`                                                | Porta HTTP                         |
-| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | Conexao usada pela aplicacao       |
-| `DATABASE_URL`                                        | Consumida pelo `node-pg-migrate`   |
-| `RATE_LIMIT_WINDOW_MS`                                | Janela do limitador (padrao 15min) |
-| `RATE_LIMIT_MAX`                                      | Teto de leitura (padrao 600)       |
-| `RATE_LIMIT_WRITE_MAX`                                | Teto de escrita (padrao 100)       |
+| Variavel                                              | Descricao                           |
+| ----------------------------------------------------- | ----------------------------------- |
+| `PORT`                                                | Porta HTTP                          |
+| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | Conexao usada pela aplicacao        |
+| `DATABASE_URL`                                        | Consumida pelo `node-pg-migrate`    |
+| `RATE_LIMIT_WINDOW_MS`                                | Janela do limitador (padrao 15min)  |
+| `RATE_LIMIT_MAX`                                      | Teto de leitura (padrao 600)        |
+| `RATE_LIMIT_WRITE_MAX`                                | Teto de escrita (padrao 100)        |
+| `RATE_LIMIT_BATCH_WRITE_MAX`                          | Teto das rotas em lote (padrao 600) |
+| `UPLOAD_DIR`                                          | Onde os PDFs sao gravados           |
+| `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo          |
+| `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao             |
 
 O `.npmrc` liga `engine-strict`: sem ele o campo `engines` seria so um aviso e a
 instalacao seguiria numa versao de Node incompativel.
@@ -122,6 +126,36 @@ Base: `/api/tasks`
 
 Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
 `offset` (padrao 0).
+
+### Prestacao de contas
+
+Base: `/api/reports` e `/api/receipts`
+
+| Metodo   | Rota                        | Descricao                     |
+| -------- | --------------------------- | ----------------------------- |
+| `GET`    | `/api/reports`              | Lista (filtro por `status`)   |
+| `POST`   | `/api/reports`              | Cria                          |
+| `GET`    | `/api/reports/:id`          | Detalhe                       |
+| `PATCH`  | `/api/reports/:id`          | Atualiza                      |
+| `DELETE` | `/api/reports/:id`          | Remove (leva os comprovantes) |
+| `POST`   | `/api/reports/:id/receipts` | Envia 1..N PDFs               |
+| `GET`    | `/api/reports/:id/receipts` | Lista comprovantes com totais |
+| `GET`    | `/api/receipts/:id`         | Detalhe                       |
+| `PATCH`  | `/api/receipts/:id`         | Corrige campos na revisao     |
+| `DELETE` | `/api/receipts/:id`         | Remove                        |
+
+O upload aceita multipart no campo `files`, confere os **magic bytes** (`%PDF`)
+em vez da extensao, e separa o arquivo em uma linha por pagina. O arquivo e
+gravado com o proprio SHA-256 como nome, entao o mesmo PDF ocupa um lugar so no
+disco; reenviar responde `200` com o que ja existe, e nao erro.
+
+**Dinheiro e sempre inteiro em centavos.** Somar float produziu
+`219.98000000000002` na conferencia manual que originou este projeto, e a
+conversao para reais so acontece na exportacao.
+
+Confirmar um comprovante exige data, valor e categoria — a checagem considera o
+que ja esta gravado, nao so o que veio no corpo. Comprovante marcado como
+duplicata continua listado, mas fica **fora do somatorio**.
 
 `GET /api/health` consulta o banco de verdade: devolve `200` com
 `{ "data": { "status": "ok", "uptime": ... } }` quando o Postgres responde e

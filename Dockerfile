@@ -33,6 +33,10 @@ COPY package.json ./
 COPY src ./src
 COPY infra ./infra
 
+# Templates de exportacao (Anexo I). O diretorio precisa existir no contexto,
+# senao o COPY falha o build inteiro.
+COPY assets ./assets
+
 # Sem Vite em producao: o Express serve este build na mesma origem da API.
 COPY --from=build /app/web/dist ./web/dist
 

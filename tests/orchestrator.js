@@ -80,8 +80,12 @@ function runPendingMigrations() {
   }
 }
 
+// CASCADE porque receipts referencia reports e merchants; sem ele o TRUNCATE
+// recusa a tabela que tem dependente.
 function clearDatabase() {
-  return db.query('TRUNCATE TABLE tasks RESTART IDENTITY');
+  return db.query(
+    'TRUNCATE TABLE tasks, receipts, reports, merchants RESTART IDENTITY CASCADE',
+  );
 }
 
 function closeDatabase() {
@@ -106,6 +110,69 @@ async function insertTask(overrides = {}) {
      VALUES ($1, $2, $3, $4)
      RETURNING id, title, description, status, due_date, created_at, updated_at`,
     [task.title, task.description, task.status, task.due_date],
+  );
+
+  return rows[0];
+}
+
+/** Insere um relatorio direto no banco, sem passar pela API. */
+async function insertReport(overrides = {}) {
+  const report = {
+    title: 'Viagem de teste',
+    period_start: '2026-06-01',
+    period_end: '2026-06-30',
+    advance_cents: 0,
+    status: 'open',
+    ...overrides,
+  };
+
+  const { rows } = await db.query(
+    `INSERT INTO reports (title, period_start, period_end, advance_cents, status)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, title, period_start, period_end, advance_cents, status,
+               created_at, updated_at`,
+    [
+      report.title,
+      report.period_start,
+      report.period_end,
+      report.advance_cents,
+      report.status,
+    ],
+  );
+
+  return rows[0];
+}
+
+/** Insere um comprovante direto no banco, sem passar pela API. */
+async function insertReceipt(reportId, overrides = {}) {
+  const receipt = {
+    file_path: 'fixture.pdf',
+    file_hash: 'a'.repeat(64),
+    page_number: 1,
+    issued_at: null,
+    amount_cents: null,
+    category: null,
+    status: 'pending',
+    ...overrides,
+  };
+
+  const { rows } = await db.query(
+    `INSERT INTO receipts
+       (report_id, file_path, file_hash, page_number, issued_at, amount_cents,
+        category, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, report_id, file_path, file_hash, page_number, issued_at,
+               amount_cents, category, status, extraction_source, updated_at`,
+    [
+      reportId,
+      receipt.file_path,
+      receipt.file_hash,
+      receipt.page_number,
+      receipt.issued_at,
+      receipt.amount_cents,
+      receipt.category,
+      receipt.status,
+    ],
   );
 
   return rows[0];
@@ -151,6 +218,45 @@ async function request(method, pathname, body) {
   };
 }
 
+/**
+ * Envio multipart, para as rotas de upload. O `fetch` monta o boundary sozinho
+ * a partir do FormData — definir Content-Type na mao quebraria isso.
+ */
+async function requestUpload(pathname, files) {
+  const form = new FormData();
+
+  for (const { buffer, filename } of files) {
+    form.append(
+      'files',
+      new Blob([buffer], { type: 'application/pdf' }),
+      filename,
+    );
+  }
+
+  const response = await fetch(apiUrl(pathname), {
+    method: 'POST',
+    body: form,
+  });
+  const text = await response.text();
+
+  return {
+    status: response.status,
+    headers: response.headers,
+    body: text ? JSON.parse(text) : null,
+  };
+}
+
+/** Le os receipts de um relatorio direto do banco, na ordem de pagina. */
+async function findReceipts(reportId) {
+  const { rows } = await db.query(
+    `SELECT id, report_id, file_path, file_hash, page_number, status, raw_text
+     FROM receipts WHERE report_id = $1
+     ORDER BY file_hash, page_number`,
+    [reportId],
+  );
+  return rows;
+}
+
 module.exports = {
   apiUrl,
   waitForAllServices,
@@ -158,6 +264,10 @@ module.exports = {
   clearDatabase,
   closeDatabase,
   insertTask,
+  insertReport,
+  insertReceipt,
   updateTaskTitleDirectly,
+  findReceipts,
   request,
+  requestUpload,
 };
