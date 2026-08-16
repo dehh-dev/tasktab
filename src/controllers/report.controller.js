@@ -6,6 +6,7 @@ const { NotFoundError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const validation = require('../services/validation');
 const xlsxResumo = require('../services/export/xlsx-resumo.service');
+const anexoI = require('../services/export/anexo-i.service');
 
 function reportNotFound(id) {
   return new NotFoundError({
@@ -111,6 +112,28 @@ async function exportXlsx(req, res) {
   res.end();
 }
 
+/** GET /api/reports/:id/export/anexo-i.xlsx */
+async function exportAnexoI(req, res) {
+  const id = validator.validateId(req.params.id);
+  const report = await Report.findById(id);
+
+  if (!report) {
+    throw reportNotFound(id);
+  }
+
+  const receipts = await Receipt.findForExport(id);
+  const buffer = await anexoI.fillAnexoI(report, receipts);
+
+  res
+    .status(200)
+    .set(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    .set('Content-Disposition', `attachment; filename="anexo-i-${id}.xlsx"`)
+    .send(buffer);
+}
+
 module.exports = {
   index,
   show,
@@ -119,4 +142,5 @@ module.exports = {
   destroy,
   validate,
   exportXlsx,
+  exportAnexoI,
 };
