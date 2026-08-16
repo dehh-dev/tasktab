@@ -270,7 +270,14 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - **Nada e confirmado automaticamente.** A extracao troca digitar por
   conferir, nao por deixar de olhar.
 - Categoria **nunca** e adivinhada por nome ou palavra-chave — vem do CNPJ do
-  emitente (M3).
+  emitente cadastrado. Ha teste com um cupom de "RESTAURANTE E LANCHONETE"
+  que continua sem categoria, justamente para travar essa tentacao.
+- O CNPJ confiavel e o das posicoes 7 a 20 da **chave de acesso**, nao o do
+  texto: o cupom traz tambem o da credenciadora do cartao.
+- Chave que nao fecha o DV mod-11 e **descartada**. Nao ha meio termo entre
+  confiar e nao confiar num identificador com verificador.
+- `nao_classificado` vira `NULL` no comprovante: e ausencia de decisao, nao
+  categoria. Gravar o enum faria a linha parecer classificada nos subtotais.
 - Pagina sem texto util fica com `extraction_source` nulo e `needs_review`:
   esse par e a fila da rota de imagem.
 - Os testes puros de extracao vivem em `tests/services/`. E excecao estreita a
