@@ -20,23 +20,23 @@ export default function App() {
 
       <TabNav tabs={TABS} active={tab} onChange={setTab} />
 
-      <div
-        id="panel-tasks"
-        role="tabpanel"
-        aria-labelledby="tab-tasks"
-        hidden={tab !== 'tasks'}
-      >
-        <TasksApp />
-      </div>
+      {
+        // Desmontado, nao so escondido: os dois dominios usam listas com o
+        // mesmo tipo de marcacao, e manter os dois no DOM ao mesmo tempo (so
+        // com `hidden`) deixava locators estruturais de um teste contarem
+        // elementos que vazaram do outro dominio. Aconteceu de verdade.
+      }
+      {tab === 'tasks' && (
+        <div id="panel-tasks" role="tabpanel" aria-labelledby="tab-tasks">
+          <TasksApp />
+        </div>
+      )}
 
-      <div
-        id="panel-expenses"
-        role="tabpanel"
-        aria-labelledby="tab-expenses"
-        hidden={tab !== 'expenses'}
-      >
-        <ExpensesApp />
-      </div>
+      {tab === 'expenses' && (
+        <div id="panel-expenses" role="tabpanel" aria-labelledby="tab-expenses">
+          <ExpensesApp />
+        </div>
+      )}
     </div>
   );
 }

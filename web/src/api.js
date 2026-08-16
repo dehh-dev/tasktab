@@ -1,4 +1,6 @@
-const BASE_URL = '/api/tasks';
+const TASKS_URL = '/api/tasks';
+const REPORTS_URL = '/api/reports';
+const RECEIPTS_URL = '/api/receipts';
 
 /**
  * Erro de API que preserva os detalhes por campo devolvidos pelo backend
@@ -26,11 +28,15 @@ export class ApiError extends Error {
 async function request(url, options = {}) {
   let response;
 
+  // FormData (upload multipart) precisa que o browser defina o Content-Type
+  // sozinho, com o boundary — um header manual quebraria o corpo.
+  const headers =
+    options.body instanceof FormData
+      ? options.headers
+      : { 'Content-Type': 'application/json', ...options.headers };
+
   try {
-    response = await fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
-    });
+    response = await fetch(url, { ...options, headers });
   } catch {
     throw new ApiError('Nao foi possivel falar com o servidor.', {
       action: 'Verifique sua conexao e se a API esta no ar.',
@@ -61,20 +67,79 @@ export function listTasks({ status } = {}) {
     params.set('status', status);
   }
   const query = params.toString();
-  return request(query ? `${BASE_URL}?${query}` : BASE_URL);
+  return request(query ? `${TASKS_URL}?${query}` : TASKS_URL);
 }
 
 export function createTask(data) {
-  return request(BASE_URL, { method: 'POST', body: JSON.stringify(data) });
+  return request(TASKS_URL, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export function updateTask(id, data) {
-  return request(`${BASE_URL}/${id}`, {
+  return request(`${TASKS_URL}/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
 }
 
 export function deleteTask(id) {
-  return request(`${BASE_URL}/${id}`, { method: 'DELETE' });
+  return request(`${TASKS_URL}/${id}`, { method: 'DELETE' });
+}
+
+// ---------- prestacao de contas ----------
+
+export function listReports() {
+  return request(REPORTS_URL);
+}
+
+export function createReport(data) {
+  return request(REPORTS_URL, { method: 'POST', body: JSON.stringify(data) });
+}
+
+export function getReport(id) {
+  return request(`${REPORTS_URL}/${id}`);
+}
+
+export function getValidation(reportId) {
+  return request(`${REPORTS_URL}/${reportId}/validation`);
+}
+
+export function listReceipts(reportId, { status, category } = {}) {
+  const params = new URLSearchParams();
+  if (status) {
+    params.set('status', status);
+  }
+  if (category) {
+    params.set('category', category);
+  }
+  const query = params.toString();
+  const base = `${REPORTS_URL}/${reportId}/receipts`;
+  return request(query ? `${base}?${query}` : base);
+}
+
+/** Envia 1..N PDFs. `files` e uma FileList ou array de File. */
+export function uploadReceipts(reportId, files) {
+  const form = new FormData();
+  for (const file of files) {
+    form.append('files', file);
+  }
+  return request(`${REPORTS_URL}/${reportId}/receipts`, {
+    method: 'POST',
+    body: form,
+  });
+}
+
+export function updateReceipt(id, data) {
+  return request(`${RECEIPTS_URL}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function reprocessReceipt(id) {
+  return request(`${RECEIPTS_URL}/${id}/reprocess`, { method: 'POST' });
+}
+
+/** URL da imagem renderizada do comprovante — usada direto num <img src>. */
+export function receiptImageUrl(id) {
+  return `${RECEIPTS_URL}/${id}/image`;
 }
