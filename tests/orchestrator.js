@@ -180,16 +180,20 @@ async function insertReceipt(reportId, overrides = {}) {
     amount_cents: null,
     category: null,
     status: 'pending',
+    access_key: null,
+    raw_text: null,
+    merchant_id: null,
     ...overrides,
   };
 
   const { rows } = await db.query(
     `INSERT INTO receipts
        (report_id, file_path, file_hash, page_number, issued_at, amount_cents,
-        category, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        category, status, access_key, raw_text, merchant_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING id, report_id, file_path, file_hash, page_number, issued_at,
-               amount_cents, category, status, extraction_source, updated_at`,
+               amount_cents, category, status, access_key, extraction_source,
+               updated_at`,
     [
       reportId,
       receipt.file_path,
@@ -199,6 +203,9 @@ async function insertReceipt(reportId, overrides = {}) {
       receipt.amount_cents,
       receipt.category,
       receipt.status,
+      receipt.access_key,
+      receipt.raw_text,
+      receipt.merchant_id,
     ],
   );
 

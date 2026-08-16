@@ -8,6 +8,7 @@ const parsers = require('./parsers');
 const accessKey = require('./access-key');
 const qrService = require('./qr.service');
 const ocrService = require('./ocr.service');
+const dedup = require('../dedup.service');
 
 // Chave lida do QR e o dado mais confiavel que a extracao produz: o codigo tem
 // correcao de erro propria e a chave ainda passa pelo DV.
@@ -161,6 +162,19 @@ async function processPage(receipt, page, { buffer, log }) {
         : { ...fields, ocr: { confidence: ocrConfidence } },
     ),
   });
+
+  // So o que e provadamente o mesmo documento colapsa sozinho. Suspeita vira
+  // alerta na revisao, nunca exclusao silenciosa.
+  const original = await dedup.collapseExact(
+    await Receipt.findById(receipt.id),
+  );
+
+  if (original) {
+    log?.info(
+      { receipt_id: receipt.id, duplicate_of_id: original },
+      'comprovante marcado como duplicata pela chave de acesso',
+    );
+  }
 }
 
 /**
