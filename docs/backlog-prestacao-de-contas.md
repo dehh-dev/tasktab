@@ -968,21 +968,21 @@ barras, a roda do mouse e o teclado coerentes de graça.
 
 **Critérios de aceite**
 
-- [ ] `transform-origin: top left`, com a evidência acima registrada em
+- [x] `transform-origin: top left`, com a evidência acima registrada em
       comentário — é a razão de não voltar para `center`
-- [ ] Arrastar com o botão esquerdo dentro da imagem move a visualização na
+- [x] Arrastar com o botão esquerdo dentro da imagem move a visualização na
       direção do gesto (pegar e puxar o papel, não mover uma câmera)
-- [ ] Ponteiro indica o estado: `grab` quando há o que arrastar, `grabbing`
+- [x] Ponteiro indica o estado: `grab` quando há o que arrastar, `grabbing`
       durante o gesto, padrão quando a imagem cabe inteira
-- [ ] Usa Pointer Events com `setPointerCapture`: soltar o botão fora do painel
+- [x] Usa Pointer Events com `setPointerCapture`: soltar o botão fora do painel
       — ou fora da janela — não pode deixar o arrasto grudado
-- [ ] O arrasto nativo de imagem do browser (`dragstart`) é suprimido; sem isso
+- [x] O arrasto nativo de imagem do browser (`dragstart`) é suprimido; sem isso
       o gesto vira um "arrastar arquivo" com imagem fantasma
-- [ ] Clique sem movimento não é tratado como arrasto e não seleciona texto
-- [ ] Zoom, roda do mouse e o botão "Redefinir" continuam como estão
-- [ ] O container é focável e rolável por teclado — quem não usa mouse também
+- [x] Clique sem movimento não é tratado como arrasto e não seleciona texto
+- [x] Zoom, roda do mouse e o botão "Redefinir" continuam como estão
+- [x] O container é focável e rolável por teclado — quem não usa mouse também
       precisa alcançar o cupom ampliado
-- [ ] Specs E2E: o recorte à esquerda deixa de existir a 300%, e um arrasto
+- [x] Specs E2E: o recorte à esquerda deixa de existir a 300%, e um arrasto
       altera `scrollLeft` na direção certa
 
 **Fora de escopo**

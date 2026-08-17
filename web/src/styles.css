@@ -551,6 +551,18 @@ textarea.field__input {
   overflow: auto;
 }
 
+/* O ponteiro so promete o arrasto quando ha o que arrastar: com o cupom
+   cabendo inteiro, uma mao aberta convidaria a um gesto que nao faz nada. */
+.review__image-scroll--pannable {
+  cursor: grab;
+}
+
+.review__image-scroll--dragging {
+  cursor: grabbing;
+  /* Sem isto o arrasto vira selecao de texto no meio do caminho. */
+  user-select: none;
+}
+
 /* transform-origin `top left`, nunca `center`: a regiao de overflow rolavel de
    um container so se estende para a direita e para baixo. Escalando a partir do
    centro a imagem cresce para os dois lados, e o que passa da borda esquerda
