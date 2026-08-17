@@ -401,7 +401,8 @@ textarea.field__input {
   margin-top: 6px;
 }
 
-.task__actions {
+.task__actions,
+.list-item__actions {
   display: flex;
   gap: 8px;
 }
@@ -550,9 +551,28 @@ textarea.field__input {
   overflow: auto;
 }
 
+/* O ponteiro so promete o arrasto quando ha o que arrastar: com o cupom
+   cabendo inteiro, uma mao aberta convidaria a um gesto que nao faz nada. */
+.review__image-scroll--pannable {
+  cursor: grab;
+}
+
+.review__image-scroll--dragging {
+  cursor: grabbing;
+  /* Sem isto o arrasto vira selecao de texto no meio do caminho. */
+  user-select: none;
+}
+
+/* transform-origin `top left`, nunca `center`: a regiao de overflow rolavel de
+   um container so se estende para a direita e para baixo. Escalando a partir do
+   centro a imagem cresce para os dois lados, e o que passa da borda esquerda
+   fica fora do alcance de qualquer barra de rolagem. Medido a 300% num painel
+   de 396px: imagem de 1188px, scrollWidth de 792px e scrollLeft no maximo 396 —
+   o terco esquerdo do cupom, onde ficam a descricao dos itens e o CNPJ, era
+   impossivel de ver. Ha spec E2E do caso. */
 .review__image {
   max-width: 100%;
-  transform-origin: top center;
+  transform-origin: top left;
 }
 
 .review__fields {

@@ -135,6 +135,10 @@ export function updateReceipt(id, data) {
   });
 }
 
+export function deleteReceipt(id) {
+  return request(`${RECEIPTS_URL}/${id}`, { method: 'DELETE' });
+}
+
 export function reprocessReceipt(id) {
   return request(`${RECEIPTS_URL}/${id}/reprocess`, { method: 'POST' });
 }

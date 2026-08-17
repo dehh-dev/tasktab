@@ -5,7 +5,7 @@ import {
   receiptStatusLabel,
 } from '../constants';
 
-function ReceiptRow({ receipt, onOpen }) {
+function ReceiptRow({ receipt, onOpen, onDelete, busy }) {
   const issuedAt = formatDate(receipt.issued_at);
 
   return (
@@ -29,11 +29,22 @@ function ReceiptRow({ receipt, onOpen }) {
           )}
         </div>
       </div>
+
+      <div className="list-item__actions">
+        <button
+          type="button"
+          className="btn btn--sm btn--danger"
+          onClick={() => onDelete(receipt)}
+          disabled={busy}
+        >
+          Deletar
+        </button>
+      </div>
     </li>
   );
 }
 
-export default function ReceiptList({ receipts, onOpen }) {
+export default function ReceiptList({ receipts, onOpen, onDelete, busy }) {
   if (receipts.length === 0) {
     return (
       <p className="state">
@@ -45,7 +56,13 @@ export default function ReceiptList({ receipts, onOpen }) {
   return (
     <ul className="list">
       {receipts.map((receipt) => (
-        <ReceiptRow key={receipt.id} receipt={receipt} onOpen={onOpen} />
+        <ReceiptRow
+          key={receipt.id}
+          receipt={receipt}
+          onOpen={onOpen}
+          onDelete={onDelete}
+          busy={busy}
+        />
       ))}
     </ul>
   );

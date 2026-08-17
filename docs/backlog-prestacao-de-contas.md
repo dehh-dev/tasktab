@@ -873,3 +873,120 @@ Podem entrar a qualquer momento depois do M1.
       Nenhuma chamada atual loga o campo; a regra ficou no `CLAUDE.md`
 - [x] Registrar a decisão antes de qualquer deploy em produção — seção
       "Retencao e privacidade" no `README.md`
+
+---
+
+## Issue 27 — Remover um comprovante pela interface
+
+`area:web` · depende de #20 e #21
+
+Hoje a única saída para um comprovante que não deveria estar no relatório é
+apagar o relatório inteiro. Página em branco no fim do PDF, cupom de outra
+viagem, arquivo escaneado torto que nem o OCR leu — todos ficam na lista, e
+`needs_review` que ninguém consegue resolver trava a fila de revisão: o
+contador "3 de 12 pendentes" nunca chega ao fim.
+
+**O backend já resolve isso.** `DELETE /api/receipts/:id` existe desde a #5,
+responde `204`, devolve `404` para id inexistente e apaga o PDF do disco pela
+contagem de referência da #24 (`src/services/retention.service.js`). Está
+coberto por `tests/api/receipts/delete.test.js` e documentado no README. Esta
+issue **não toca no backend** — é só a afordância que falta.
+
+**Escopo**
+
+Botão "Deletar" na linha da lista (`ReceiptList`) e na barra da tela de revisão
+(`ReceiptReview`), os dois passando pelo `ConfirmDialog` já existente. A
+exclusão é definitiva e leva o PDF junto quando nenhuma outra página o
+referencia — o diálogo tem que deixar isso claro.
+
+**Critérios de aceite**
+
+- [x] `web/src/api.js` ganha `deleteReceipt(id)`, espelhando `deleteTask`
+- [x] Cada linha de `ReceiptList` tem "Deletar" (`btn btn--sm btn--danger`), sem
+      empurrar o `link-button` que abre a revisão
+- [x] A barra da `ReceiptReview` também tem a ação: a decisão de descartar
+      costuma ser tomada olhando a imagem, não a lista
+- [x] Reaproveita o `ConfirmDialog` (`<dialog>` nativo, foco preso, foco inicial
+      no Cancelar) — nada de `window.confirm`, nada de div nova
+- [x] O `target` do diálogo identifica o comprovante: nome do emitente ou
+      `Comprovante #id`, com valor e data quando houver
+- [x] O estado do diálogo mora na `ReportDetail`, uma instância só, e ela é
+      renderizada tanto no ramo da lista quanto no ramo da revisão
+- [x] Deletar o comprovante em revisão fecha a revisão e volta à lista; se ainda
+      houver pendentes, segue para o próximo (mesmo `handleAction`)
+- [x] Após a exclusão, `load()` atualiza lista, total e subtotais do
+      `ReceiptSummary` — nada de remover só do estado local
+- [x] Erro exibe `message` e `action`, no mesmo alerta que a tela já usa
+- [x] Nenhum status é bloqueado: `confirmed`, `duplicate` e `failed` também
+      podem ser removidos. Relatório `closed` também — a regra de fechamento não
+      existe no backend e inventá-la só na UI seria promessa vazia
+- [x] Specs E2E: excluir pela lista (some da lista e do total), cancelar (nada
+      muda), e excluir pelo ramo de revisão
+
+**Fora de escopo**
+
+Desfazer / lixeira, exclusão em lote e bloqueio por relatório fechado. Cada um é
+uma issue própria; a lixeira, em particular, brigaria com a política de retenção
+da #24 (o arquivo morre junto com a linha).
+
+---
+
+## Issue 28 — Arrastar a imagem do comprovante para navegar
+
+`area:web` · depende de #21
+
+Com zoom, a única forma de andar pelo cupom é a barra de rolagem. Numa tela em
+que a pessoa alterna imagem e formulário dezenas de vezes por lote, mirar uma
+barra de 8px é atrito puro — o gesto natural é agarrar o documento e puxar,
+como em qualquer visualizador de PDF.
+
+**A investigação achou um defeito mais grave que a ergonomia.** `.review__image`
+usa `transform-origin: top center` dentro de um flex com `justify-content:
+center`. A imagem escalada cresce para os dois lados, mas a região de overflow
+rolável só se estende para direita/baixo — o que transborda à esquerda fica
+fora do alcance de qualquer barra. Medido no navegador, cupom a 300% num painel
+de 396px:
+
+|                                 | `top center` (atual) | `top left` |
+| ------------------------------- | -------------------- | ---------- |
+| Largura renderizada             | 1188px               | 1188px     |
+| `scrollWidth`                   | 792px                | 1188px     |
+| Faixa de `scrollLeft`           | 0–396                | 0–792      |
+| Recorte inalcançável à esquerda | **396px (33%)**      | 0px        |
+
+Ou seja: hoje **o terço esquerdo do cupom não pode ser visto a 300%**, e é onde
+ficam a descrição dos itens e o CNPJ. Trocar a origem para `top left` resolve, e
+é pré-requisito do arrasto — sem isso o gesto esbarraria num limite de rolagem
+que não corresponde à imagem.
+
+**Escopo**
+
+Arrasto com o botão esquerdo dentro da imagem move a visualização, via
+`scrollLeft`/`scrollTop` do `.review__image-scroll`. Nada de reimplementar
+rolagem com `transform`: o container já rola, e mexer no `scrollLeft` mantém as
+barras, a roda do mouse e o teclado coerentes de graça.
+
+**Critérios de aceite**
+
+- [x] `transform-origin: top left`, com a evidência acima registrada em
+      comentário — é a razão de não voltar para `center`
+- [x] Arrastar com o botão esquerdo dentro da imagem move a visualização na
+      direção do gesto (pegar e puxar o papel, não mover uma câmera)
+- [x] Ponteiro indica o estado: `grab` quando há o que arrastar, `grabbing`
+      durante o gesto, padrão quando a imagem cabe inteira
+- [x] Usa Pointer Events com `setPointerCapture`: soltar o botão fora do painel
+      — ou fora da janela — não pode deixar o arrasto grudado
+- [x] O arrasto nativo de imagem do browser (`dragstart`) é suprimido; sem isso
+      o gesto vira um "arrastar arquivo" com imagem fantasma
+- [x] Clique sem movimento não é tratado como arrasto e não seleciona texto
+- [x] Zoom, roda do mouse e o botão "Redefinir" continuam como estão
+- [x] O container é focável e rolável por teclado — quem não usa mouse também
+      precisa alcançar o cupom ampliado
+- [x] Specs E2E: o recorte à esquerda deixa de existir a 300%, e um arrasto
+      altera `scrollLeft` na direção certa
+
+**Fora de escopo**
+
+Zoom ancorado no cursor (hoje a roda amplia a partir da origem, não do ponto
+sob o mouse), arrasto com botão do meio e gestos de pinça em touch. São
+melhorias independentes, e nenhuma é bloqueada por esta.

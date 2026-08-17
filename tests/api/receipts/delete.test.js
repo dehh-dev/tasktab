@@ -23,6 +23,31 @@ describe('DELETE /api/receipts/:id', () => {
     expect(lookup.status).toBe(404);
   });
 
+  it('tira o comprovante confirmado do somatorio do relatorio', async () => {
+    const report = await insertReport();
+    await insertReceipt(report.id, {
+      status: 'confirmed',
+      amount_cents: 1000,
+      category: 'alimentacao',
+      issued_at: '2026-06-10',
+    });
+    const descartado = await insertReceipt(report.id, {
+      page_number: 2,
+      status: 'confirmed',
+      amount_cents: 2500,
+      category: 'alimentacao',
+      issued_at: '2026-06-11',
+    });
+
+    await request('DELETE', `/api/receipts/${descartado.id}`);
+
+    const { body } = await request('GET', `/api/reports/${report.id}/receipts`);
+
+    // A linha some do total, e nao so da listagem: o resumo da tela le daqui.
+    expect(body.meta.total).toBe(1);
+    expect(body.meta.total_cents).toBe(1000);
+  });
+
   it('retorna 404 ao deletar id inexistente', async () => {
     const response = await request('DELETE', '/api/receipts/999999');
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as api from '../api';
 import { ApiError } from '../api';
 import {
@@ -56,6 +56,7 @@ export default function ReceiptReview({
   onNavigate,
   onBack,
   onAction,
+  onDelete,
 }) {
   const [values, setValues] = useState({
     issued_at: receipt.issued_at ?? '',
@@ -70,6 +71,14 @@ export default function ReceiptReview({
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [dismissed, setDismissed] = useState(() => new Set());
+
+  const scrollRef = useRef(null);
+  // Os dados do gesto em curso ficam num ref, nao em estado: eles mudam a cada
+  // pixel de movimento e nada na tela depende deles diretamente — re-renderizar
+  // por causa disso derrubaria o arrasto para um engasgo.
+  const dragRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [pannable, setPannable] = useState(false);
 
   const errors = { ...serverErrors, ...localErrors };
   const visibleAlerts = alerts.filter(
@@ -166,6 +175,14 @@ export default function ReceiptReview({
   // padrao ja usado pelo ConfirmDialog.
   useEffect(() => {
     function handleKeyDown(event) {
+      // Com o ConfirmDialog aberto os atalhos sao dele. O keydown do Escape
+      // borbulha ate o document antes de o <dialog> disparar `cancel`, entao
+      // sem esta guarda um Escape cancelaria a exclusao e ainda fecharia a
+      // revisao junto, jogando a pessoa na lista sem ela ter pedido.
+      if (document.querySelector('dialog[open]')) {
+        return;
+      }
+
       if (event.key === 'Escape') {
         onBack();
         return;
@@ -190,6 +207,82 @@ export default function ReceiptReview({
       const next = current + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP);
       return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
     });
+  }
+
+  // O cupom cabe inteiro? Entao nao ha o que arrastar, e o ponteiro nao deve
+  // prometer que ha. Medido depois do layout, porque depende do zoom e das
+  // dimensoes reais da imagem — que so existem depois que ela carrega.
+  useLayoutEffect(() => {
+    const box = scrollRef.current;
+
+    if (!box) {
+      return;
+    }
+
+    setPannable(
+      box.scrollWidth > box.clientWidth || box.scrollHeight > box.clientHeight,
+    );
+  }, [zoom, imageLoaded]);
+
+  /**
+   * Arrastar para navegar pelo cupom ampliado. Mexe no `scrollLeft`/`scrollTop`
+   * do proprio container em vez de reimplementar rolagem com `transform`: assim
+   * as barras, a roda do mouse e o teclado continuam falando da mesma posicao,
+   * sem um segundo sistema de coordenadas para manter em sincronia.
+   */
+  function handlePointerDown(event) {
+    const box = scrollRef.current;
+
+    // So o botao esquerdo. O do meio e o direito tem significado proprio no
+    // navegador, e sequestra-los surpreenderia mais do que ajudaria.
+    if (event.button !== 0 || !box || !pannable) {
+      return;
+    }
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      scrollLeft: box.scrollLeft,
+      scrollTop: box.scrollTop,
+    };
+
+    // Captura do ponteiro: sem isso, soltar o botao fora do painel (ou fora da
+    // janela) nunca entrega o `pointerup`, e o arrasto fica grudado no cursor.
+    // Ha spec E2E do caso, verificada falhando sem esta linha.
+    box.setPointerCapture(event.pointerId);
+    setDragging(true);
+  }
+
+  function handlePointerMove(event) {
+    const drag = dragRef.current;
+
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    // O gesto e puxar o papel, nao mover uma camera: a imagem acompanha o
+    // ponteiro, entao o scroll anda na direcao contraria.
+    const box = scrollRef.current;
+    box.scrollLeft = drag.scrollLeft - (event.clientX - drag.x);
+    box.scrollTop = drag.scrollTop - (event.clientY - drag.y);
+  }
+
+  function endDrag(event) {
+    const drag = dragRef.current;
+
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const box = scrollRef.current;
+
+    if (box.hasPointerCapture(event.pointerId)) {
+      box.releasePointerCapture(event.pointerId);
+    }
+
+    dragRef.current = null;
+    setDragging(false);
   }
 
   return (
@@ -221,6 +314,17 @@ export default function ReceiptReview({
             </button>
           </div>
         )}
+        {/* Descartar e decisao que se toma olhando a imagem, nao a lista: o
+            cupom que nao deveria estar aqui so se revela quando aparece na
+            tela. O dialogo e o estado ficam na ReportDetail. */}
+        <button
+          type="button"
+          className="btn btn--sm btn--danger"
+          onClick={() => onDelete(receipt)}
+          disabled={submitting}
+        >
+          Deletar
+        </button>
       </div>
 
       {visibleAlerts.length > 0 && (
@@ -298,7 +402,26 @@ export default function ReceiptReview({
             )}
           </div>
 
-          <div className="review__image-scroll" onWheel={handleWheelZoom}>
+          {/* Focavel de proposito: com o cupom ampliado, quem navega por
+              teclado tambem precisa alcancar o que saiu da area visivel — as
+              setas rolam o container nativamente. */}
+          <div
+            className={[
+              'review__image-scroll',
+              pannable && 'review__image-scroll--pannable',
+              dragging && 'review__image-scroll--dragging',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            ref={scrollRef}
+            tabIndex={0}
+            aria-label="Imagem do comprovante — arraste para mover"
+            onWheel={handleWheelZoom}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          >
             {imageFailed ? (
               <p className="state">
                 Nao foi possivel carregar a imagem deste comprovante.
@@ -315,6 +438,9 @@ export default function ReceiptReview({
                   className="review__image"
                   src={api.receiptImageUrl(receipt.id)}
                   alt={`Comprovante #${receipt.id}`}
+                  // Sem isso o navegador trata o gesto como "arrastar imagem"
+                  // e o cupom sai voando atras do cursor como fantasma.
+                  draggable={false}
                   hidden={!imageLoaded}
                   style={{ transform: `scale(${zoom})` }}
                   onLoad={() => setImageLoaded(true)}

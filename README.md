@@ -461,10 +461,21 @@ repetir o problema.
   que a API devolve.
 - **Fila de revisao** (`ReceiptReview`): imagem do comprovante pelo endpoint
   proprio (`GET /api/receipts/:id/image`, mesma origem), com zoom por botao
-  ou roda do mouse, e formulario de data/valor/categoria ao lado. O badge de
-  origem/confianca e **um so por comprovante** — o pipeline grava a confianca
-  do campo mais fraco, nao uma por campo, entao nao ha dado para destacar um
-  campo especifico sem mudar o schema.
+  ou roda do mouse, arrasto com o botao esquerdo para andar pelo cupom
+  ampliado, e formulario de data/valor/categoria ao lado.
+  - O arrasto mexe no `scrollLeft`/`scrollTop` do container, que ja rola —
+    nao ha um segundo sistema de coordenadas em `transform` para manter em
+    sincronia com as barras, a roda e o teclado. Usa `setPointerCapture`,
+    porque sem ele soltar o botao fora do painel nunca entrega o `pointerup`
+    e o arrasto fica grudado no cursor.
+  - `transform-origin` da imagem e `top left`, **nunca `center`**: a regiao de
+    overflow rolavel de um container so se estende para direita e baixo, entao
+    escalar a partir do centro punha um terco do cupom fora do alcance de
+    qualquer barra de rolagem. Medido a 300% num painel de 396px — 1188px de
+    imagem para 792px de `scrollWidth`. O badge de
+    origem/confianca e **um so por comprovante** — o pipeline grava a confianca
+    do campo mais fraco, nao uma por campo, entao nao ha dado para destacar um
+    campo especifico sem mudar o schema.
   - Alertas de validacao e de duplicata aparecem no topo, com "Marcar como
     duplicata" (so na regra `possivel_duplicata`) e "Dispensar" — dispensar e
     **local**, nao persiste no servidor, so tira o alerta da vista naquela
@@ -477,6 +488,17 @@ repetir o problema.
     comprovante o componente remonta (via `key={receipt.id}`, necessario para
     nao vazar zoom e valores digitados de um comprovante para o proximo) e o
     foco pode ficar fora da subarvore da div, calando o atalho em silencio.
+    Com o `ConfirmDialog` aberto os dois atalhos ficam mudos de proposito: o
+    `Escape` e do dialogo, e sem essa guarda um unico toque cancelaria a
+    exclusao **e** fecharia a revisao junto.
+- **Descartar um comprovante** (`ReceiptList` e a barra da `ReceiptReview`,
+  estado e dialogo na `ReportDetail`): pagina em branco no fim do PDF ou cupom
+  de outra viagem nao tem como ser resolvido na revisao, e um `needs_review`
+  insoluvel trava a fila. Nenhum status e bloqueado — inclusive `confirmed` e
+  `duplicate`. A exclusao e definitiva e leva o PDF junto quando nenhuma outra
+  pagina o referencia (ver "Retencao e privacidade"), por isso passa sempre
+  pelo `ConfirmDialog`, cujo alvo traz data e valor: sem emitente extraido, e
+  o unico jeito de conferir que o cupom certo esta sendo apagado.
 
 ### Paleta
 

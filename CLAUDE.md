@@ -413,6 +413,13 @@ React 19 + Vite, sem router e sem biblioteca de estado — tela unica, estado no
   canal de informacao** — todo badge carrega tambem o texto do status.
 - `web/src/constants.js` espelha o enum `task_status` do banco. Mudou o enum na
   migration? Atualize os dois.
+- Conteudo ampliado por `transform: scale()` dentro de um container com
+  `overflow: auto` leva `transform-origin: top left`. A regiao de overflow
+  rolavel so se estende para direita e baixo: escalando a partir do centro, o
+  que passa da borda esquerda fica **inalcancavel** por qualquer barra. Foi o
+  que aconteceu com a imagem do cupom (`.review__image`), onde um terco do
+  documento nao podia ser visto a 300%. **Nao volte para `center`** — ha spec
+  E2E medindo o recorte.
 
 ## Nunca
 

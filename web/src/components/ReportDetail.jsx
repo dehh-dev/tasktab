@@ -4,6 +4,7 @@ import ReceiptUpload from './ReceiptUpload';
 import ReceiptSummary from './ReceiptSummary';
 import ReceiptList from './ReceiptList';
 import ReceiptReview from './ReceiptReview';
+import ConfirmDialog from './ConfirmDialog';
 import { formatDate, formatMoney, reportStatusLabel } from '../constants';
 
 const POLL_INTERVAL_MS = 1500;
@@ -16,6 +17,21 @@ function needsReviewQueue(receipts) {
     .map((receipt) => receipt.id);
 }
 
+/**
+ * Como o comprovante aparece no dialogo de exclusao. Sem emitente extraido a
+ * linha nao tem nome nenhum — data e valor sao o que permite conferir que se
+ * esta apagando o cupom certo antes de confirmar.
+ */
+function receiptLabel(receipt) {
+  const name = receipt.merchant_name || `Comprovante #${receipt.id}`;
+  const details = [
+    formatDate(receipt.issued_at),
+    receipt.amount_cents !== null ? formatMoney(receipt.amount_cents) : null,
+  ].filter(Boolean);
+
+  return details.length > 0 ? `${name} — ${details.join(' · ')}` : name;
+}
+
 export default function ReportDetail({ reportId, onBack }) {
   const [report, setReport] = useState(null);
   const [receipts, setReceipts] = useState([]);
@@ -26,6 +42,9 @@ export default function ReportDetail({ reportId, onBack }) {
 
   // null = lista | id = revisando aquele comprovante
   const [reviewingId, setReviewingId] = useState(null);
+
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   /**
    * Devolve os comprovantes recem-buscados, e nao so os grava no estado.
@@ -93,6 +112,36 @@ export default function ReportDetail({ reportId, onBack }) {
     setReviewingId(queue.length > 0 ? queue[0] : null);
   }
 
+  /**
+   * Excluir e definitivo: o backend apaga tambem o PDF do disco quando nenhuma
+   * outra pagina o referencia. Por isso passa pelo ConfirmDialog, e por isso o
+   * recarregamento vem do servidor — remover so do estado local deixaria o
+   * total do ReceiptSummary contando um comprovante que ja nao existe.
+   */
+  async function handleDelete() {
+    setDeleting(true);
+
+    try {
+      await api.deleteReceipt(pendingDelete.id);
+      setPendingDelete(null);
+
+      // Quem estava revisando quer o proximo pendente; quem estava na lista
+      // quer continuar na lista. `handleAction` abre a revisao do primeiro
+      // pendente, entao chama-lo dos dois lados sequestraria a tela de quem
+      // so apagou uma linha de la.
+      if (reviewingId) {
+        await handleAction();
+      } else {
+        await load();
+      }
+    } catch (caught) {
+      setError({ message: caught.message, action: caught.action });
+      setPendingDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   /** Prev/anterior dentro da fila, sem mutar nada — usa o estado atual. */
   function handleNavigate(direction) {
     const queue = needsReviewQueue(receipts);
@@ -114,6 +163,20 @@ export default function ReportDetail({ reportId, onBack }) {
     return <p className="state">Carregando relatorio...</p>;
   }
 
+  // Montado uma vez e incluido nos dois retornos: o ramo da revisao sai antes
+  // do return final, entao um dialogo declarado so la embaixo nunca chegaria a
+  // renderizar para o botao da ReceiptReview.
+  const deleteDialog = pendingDelete && (
+    <ConfirmDialog
+      title="Deletar comprovante?"
+      target={receiptLabel(pendingDelete)}
+      confirmLabel="Deletar"
+      onConfirm={handleDelete}
+      onCancel={() => setPendingDelete(null)}
+      busy={deleting}
+    />
+  );
+
   if (reviewingId) {
     const receipt = receipts.find((item) => item.id === reviewingId);
     const queue = needsReviewQueue(receipts);
@@ -126,20 +189,24 @@ export default function ReportDetail({ reportId, onBack }) {
     }
 
     return (
-      <ReceiptReview
-        // Forca remontagem ao trocar de comprovante: sem isso, zoom, valores
-        // digitados e o estado de carregamento da imagem vazariam de um
-        // comprovante para o proximo, porque React reaproveitaria a mesma
-        // instancia (mesma posicao na arvore).
-        key={receipt.id}
-        receipt={receipt}
-        alerts={alerts.filter((alert) => alert.receipt_id === reviewingId)}
-        queuePosition={queuePosition > 0 ? queuePosition : 1}
-        queueTotal={queue.length}
-        onNavigate={handleNavigate}
-        onBack={() => setReviewingId(null)}
-        onAction={handleAction}
-      />
+      <>
+        <ReceiptReview
+          // Forca remontagem ao trocar de comprovante: sem isso, zoom, valores
+          // digitados e o estado de carregamento da imagem vazariam de um
+          // comprovante para o proximo, porque React reaproveitaria a mesma
+          // instancia (mesma posicao na arvore).
+          key={receipt.id}
+          receipt={receipt}
+          alerts={alerts.filter((alert) => alert.receipt_id === reviewingId)}
+          queuePosition={queuePosition > 0 ? queuePosition : 1}
+          queueTotal={queue.length}
+          onNavigate={handleNavigate}
+          onBack={() => setReviewingId(null)}
+          onAction={handleAction}
+          onDelete={setPendingDelete}
+        />
+        {deleteDialog}
+      </>
     );
   }
 
@@ -178,7 +245,14 @@ export default function ReportDetail({ reportId, onBack }) {
 
       <ReceiptUpload reportId={reportId} onUploaded={load} />
       <ReceiptSummary meta={meta} />
-      <ReceiptList receipts={receipts} onOpen={setReviewingId} />
+      <ReceiptList
+        receipts={receipts}
+        onOpen={setReviewingId}
+        onDelete={setPendingDelete}
+        busy={deleting}
+      />
+
+      {deleteDialog}
     </>
   );
 }
