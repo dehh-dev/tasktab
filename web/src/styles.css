@@ -401,7 +401,8 @@ textarea.field__input {
   margin-top: 6px;
 }
 
-.task__actions {
+.task__actions,
+.list-item__actions {
   display: flex;
   gap: 8px;
 }

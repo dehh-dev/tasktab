@@ -873,3 +873,58 @@ Podem entrar a qualquer momento depois do M1.
       Nenhuma chamada atual loga o campo; a regra ficou no `CLAUDE.md`
 - [x] Registrar a decisão antes de qualquer deploy em produção — seção
       "Retencao e privacidade" no `README.md`
+
+---
+
+## Issue 27 — Remover um comprovante pela interface
+
+`area:web` · depende de #20 e #21
+
+Hoje a única saída para um comprovante que não deveria estar no relatório é
+apagar o relatório inteiro. Página em branco no fim do PDF, cupom de outra
+viagem, arquivo escaneado torto que nem o OCR leu — todos ficam na lista, e
+`needs_review` que ninguém consegue resolver trava a fila de revisão: o
+contador "3 de 12 pendentes" nunca chega ao fim.
+
+**O backend já resolve isso.** `DELETE /api/receipts/:id` existe desde a #5,
+responde `204`, devolve `404` para id inexistente e apaga o PDF do disco pela
+contagem de referência da #24 (`src/services/retention.service.js`). Está
+coberto por `tests/api/receipts/delete.test.js` e documentado no README. Esta
+issue **não toca no backend** — é só a afordância que falta.
+
+**Escopo**
+
+Botão "Deletar" na linha da lista (`ReceiptList`) e na barra da tela de revisão
+(`ReceiptReview`), os dois passando pelo `ConfirmDialog` já existente. A
+exclusão é definitiva e leva o PDF junto quando nenhuma outra página o
+referencia — o diálogo tem que deixar isso claro.
+
+**Critérios de aceite**
+
+- [x] `web/src/api.js` ganha `deleteReceipt(id)`, espelhando `deleteTask`
+- [x] Cada linha de `ReceiptList` tem "Deletar" (`btn btn--sm btn--danger`), sem
+      empurrar o `link-button` que abre a revisão
+- [x] A barra da `ReceiptReview` também tem a ação: a decisão de descartar
+      costuma ser tomada olhando a imagem, não a lista
+- [x] Reaproveita o `ConfirmDialog` (`<dialog>` nativo, foco preso, foco inicial
+      no Cancelar) — nada de `window.confirm`, nada de div nova
+- [x] O `target` do diálogo identifica o comprovante: nome do emitente ou
+      `Comprovante #id`, com valor e data quando houver
+- [x] O estado do diálogo mora na `ReportDetail`, uma instância só, e ela é
+      renderizada tanto no ramo da lista quanto no ramo da revisão
+- [x] Deletar o comprovante em revisão fecha a revisão e volta à lista; se ainda
+      houver pendentes, segue para o próximo (mesmo `handleAction`)
+- [x] Após a exclusão, `load()` atualiza lista, total e subtotais do
+      `ReceiptSummary` — nada de remover só do estado local
+- [x] Erro exibe `message` e `action`, no mesmo alerta que a tela já usa
+- [x] Nenhum status é bloqueado: `confirmed`, `duplicate` e `failed` também
+      podem ser removidos. Relatório `closed` também — a regra de fechamento não
+      existe no backend e inventá-la só na UI seria promessa vazia
+- [x] Specs E2E: excluir pela lista (some da lista e do total), cancelar (nada
+      muda), e excluir pelo ramo de revisão
+
+**Fora de escopo**
+
+Desfazer / lixeira, exclusão em lote e bloqueio por relatório fechado. Cada um é
+uma issue própria; a lixeira, em particular, brigaria com a política de retenção
+da #24 (o arquivo morre junto com a linha).

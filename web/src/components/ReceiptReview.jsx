@@ -56,6 +56,7 @@ export default function ReceiptReview({
   onNavigate,
   onBack,
   onAction,
+  onDelete,
 }) {
   const [values, setValues] = useState({
     issued_at: receipt.issued_at ?? '',
@@ -166,6 +167,14 @@ export default function ReceiptReview({
   // padrao ja usado pelo ConfirmDialog.
   useEffect(() => {
     function handleKeyDown(event) {
+      // Com o ConfirmDialog aberto os atalhos sao dele. O keydown do Escape
+      // borbulha ate o document antes de o <dialog> disparar `cancel`, entao
+      // sem esta guarda um Escape cancelaria a exclusao e ainda fecharia a
+      // revisao junto, jogando a pessoa na lista sem ela ter pedido.
+      if (document.querySelector('dialog[open]')) {
+        return;
+      }
+
       if (event.key === 'Escape') {
         onBack();
         return;
@@ -221,6 +230,17 @@ export default function ReceiptReview({
             </button>
           </div>
         )}
+        {/* Descartar e decisao que se toma olhando a imagem, nao a lista: o
+            cupom que nao deveria estar aqui so se revela quando aparece na
+            tela. O dialogo e o estado ficam na ReportDetail. */}
+        <button
+          type="button"
+          className="btn btn--sm btn--danger"
+          onClick={() => onDelete(receipt)}
+          disabled={submitting}
+        >
+          Deletar
+        </button>
       </div>
 
       {visibleAlerts.length > 0 && (

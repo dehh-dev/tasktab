@@ -477,6 +477,17 @@ repetir o problema.
     comprovante o componente remonta (via `key={receipt.id}`, necessario para
     nao vazar zoom e valores digitados de um comprovante para o proximo) e o
     foco pode ficar fora da subarvore da div, calando o atalho em silencio.
+    Com o `ConfirmDialog` aberto os dois atalhos ficam mudos de proposito: o
+    `Escape` e do dialogo, e sem essa guarda um unico toque cancelaria a
+    exclusao **e** fecharia a revisao junto.
+- **Descartar um comprovante** (`ReceiptList` e a barra da `ReceiptReview`,
+  estado e dialogo na `ReportDetail`): pagina em branco no fim do PDF ou cupom
+  de outra viagem nao tem como ser resolvido na revisao, e um `needs_review`
+  insoluvel trava a fila. Nenhum status e bloqueado — inclusive `confirmed` e
+  `duplicate`. A exclusao e definitiva e leva o PDF junto quando nenhuma outra
+  pagina o referencia (ver "Retencao e privacidade"), por isso passa sempre
+  pelo `ConfirmDialog`, cujo alvo traz data e valor: sem emitente extraido, e
+  o unico jeito de conferir que o cupom certo esta sendo apagado.
 
 ### Paleta
 
