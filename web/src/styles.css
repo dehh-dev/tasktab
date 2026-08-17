@@ -551,9 +551,16 @@ textarea.field__input {
   overflow: auto;
 }
 
+/* transform-origin `top left`, nunca `center`: a regiao de overflow rolavel de
+   um container so se estende para a direita e para baixo. Escalando a partir do
+   centro a imagem cresce para os dois lados, e o que passa da borda esquerda
+   fica fora do alcance de qualquer barra de rolagem. Medido a 300% num painel
+   de 396px: imagem de 1188px, scrollWidth de 792px e scrollLeft no maximo 396 —
+   o terco esquerdo do cupom, onde ficam a descricao dos itens e o CNPJ, era
+   impossivel de ver. Ha spec E2E do caso. */
 .review__image {
   max-width: 100%;
-  transform-origin: top center;
+  transform-origin: top left;
 }
 
 .review__fields {
