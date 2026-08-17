@@ -928,3 +928,65 @@ referencia — o diálogo tem que deixar isso claro.
 Desfazer / lixeira, exclusão em lote e bloqueio por relatório fechado. Cada um é
 uma issue própria; a lixeira, em particular, brigaria com a política de retenção
 da #24 (o arquivo morre junto com a linha).
+
+---
+
+## Issue 28 — Arrastar a imagem do comprovante para navegar
+
+`area:web` · depende de #21
+
+Com zoom, a única forma de andar pelo cupom é a barra de rolagem. Numa tela em
+que a pessoa alterna imagem e formulário dezenas de vezes por lote, mirar uma
+barra de 8px é atrito puro — o gesto natural é agarrar o documento e puxar,
+como em qualquer visualizador de PDF.
+
+**A investigação achou um defeito mais grave que a ergonomia.** `.review__image`
+usa `transform-origin: top center` dentro de um flex com `justify-content:
+center`. A imagem escalada cresce para os dois lados, mas a região de overflow
+rolável só se estende para direita/baixo — o que transborda à esquerda fica
+fora do alcance de qualquer barra. Medido no navegador, cupom a 300% num painel
+de 396px:
+
+|                                 | `top center` (atual) | `top left` |
+| ------------------------------- | -------------------- | ---------- |
+| Largura renderizada             | 1188px               | 1188px     |
+| `scrollWidth`                   | 792px                | 1188px     |
+| Faixa de `scrollLeft`           | 0–396                | 0–792      |
+| Recorte inalcançável à esquerda | **396px (33%)**      | 0px        |
+
+Ou seja: hoje **o terço esquerdo do cupom não pode ser visto a 300%**, e é onde
+ficam a descrição dos itens e o CNPJ. Trocar a origem para `top left` resolve, e
+é pré-requisito do arrasto — sem isso o gesto esbarraria num limite de rolagem
+que não corresponde à imagem.
+
+**Escopo**
+
+Arrasto com o botão esquerdo dentro da imagem move a visualização, via
+`scrollLeft`/`scrollTop` do `.review__image-scroll`. Nada de reimplementar
+rolagem com `transform`: o container já rola, e mexer no `scrollLeft` mantém as
+barras, a roda do mouse e o teclado coerentes de graça.
+
+**Critérios de aceite**
+
+- [ ] `transform-origin: top left`, com a evidência acima registrada em
+      comentário — é a razão de não voltar para `center`
+- [ ] Arrastar com o botão esquerdo dentro da imagem move a visualização na
+      direção do gesto (pegar e puxar o papel, não mover uma câmera)
+- [ ] Ponteiro indica o estado: `grab` quando há o que arrastar, `grabbing`
+      durante o gesto, padrão quando a imagem cabe inteira
+- [ ] Usa Pointer Events com `setPointerCapture`: soltar o botão fora do painel
+      — ou fora da janela — não pode deixar o arrasto grudado
+- [ ] O arrasto nativo de imagem do browser (`dragstart`) é suprimido; sem isso
+      o gesto vira um "arrastar arquivo" com imagem fantasma
+- [ ] Clique sem movimento não é tratado como arrasto e não seleciona texto
+- [ ] Zoom, roda do mouse e o botão "Redefinir" continuam como estão
+- [ ] O container é focável e rolável por teclado — quem não usa mouse também
+      precisa alcançar o cupom ampliado
+- [ ] Specs E2E: o recorte à esquerda deixa de existir a 300%, e um arrasto
+      altera `scrollLeft` na direção certa
+
+**Fora de escopo**
+
+Zoom ancorado no cursor (hoje a roda amplia a partir da origem, não do ponto
+sob o mouse), arrasto com botão do meio e gestos de pinça em touch. São
+melhorias independentes, e nenhuma é bloqueada por esta.
