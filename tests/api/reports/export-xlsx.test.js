@@ -6,6 +6,7 @@ const {
   insertReport,
   insertReceipt,
 } = require('../../orchestrator');
+const { evaluateSum, findRow } = require('../../helpers/xlsx-formula');
 
 async function loadWorkbook(reportId) {
   const response = await requestBinary(
@@ -15,6 +16,11 @@ async function loadWorkbook(reportId) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(response.buffer);
   return { response, workbook };
+}
+
+/** Um confirmado completo; sem os tres campos o comprovante nao entraria. */
+function confirmed(overrides) {
+  return { status: 'confirmed', category: 'alimentacao', ...overrides };
 }
 
 describe('GET /api/reports/:id/export.xlsx', () => {
@@ -32,94 +38,237 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     );
   });
 
-  it('grava data como data de verdade e valor com formato pt-BR', async () => {
+  it('cria uma aba por tipo com lancamento, na ordem do enum', async () => {
     const report = await insertReport();
-    await insertReceipt(report.id, {
-      issued_at: '2026-06-19',
-      amount_cents: 3760,
-      category: 'alimentacao',
-      status: 'confirmed',
-    });
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 1,
+        category: 'transporte',
+        issued_at: '2026-06-19',
+        amount_cents: 2436,
+      }),
+    );
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 2,
+        category: 'alimentacao',
+        issued_at: '2026-06-20',
+        amount_cents: 3760,
+      }),
+    );
 
     const { workbook } = await loadWorkbook(report.id);
-    const sheet = workbook.getWorksheet('Resumo');
 
+    // Ordem do enum, nao do valor nem da data: dois relatorios da mesma
+    // pessoa precisam sair com o mesmo layout para poderem ser comparados.
+    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+      'Resumo',
+      'Alimentação',
+      'Transporte',
+    ]);
+  });
+
+  it('a aba do tipo grava data de verdade e valor com formato pt-BR', async () => {
+    const report = await insertReport();
+    await insertReceipt(
+      report.id,
+      confirmed({ issued_at: '2026-06-19', amount_cents: 3760 }),
+    );
+
+    const { workbook } = await loadWorkbook(report.id);
+    const sheet = workbook.getWorksheet('Alimentação');
+
+    expect(sheet.getCell('A1').value).toBe('Data');
     expect(sheet.getCell('A2').value).toEqual(new Date(Date.UTC(2026, 5, 19)));
     expect(sheet.getCell('A2').numFmt).toBe('DD/MM/YYYY');
-    expect(sheet.getCell('E2').value).toBe(37.6);
+    expect(sheet.getCell('D2').value).toBe(37.6);
     // [$R$-416] e o codigo de moeda pt-BR do Excel — sem ele o separador
     // segue o locale de quem abre o arquivo.
-    expect(sheet.getCell('E2').numFmt).toBe('[$R$-416] #,##0.00');
+    expect(sheet.getCell('D2').numFmt).toBe('[$R$-416] #,##0.00');
   });
 
-  it('total geral e formula, nao valor fixo', async () => {
+  it('o resumo puxa o valor de cada tipo da aba daquele tipo', async () => {
     const report = await insertReport();
-    await insertReceipt(report.id, {
-      page_number: 1,
-      amount_cents: 3760,
-      category: 'alimentacao',
-      status: 'confirmed',
-      issued_at: '2026-06-19',
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 1,
+        issued_at: '2026-06-19',
+        amount_cents: 3760,
+      }),
+    );
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 2,
+        issued_at: '2026-06-21',
+        amount_cents: 5200,
+      }),
+    );
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 3,
+        category: 'combustivel',
+        issued_at: '2026-06-20',
+        amount_cents: 18000,
+      }),
+    );
+
+    const { workbook } = await loadWorkbook(report.id);
+    const summary = workbook.getWorksheet('Resumo');
+    const alimentacao = findRow(summary, 'Alimentação');
+
+    expect(summary.getCell(`B${alimentacao}`).value).toBe(2);
+    expect(summary.getCell(`C${alimentacao}`).value).toEqual({
+      formula: "SUM('Alimentação'!D2:D3)",
     });
+    // A formula e resolvida contra as celulas de verdade: se o intervalo
+    // apontar para a aba errada ou para linhas de menos, isto quebra.
+    expect(evaluateSum(workbook, 'Resumo', `C${alimentacao}`)).toBe(89.6);
+    expect(
+      evaluateSum(workbook, 'Resumo', `C${findRow(summary, 'Combustível')}`),
+    ).toBe(180);
+  });
+
+  it('o total geral e a soma das abas, e sai como formula', async () => {
+    const report = await insertReport();
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 1,
+        issued_at: '2026-06-19',
+        amount_cents: 3760,
+      }),
+    );
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 2,
+        category: 'combustivel',
+        issued_at: '2026-06-20',
+        amount_cents: 18000,
+      }),
+    );
+
+    const { workbook } = await loadWorkbook(report.id);
+    const summary = workbook.getWorksheet('Resumo');
+    const totalRow = findRow(summary, 'TOTAL');
+
+    expect(summary.getCell(`C${totalRow}`).value).toHaveProperty('formula');
+    expect(evaluateSum(workbook, 'Resumo', `C${totalRow}`)).toBe(217.6);
+    expect(evaluateSum(workbook, 'Resumo', `B${totalRow}`)).toBe(2);
+
+    // O total de cada aba e a mesma conta pelo outro lado — se um dos dois
+    // divergir, o arquivo se contradiz sozinho.
+    const alimentacao = workbook.getWorksheet('Alimentação');
+    expect(
+      evaluateSum(
+        workbook,
+        'Alimentação',
+        `D${findRow(alimentacao, 'TOTAL', 3)}`,
+      ),
+    ).toBe(37.6);
+  });
+
+  it('so entra confirmado; o resto e contado fora da prestacao', async () => {
+    const report = await insertReport();
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 1,
+        issued_at: '2026-06-19',
+        amount_cents: 3760,
+      }),
+    );
     await insertReceipt(report.id, {
       page_number: 2,
-      amount_cents: 2436,
-      category: 'transporte',
-      status: 'confirmed',
+      status: 'needs_review',
       issued_at: '2026-06-20',
+      amount_cents: 1500,
+    });
+    await insertReceipt(report.id, {
+      page_number: 3,
+      status: 'duplicate',
+      category: 'alimentacao',
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
     });
 
     const { workbook } = await loadWorkbook(report.id);
-    const sheet = workbook.getWorksheet('Resumo');
+    const summary = workbook.getWorksheet('Resumo');
 
-    const total = sheet.getCell('E5').value;
-    expect(total).toEqual({ formula: 'SUMIFS(E2:E3,F2:F3,0)' });
+    // A duplicata tem o mesmo tipo do confirmado e mesmo assim nao pode
+    // aparecer na aba dele — seria pagar duas vezes o mesmo almoco.
+    expect(workbook.getWorksheet('Alimentação').getCell('D3').value).toBeNull();
+    expect(
+      evaluateSum(workbook, 'Resumo', `C${findRow(summary, 'TOTAL')}`),
+    ).toBe(37.6);
 
-    // Os valores brutos que a formula referencia batem com o esperado — a
-    // semantica do SUMIFS (somar E onde F=0) e Excel padrao, verificada
-    // manualmente com HyperFormula durante o desenvolvimento.
-    expect(sheet.getCell('E2').value).toBe(37.6);
-    expect(sheet.getCell('F2').value).toBe(0);
-    expect(sheet.getCell('E3').value).toBe(24.36);
-    expect(sheet.getCell('F3').value).toBe(0);
+    const revisao = findRow(summary, 'Aguardando revisao');
+    expect(summary.getCell(`B${revisao}`).value).toBe(1);
+    expect(summary.getCell(`C${revisao}`).value).toBe(15);
+    expect(summary.getCell(`B${findRow(summary, 'Duplicata')}`).value).toBe(1);
   });
 
-  it('duplicata fica marcada e a coluna auxiliar exclui do total', async () => {
+  it('confirmado sem categoria cai no grupo "Sem categoria"', async () => {
     const report = await insertReport();
+    // A API nao deixa confirmar sem categoria; escrita direta no banco deixa,
+    // e a exportacao nao pode se perder por causa disso. `nao_classificado`
+    // e o mesmo caso: ausencia de decisao, nao um tipo de despesa.
     await insertReceipt(report.id, {
       page_number: 1,
-      amount_cents: 4860,
-      category: 'alimentacao',
       status: 'confirmed',
-      issued_at: '2026-06-17',
+      category: null,
+      issued_at: '2026-06-19',
+      amount_cents: 1500,
     });
     await insertReceipt(report.id, {
       page_number: 2,
-      amount_cents: 4860,
-      category: 'alimentacao',
-      status: 'duplicate',
-      issued_at: '2026-06-17',
+      status: 'confirmed',
+      category: 'nao_classificado',
+      issued_at: '2026-06-20',
+      amount_cents: 2500,
     });
 
     const { workbook } = await loadWorkbook(report.id);
-    const sheet = workbook.getWorksheet('Resumo');
+    const summary = workbook.getWorksheet('Resumo');
 
-    // A ordem e cronologica; ambos tem a mesma data, entao a ordem entre
-    // eles segue o id (desempate estavel) — a duplicata e a segunda linha.
-    expect(sheet.getCell('D3').value).toMatch(/Duplicata/);
-    expect(sheet.getCell('F3').value).toBe(1);
+    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
+      'Resumo',
+      'Sem categoria',
+    ]);
+    expect(summary.getCell(`B${findRow(summary, 'Sem categoria')}`).value).toBe(
+      2,
+    );
+    // O grupo nao pode ficar fora do total so por nao ter tipo — foi assim
+    // que a soma dos tipos deixou de fechar com o total geral.
+    expect(
+      evaluateSum(workbook, 'Resumo', `C${findRow(summary, 'TOTAL')}`),
+    ).toBe(40);
   });
 
-  it('relatorio sem comprovantes gera planilha valida com total zero', async () => {
-    const report = await insertReport();
+  it('relatorio sem confirmado gera planilha valida com total zero', async () => {
+    const report = await insertReport({ title: 'Viagem sem revisao' });
+    await insertReceipt(report.id, {
+      status: 'needs_review',
+      amount_cents: 1500,
+    });
 
     const { response, workbook } = await loadWorkbook(report.id);
 
     expect(response.status).toBe(200);
-    const sheet = workbook.getWorksheet('Resumo');
-    // Sem linha de dados, o total cai logo na linha seguinte ao cabecalho.
-    expect(sheet.getCell('D3').value).toBe('TOTAL');
-    expect(sheet.getCell('E3').value).toBe(0);
+    const summary = workbook.getWorksheet('Resumo');
+
+    expect(workbook.worksheets).toHaveLength(1);
+    expect(summary.getCell('A1').value).toBe('Viagem sem revisao');
+    // Zero literal, nao formula: SUM sobre intervalo vazio abriria com #REF!.
+    expect(summary.getCell(`C${findRow(summary, 'TOTAL')}`).value).toBe(0);
+    expect(
+      summary.getCell(`B${findRow(summary, 'Aguardando revisao')}`).value,
+    ).toBe(1);
   });
 
   it('retorna 404 para relatorio inexistente', async () => {

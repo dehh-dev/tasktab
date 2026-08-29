@@ -5,6 +5,10 @@
  * num lugar so para as tres saidas (resumo, Anexo I, PDF) nao divergirem.
  */
 
+// `nao_classificado` de proposito nao esta aqui: e ausencia de decisao, nao
+// categoria, e a aplicacao grava NULL no comprovante. Ter um rotulo proprio
+// para ele criava dois nomes para a mesma coisa — foi o que fez o subtotal
+// "Nao classificado" da planilha nunca casar com as linhas "Sem categoria".
 const CATEGORY_LABELS = {
   alimentacao: 'Alimentação',
   combustivel: 'Combustível',
@@ -13,8 +17,9 @@ const CATEGORY_LABELS = {
   transporte: 'Transporte',
   hospedagem: 'Hospedagem',
   outros: 'Outros',
-  nao_classificado: 'Não classificado',
 };
+
+const NO_CATEGORY_LABEL = 'Sem categoria';
 
 const STATUS_LABELS = {
   pending: 'Pendente',
@@ -25,12 +30,29 @@ const STATUS_LABELS = {
   failed: 'Falhou',
 };
 
+/**
+ * Chave de agrupamento de uma categoria: `null` quando nao ha decisao
+ * humana registrada. Agrupar pelo valor cru separaria em dois grupos o que
+ * a aplicacao trata como um so.
+ */
+function categoryKey(category) {
+  return category && category !== 'nao_classificado' ? category : null;
+}
+
 function categoryLabel(category) {
-  return category ? CATEGORY_LABELS[category] || category : 'Sem categoria';
+  const key = categoryKey(category);
+  return key ? CATEGORY_LABELS[key] || key : NO_CATEGORY_LABEL;
 }
 
 function statusLabel(status) {
   return STATUS_LABELS[status] || status;
 }
 
-module.exports = { CATEGORY_LABELS, STATUS_LABELS, categoryLabel, statusLabel };
+module.exports = {
+  CATEGORY_LABELS,
+  STATUS_LABELS,
+  NO_CATEGORY_LABEL,
+  categoryKey,
+  categoryLabel,
+  statusLabel,
+};

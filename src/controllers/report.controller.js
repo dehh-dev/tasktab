@@ -6,7 +6,7 @@ const { NotFoundError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const validation = require('../services/validation');
 const retention = require('../services/retention.service');
-const xlsxResumo = require('../services/export/xlsx-resumo.service');
+const xlsxPorTipo = require('../services/export/xlsx-por-tipo.service');
 const anexoI = require('../services/export/anexo-i.service');
 const pdfConsolidado = require('../services/export/pdf-consolidado.service');
 
@@ -105,7 +105,7 @@ async function exportXlsx(req, res) {
   }
 
   const receipts = await Receipt.findForExport(id);
-  const workbook = await xlsxResumo.buildResumoWorkbook(report, receipts);
+  const workbook = await xlsxPorTipo.buildWorkbook(report, receipts);
 
   res
     .status(200)
