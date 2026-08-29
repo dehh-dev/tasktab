@@ -5,6 +5,7 @@ const {
   requestBinary,
   insertReport,
   insertReceipt,
+  insertMerchant,
 } = require('../../orchestrator');
 const { evaluateSum, findRow } = require('../../helpers/xlsx-formula');
 
@@ -83,10 +84,10 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     expect(sheet.getCell('A1').value).toBe('Data');
     expect(sheet.getCell('A2').value).toEqual(new Date(Date.UTC(2026, 5, 19)));
     expect(sheet.getCell('A2').numFmt).toBe('DD/MM/YYYY');
-    expect(sheet.getCell('D2').value).toBe(37.6);
+    expect(sheet.getCell('F2').value).toBe(37.6);
     // [$R$-416] e o codigo de moeda pt-BR do Excel — sem ele o separador
     // segue o locale de quem abre o arquivo.
-    expect(sheet.getCell('D2').numFmt).toBe('[$R$-416] #,##0.00');
+    expect(sheet.getCell('F2').numFmt).toBe('[$R$-416] #,##0.00');
   });
 
   it('o resumo puxa o valor de cada tipo da aba daquele tipo', async () => {
@@ -123,7 +124,7 @@ describe('GET /api/reports/:id/export.xlsx', () => {
 
     expect(summary.getCell(`B${alimentacao}`).value).toBe(2);
     expect(summary.getCell(`C${alimentacao}`).value).toEqual({
-      formula: "SUM('Alimentação'!D2:D3)",
+      formula: "SUM('Alimentação'!F2:F3)",
     });
     // A formula e resolvida contra as celulas de verdade: se o intervalo
     // apontar para a aba errada ou para linhas de menos, isto quebra.
@@ -165,12 +166,115 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     // divergir, o arquivo se contradiz sozinho.
     const alimentacao = workbook.getWorksheet('Alimentação');
     expect(
-      evaluateSum(
-        workbook,
-        'Alimentação',
-        `D${findRow(alimentacao, 'TOTAL', 3)}`,
-      ),
+      evaluateSum(workbook, 'Alimentação', `F${findRow(alimentacao, 'TOTAL')}`),
     ).toBe(37.6);
+  });
+
+  it('traz cidade, hora e documento nas colunas da aba do tipo', async () => {
+    const report = await insertReport();
+    const merchant = await insertMerchant({
+      name: 'CEA COMERCIO DE ALIMENTOS',
+      city: 'Fortaleza/CE',
+    });
+
+    await insertReceipt(
+      report.id,
+      confirmed({
+        issued_at: '2026-08-02',
+        issued_time: '13:59:27',
+        amount_cents: 16500,
+        document_ref: 'NFC-e 3210 / série 012',
+        merchant_id: merchant.id,
+      }),
+    );
+
+    const { workbook } = await loadWorkbook(report.id);
+    const sheet = workbook.getWorksheet('Alimentação');
+
+    expect(sheet.getRow(1).values.slice(1)).toEqual([
+      'Data',
+      'Local',
+      'Cidade',
+      'Hora',
+      'Documento',
+      'Valor (R$)',
+    ]);
+
+    expect(sheet.getCell('B2').value).toBe('CEA COMERCIO DE ALIMENTOS');
+    expect(sheet.getCell('C2').value).toBe('Fortaleza/CE');
+    // Os segundos vem do carimbo de autorizacao e nao dizem nada a quem
+    // confere — a coluna mostra HH:MM.
+    expect(sheet.getCell('D2').value).toBe('13:59');
+    expect(sheet.getCell('E2').value).toBe('NFC-e 3210 / série 012');
+  });
+
+  it('deixa a coluna vazia quando o cupom nao trouxe o campo', async () => {
+    const report = await insertReport();
+    await insertReceipt(
+      report.id,
+      confirmed({ issued_at: '2026-06-19', amount_cents: 3760 }),
+    );
+
+    const { workbook } = await loadWorkbook(report.id);
+    const sheet = workbook.getWorksheet('Alimentação');
+
+    // Recibo manuscrito nao tem hora nem numero de documento, e inventar
+    // qualquer coisa ali seria pior que a celula em branco.
+    expect(sheet.getCell('D2').value).toBe('');
+    expect(sheet.getCell('E2').value).toBe('');
+  });
+
+  it('a planilha sai formatada, nao so preenchida', async () => {
+    const report = await insertReport();
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 1,
+        issued_at: '2026-06-19',
+        amount_cents: 3760,
+      }),
+    );
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 2,
+        issued_at: '2026-06-20',
+        amount_cents: 5200,
+      }),
+    );
+
+    const { workbook } = await loadWorkbook(report.id);
+    const sheet = workbook.getWorksheet('Alimentação');
+
+    // Cabecalho branco sobre azul, com borda: e o layout da planilha manual
+    // que este projeto substitui, e quem confere ja sabe onde olhar nele.
+    expect(sheet.getCell('A1').font).toMatchObject({
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    });
+    expect(sheet.getCell('A1').fill).toMatchObject({
+      fgColor: { argb: 'FF1F3864' },
+    });
+    expect(sheet.getCell('A1').border).toBeDefined();
+
+    // Zebra na segunda linha de dado: e o que permite seguir uma linha larga
+    // da data ate o valor sem escorregar para a linha de cima.
+    expect(sheet.getCell('A3').fill).toMatchObject({
+      fgColor: { argb: 'FFF2F2F2' },
+    });
+    // O exceljs devolve `{ pattern: 'none' }` na celula sem preenchimento, e
+    // nao `undefined`: a assercao e sobre nao haver fundo solido.
+    expect(sheet.getCell('A2').fill?.pattern).not.toBe('solid');
+
+    // Cabecalho congelado e filtro: um lote de 30 cupons passa da altura da
+    // tela, e sem isso a coluna de valor fica sem titulo ao rolar.
+    expect(sheet.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
+    expect(sheet.autoFilter).toBeDefined();
+
+    // A linha de TOTAL e mesclada ate a coluna do valor.
+    const totalRow = findRow(sheet, 'TOTAL');
+    expect(sheet.getCell(`A${totalRow}`).isMerged).toBe(true);
+    expect(sheet.getColumn(2).width).toBeGreaterThan(20);
   });
 
   it('so entra confirmado; o resto e contado fora da prestacao', async () => {
@@ -201,8 +305,11 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     const summary = workbook.getWorksheet('Resumo');
 
     // A duplicata tem o mesmo tipo do confirmado e mesmo assim nao pode
-    // aparecer na aba dele — seria pagar duas vezes o mesmo almoco.
-    expect(workbook.getWorksheet('Alimentação').getCell('D3').value).toBeNull();
+    // aparecer na aba dele — seria pagar duas vezes o mesmo almoco. A aba tem
+    // uma linha de dado so, entao o TOTAL vem logo na linha 3.
+    const alimentacao = workbook.getWorksheet('Alimentação');
+    expect(findRow(alimentacao, 'TOTAL')).toBe(3);
+    expect(evaluateSum(workbook, 'Alimentação', 'F3')).toBe(37.6);
     expect(
       evaluateSum(workbook, 'Resumo', `C${findRow(summary, 'TOTAL')}`),
     ).toBe(37.6);
