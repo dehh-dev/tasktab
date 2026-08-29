@@ -210,12 +210,43 @@ export default function ReportDetail({ reportId, onBack }) {
     );
   }
 
+  // So o confirmado entra na planilha, entao sem nenhum confirmado o arquivo
+  // sairia com o resumo zerado — melhor dizer o que falta do que entregar uma
+  // planilha vazia que parece um erro da exportacao.
+  const confirmedCount = receipts.filter(
+    (receipt) => receipt.status === 'confirmed',
+  ).length;
+
   return (
     <>
       <div className="toolbar">
         <button type="button" className="btn" onClick={onBack}>
           Voltar
         </button>
+
+        <div className="toolbar__group">
+          {confirmedCount === 0 && (
+            <span className="field__hint">
+              Confirme um comprovante para poder exportar.
+            </span>
+          )}
+
+          {confirmedCount > 0 ? (
+            // Download por <a href>, nao por fetch: entregar o arquivo baixado
+            // exigiria um `blob:`, que a CSP do projeto nao libera.
+            <a
+              className="btn"
+              href={api.reportXlsxUrl(reportId)}
+              download={`relatorio-${reportId}.xlsx`}
+            >
+              Exportar Excel
+            </a>
+          ) : (
+            <button type="button" className="btn" disabled>
+              Exportar Excel
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (

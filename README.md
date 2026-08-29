@@ -152,7 +152,7 @@ Base: `/api/reports` e `/api/receipts`
 | `GET`    | `/api/receipts/:id/image`              | Pagina do comprovante em PNG  |
 | `POST`   | `/api/receipts/:id/reprocess`          | Reenvia para a fila           |
 | `GET`    | `/api/reports/:id/validation`          | Alertas de conferencia        |
-| `GET`    | `/api/reports/:id/export.xlsx`         | Resumo proprio (Excel)        |
+| `GET`    | `/api/reports/:id/export.xlsx`         | Resumo por tipo (Excel)       |
 | `GET`    | `/api/reports/:id/export/anexo-i.xlsx` | Anexo I oficial (Excel)       |
 | `GET`    | `/api/reports/:id/export.pdf`          | PDF consolidado               |
 
@@ -252,17 +252,24 @@ duplicata continua listado, mas fica **fora do somatorio**.
 
 Tres saidas, cada uma com um proposito diferente:
 
-| Rota                                       | Para que                                            |
-| ------------------------------------------ | --------------------------------------------------- |
-| `GET /api/reports/:id/export.xlsx`         | Resumo proprio: todos os comprovantes, com formulas |
-| `GET /api/reports/:id/export/anexo-i.xlsx` | O formulario oficial preenchido                     |
-| `GET /api/reports/:id/export.pdf`          | Todos os cupons num PDF so, com indice e carimbo    |
+| Rota                                       | Para que                                             |
+| ------------------------------------------ | ---------------------------------------------------- |
+| `GET /api/reports/:id/export.xlsx`         | Resumo por tipo: uma aba por categoria, com formulas |
+| `GET /api/reports/:id/export/anexo-i.xlsx` | O formulario oficial preenchido                      |
+| `GET /api/reports/:id/export.pdf`          | Todos os cupons num PDF so, com indice e carimbo     |
 
-O **resumo proprio** (`exceljs`, gerado do zero) traz todo comprovante, com o
-`Status` a vista. Total geral e subtotal por categoria sao **formula**
-(`SUMIFS`), nao valor fixo — o conferente edita uma linha e ve o total mudar
-sozinho. Uma coluna auxiliar oculta marca duplicata (`1`/`0`) para a formula
-excluir do somatorio sem depender de comparar texto de status.
+O **resumo por tipo** (`exceljs`, gerado do zero) tem uma aba `Resumo` e uma
+aba por tipo de despesa **com lancamento** — na ordem do enum, para dois
+relatorios da mesma pessoa sairem com o mesmo layout. So entram comprovantes
+`confirmed`, o mesmo criterio do Anexo I; confirmar ja exige categoria, entao
+toda linha tem tipo.
+
+O valor de cada tipo no `Resumo` e **formula cruzando abas**
+(`SUM('Alimentação'!D2:D9)`), nao numero repetido: corrigir um lancamento na
+aba do tipo muda o resumo e o total sozinho. O que ficou de fora
+(aguardando revisao, duplicata, falha) aparece contado no bloco "Fora da
+prestacao", sem entrar em soma nenhuma — planilha que so mostra o confirmado
+esconde o trabalho que falta de quem vai assinar.
 
 O **Anexo I** e outra historia: **so entram comprovantes `confirmed`** — e o
 unico status que significa "revisado por uma pessoa". O relatorio nao e
