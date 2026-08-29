@@ -146,7 +146,7 @@ describe('categorizacao por emitente', () => {
     expect(receipt.status).toBe('needs_review');
   });
 
-  it('nao adivinha o que o nome nao diz', async () => {
+  it('cai no piso alimentacao quando o nome nao diz nada', async () => {
     const report = await insertReport();
 
     await upload(report.id, [
@@ -161,11 +161,12 @@ describe('categorizacao por emitente', () => {
 
     const [receipt] = await listReceipts(report.id);
 
-    // Razao social que nao diz o que foi comprado continua sem categoria.
-    // Preencher **mesmo sem certeza** e preencher quando ha indicio, nao
-    // sortear um tipo para nao deixar o campo vazio.
-    expect(receipt.category).toBeNull();
-    expect(receipt.category_guessed).toBe(false);
+    // Razao social que nao diz o que foi comprado tambem chega preenchida: no
+    // relatorio real que motivou isto, 21 dos 23 lancamentos eram alimentacao,
+    // e abrir o seletor em cada um custava mais que corrigir os dois.
+    expect(receipt.category).toBe('alimentacao');
+    // O piso e chute como qualquer outro, e chega marcado como tal.
+    expect(receipt.category_guessed).toBe(true);
   });
 
   it('palpite nunca sobrescreve a categoria ja cadastrada no emitente', async () => {
