@@ -47,24 +47,72 @@ function parse(text) {
   return { parser: parser.name, fields: { ...fields, ...parser.parse(text) } };
 }
 
+// Razao social impressa junto do CNPJ. E a ancora mais confiavel que o cupom
+// oferece para o nome: o CNPJ tem forma fixa, entao o que vem colado nele e
+// texto de cadastro, nao ruido de digitalizacao.
+// `[^\S\n]*` e nao `\s*`: `\s` engole a quebra de linha, e a razao social
+// virava a linha de endereco logo abaixo do CNPJ. Mesma armadilha da ancora do
+// total em `normalize.js`.
+const CNPJ_LINE = /\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}[^\S\n]*(.{4,120})$/m;
+
+// Quanto de uma linha precisa ser letra ou espaco para ela passar por nome. O
+// lixo tipico do OCR (": 40) 47 DL? “o") fica bem abaixo disso; um nome de
+// verdade, mesmo com um caractere lido errado, fica bem acima.
+const MIN_ALPHA_RATIO = 0.7;
+
+function alphaRatio(line) {
+  const letters = line.replace(/[^A-Za-zÀ-ÿ ]/g, '').length;
+  return line.length === 0 ? 0 : letters / line.length;
+}
+
+/** Tira pontuacao e sujeira das pontas sem mexer no miolo do nome. */
+function clean(line) {
+  return line
+    .replace(/^[^A-Za-zÀ-ÿ0-9]+/, '')
+    .replace(/[^A-Za-zÀ-ÿ0-9.)]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function looksLikeName(line) {
+  return line.length >= 5 && alphaRatio(line) >= MIN_ALPHA_RATIO;
+}
+
 /**
- * Nome provavel do emitente: a primeira linha nao vazia do cupom.
+ * Nome provavel do emitente.
  *
- * Serve apenas para dar um rotulo legivel ao emitente recem-cadastrado, e
- * **nunca** para decidir categoria. Errar o nome custa uma edicao; errar a
- * categoria por palavra-chave produz planilha errada em silencio.
+ * **Nao e mais "a primeira linha nao vazia".** Num PDF escaneado a primeira
+ * linha e a margem do papel, e o OCR devolve dela coisas como `: 40) 47 DL? “o`
+ * — que era o nome com que 5 dos 19 emitentes deste projeto foram cadastrados.
+ *
+ * A ordem tenta o mais estruturado primeiro:
+ *
+ * 1. o que vem depois do CNPJ na linha do CNPJ (a razao social);
+ * 2. a primeira linha do topo que pareca nome, medida por proporcao de letras.
+ *
+ * Continua servindo so de rotulo legivel. A categoria sugerida vem de
+ * `category-guess.js`, chega marcada como palpite, e nada aqui confirma nada.
  */
 function merchantName(text) {
   if (typeof text !== 'string') {
     return null;
   }
 
-  const first = text
-    .split('\n')
-    .map((line) => line.trim())
-    .find((line) => line.length > 3);
+  const fromCnpj = text.match(CNPJ_LINE);
 
-  return first ? first.slice(0, 255) : null;
+  if (fromCnpj) {
+    const candidate = clean(fromCnpj[1]);
+
+    if (looksLikeName(candidate)) {
+      return candidate.slice(0, 255);
+    }
+  }
+
+  // So o topo do documento: mais abaixo comecam os itens, e uma descricao de
+  // produto tambem passa no teste de "parece nome".
+  const fromTop = text.split('\n').slice(0, 8).map(clean).find(looksLikeName);
+
+  return fromTop ? fromTop.slice(0, 255) : null;
 }
 
 module.exports = { parse, resolve, merchantName, PARSERS };

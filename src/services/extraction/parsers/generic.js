@@ -11,6 +11,11 @@ const normalize = require('../normalize');
  */
 const CONFIDENCE = 0.6;
 
+// O que so o passe tolerante conseguiu ler. Baixo o bastante para arrastar a
+// confianca do comprovante inteiro para baixo, que e o que faz a linha chegar
+// destacada na revisao.
+const LOOSE_CONFIDENCE = 0.3;
+
 const name = 'generic';
 
 function matches() {
@@ -27,6 +32,42 @@ function parse(text) {
       source: 'text',
       confidence: CONFIDENCE,
     };
+  } else {
+    // Segunda tentativa, tolerante ao ruido entre a ancora e o numero. Entra
+    // com confianca baixa de proposito: o campo chega preenchido, e a revisao
+    // recebe o destaque que diz "confira este aqui antes de assinar".
+    const loose = normalize.extractLooseTotal(text);
+
+    if (loose !== null) {
+      fields.amount_cents = {
+        value: loose,
+        source: 'text',
+        confidence: LOOSE_CONFIDENCE,
+      };
+    }
+  }
+
+  const time = normalize.extractTime(text);
+  if (time !== null) {
+    fields.issued_time = {
+      value: time,
+      source: 'text',
+      confidence: CONFIDENCE,
+    };
+  }
+
+  const document = normalize.extractDocument(text);
+  if (document !== null) {
+    fields.document_ref = {
+      value: document,
+      source: 'text',
+      confidence: CONFIDENCE,
+    };
+  }
+
+  const city = normalize.extractCity(text);
+  if (city !== null) {
+    fields.city = { value: city, source: 'text', confidence: CONFIDENCE };
   }
 
   const issuedAt = normalize.extractDate(text);

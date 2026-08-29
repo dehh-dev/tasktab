@@ -165,19 +165,25 @@ function parseDate(input) {
  * Nunca use "o maior numero da pagina": a chave de acesso tem 44 digitos, o
  * CNPJ tem 14 e o telefone tem 11 — todos maiores que qualquer valor de
  * refeicao. A ancora e o que separa o total do resto.
+ *
+ * A busca e **linha a linha**, e nao sobre o texto inteiro, porque `\s+` na
+ * ancora atravessava a quebra de linha: o cabecalho da tabela de itens termina
+ * em "Valor total", a linha seguinte comeca com o codigo do primeiro item, e o
+ * total do cupom virava `001` — R$ 1,00 no lugar de R$ 165,00.
  */
 function extractTotal(text) {
   if (typeof text !== 'string') {
     return null;
   }
 
-  for (const anchor of TOTAL_ANCHORS) {
-    const match = text.match(
-      new RegExp(anchor.source + `(${AMOUNT.source})`, 'i'),
-    );
+  const lines = text.split('\n');
 
-    if (match) {
-      const cents = parseAmountToCents(match[1]);
+  for (const anchor of TOTAL_ANCHORS) {
+    const regex = new RegExp(anchor.source + `(${AMOUNT.source})`, 'i');
+
+    for (const line of lines) {
+      const match = line.match(regex);
+      const cents = match ? parseAmountToCents(match[1]) : null;
 
       if (cents !== null) {
         return cents;
@@ -188,12 +194,34 @@ function extractTotal(text) {
   return null;
 }
 
-/** Primeira data plausivel do texto. */
-function extractDate(text) {
-  if (typeof text !== 'string') {
-    return null;
-  }
+/**
+ * Ancoras de data, da mais confiavel para a menos.
+ *
+ * A data **nao** e mais "a primeira que aparecer no texto". Numa NFC-e a linha
+ * do documento e a linha da autorizacao trazem a mesma data duas vezes, e o
+ * OCR erra uma das duas: num cupom real deste projeto o texto dizia
+ * `NiC-e nº 000003210 Séria 012 02/06/2026` e, tres linhas abaixo,
+ * `Data de Autorização 02/08/2026`. A primeira venceu, e agosto virou junho na
+ * planilha assinada. A autorizacao e carimbo do SEFAZ e vale mais que o que o
+ * equipamento imprimiu.
+ */
+const DATE_ANCHORS = [
+  /data\s+(?:d[aeo]\s+)?autoriza[çc][ãa]o\s*:?\s*/i,
+  /data\s+(?:d[aeo]\s+)?emiss[ãa]o\s*:?\s*/i,
+  /autoriza[çc][ãa]o\s*:?\s*/i,
+  /emiss[ãa]o\s*:?\s*/i,
+  /data\s*:?\s*/i,
+];
 
+// Folga entre a ancora e o valor, sem atravessar linha. O OCR intercala
+// sujeira curta ("Data de Autorização: ,") com frequencia suficiente para
+// exigir isso, e frequencia baixa demais para justificar mais que isso.
+const ANCHOR_GAP = '[^\\n]{0,12}?';
+
+const TIME = /(?:[01]?\d|2[0-3])\s*[:h]\s*[0-5]\d(?:\s*:\s*[0-5]\d)?/;
+
+/** Primeira data plausivel do texto, sem ancora nenhuma. */
+function firstDate(text) {
   for (const { regex } of DATE_PATTERNS) {
     const match = text.match(regex);
 
@@ -207,6 +235,243 @@ function extractDate(text) {
   }
 
   return null;
+}
+
+/**
+ * Data do documento, **ancorada em palavra-chave** — mesma disciplina do
+ * `extractTotal`, e pelo mesmo motivo: sem ancora, ganha o numero que estiver
+ * mais acima na pagina, que nao tem relacao nenhuma com o numero certo.
+ *
+ * Sem ancora nenhuma, a primeira data plausivel ainda e melhor que nada: o
+ * campo vem preenchido e a revisao confere. Devolver `null` obrigaria a
+ * digitar do zero justamente no cupom que o OCR ja leu pior.
+ */
+function extractDate(text) {
+  if (typeof text !== 'string') {
+    return null;
+  }
+
+  for (const anchor of DATE_ANCHORS) {
+    for (const { regex } of DATE_PATTERNS) {
+      const match = text.match(
+        new RegExp(anchor.source + ANCHOR_GAP + `(${regex.source})`, 'i'),
+      );
+
+      const parsed = match ? parseDate(match[1]) : null;
+
+      if (parsed !== null) {
+        return parsed;
+      }
+    }
+  }
+
+  return firstDate(text);
+}
+
+/**
+ * Hora impressa, no formato `HH:MM:SS` que a coluna `time` aceita.
+ *
+ * Procurada **junto da data ancorada**, nao solta no texto: um cupom traz hora
+ * de emissao, hora de autorizacao e as vezes a hora da maquininha de cartao. A
+ * que interessa e a que acompanha a data que foi escolhida acima.
+ */
+function extractTime(text) {
+  if (typeof text !== 'string') {
+    return null;
+  }
+
+  for (const anchor of DATE_ANCHORS) {
+    for (const { regex } of DATE_PATTERNS) {
+      const match = text.match(
+        new RegExp(
+          anchor.source +
+            ANCHOR_GAP +
+            regex.source +
+            `[^\\n]{0,8}?(?<time>${TIME.source})`,
+          'i',
+        ),
+      );
+
+      if (match) {
+        return padTime(match.groups.time);
+      }
+    }
+  }
+
+  // Sem nenhuma data no documento, uma hora solta e quase sempre ruido do OCR:
+  // num recibo manuscrito ela saiu de um numero de telefone, e um horario
+  // errado com cara de certo e pior que um campo vazio.
+  if (extractDate(text) === null) {
+    return null;
+  }
+
+  const loose = text.match(TIME);
+
+  return loose ? padTime(loose[0]) : null;
+}
+
+/** `13:59`, `13h59` e `13:59:27` viram `13:59:00` / `13:59:27`. */
+function padTime(raw) {
+  const parts = raw
+    .replace(/\s/g, '')
+    .split(/[:h]/)
+    .map((part) => part.padStart(2, '0'));
+
+  while (parts.length < 3) {
+    parts.push('00');
+  }
+
+  return parts.slice(0, 3).join(':');
+}
+
+const UFS = [
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
+];
+
+// Palavras que so aparecem no meio de um nome de cidade, nunca no fim. Sao o
+// que distingue "RIO DE JANEIRO/RJ" de "SERRINHA FORTALEZA-CE", onde
+// SERRINHA e o bairro e a cidade e so a ultima palavra.
+const CITY_CONNECTORS = new Set([
+  'DE',
+  'DA',
+  'DO',
+  'DAS',
+  'DOS',
+  'SAO',
+  'SÃO',
+  'SANTA',
+  'SANTO',
+  'NOVA',
+  'NOVO',
+  'PORTO',
+  'CAMPO',
+  'CAMPOS',
+  'BELO',
+  'BELA',
+  'RIO',
+  'VILA',
+  'MONTE',
+  'SERRA',
+  'BOA',
+  'BOM',
+  'CRUZ',
+  'PRESIDENTE',
+  'GOVERNADOR',
+  'CONCEICAO',
+  'CONCEIÇÃO',
+  'BARRA',
+  'LAGOA',
+  'POCO',
+  'POÇO',
+  'SETE',
+  'TRES',
+  'TRÊS',
+]);
+
+// A inicial e maiuscula, o resto nao precisa ser: metade dos cupons imprime o
+// endereco em caixa alta e a outra metade em caixa mista ("Fazendinha,
+// Itapipoca /CE"). Exigir caixa alta perdia essa metade em silencio.
+const CITY_UF = new RegExp(
+  `([A-ZÁÉÍÓÚÂÊÔÃÕÇ][A-Za-zÀ-ÿ' ]{2,40})\\s*[-/]\\s*(${UFS.join('|')})\\b`,
+);
+
+/**
+ * Cidade e UF do endereco impresso, no formato `Cidade/UF`.
+ *
+ * O endereco vem numa linha so, sem separador entre bairro e cidade
+ * (`... 2800 SERRINHA FORTALEZA-CE 60714-242`), entao a cidade e reconstruida
+ * de tras para frente: a ultima palavra antes da UF, mais as anteriores
+ * enquanto forem conectores. E o que devolve `Fortaleza/CE` ali e
+ * `Rio De Janeiro/RJ` num endereco carioca, sem precisar de lista de
+ * municipios.
+ */
+function extractCity(text) {
+  if (typeof text !== 'string') {
+    return null;
+  }
+
+  const match = text.match(CITY_UF);
+
+  if (!match) {
+    return null;
+  }
+
+  const words = match[1].trim().split(/\s+/);
+  const taken = [words[words.length - 1]];
+
+  for (let i = words.length - 2; i >= 0; i -= 1) {
+    if (!CITY_CONNECTORS.has(words[i].toUpperCase())) {
+      break;
+    }
+    taken.unshift(words[i]);
+  }
+
+  const city = taken.map(titleCase).join(' ');
+
+  return city.length >= 3 ? `${city}/${match[2]}` : null;
+}
+
+function titleCase(word) {
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+}
+
+// `NFC-e` sai do OCR como `NiC-e`, `NEC-e`, `NFC e`... O miolo do token e o
+// que varia, e a ancora precisa aguentar isso: exigir a grafia certa devolvia
+// `null` justamente nos cupons escaneados, que sao os que dao trabalho.
+const DOCUMENT = new RegExp(
+  'n[a-zà-ú]{0,2}c\\s*-?\\s*e\\s*n?[ºo°.]?\\s*(\\d{3,12})' +
+    '(?:[^\\n]{0,6}?s[ée]ri[ea]\\s*:?\\s*(\\d{1,3}))?',
+  'i',
+);
+
+/**
+ * Identificador do documento, como a planilha manual o escrevia:
+ * `NFC-e 3210 / série 012`.
+ *
+ * Os zeros a esquerda do numero impresso saem fora — `000003210` e como o
+ * equipamento imprime, `3210` e como a pessoa procura o cupom depois.
+ */
+function extractDocument(text) {
+  if (typeof text !== 'string') {
+    return null;
+  }
+
+  const match = text.match(DOCUMENT);
+
+  if (!match) {
+    return null;
+  }
+
+  const number = match[1].replace(/^0+/, '') || '0';
+  const series = match[2] ? ` / série ${match[2]}` : '';
+
+  return `NFC-e ${number}${series}`;
 }
 
 /** CNPJ com 14 digitos, sem mascara. */
@@ -251,11 +516,57 @@ function extractItemTotals(text) {
     .filter((cents) => cents !== null);
 }
 
+/**
+ * Total quando a ancora existe mas o OCR sujou o que vem logo depois.
+ *
+ * Num posto de combustivel real a linha saiu como
+ * `.. VALOR TOTAL Ri 2... 2.225,49`: a ancora esta la, e o `Ri 2... ` entre ela
+ * e o numero derruba a leitura estrita. Aqui a folga e permitida e vence o
+ * **ultimo** valor da linha, que e onde o total e impresso.
+ *
+ * Separado de `extractTotal` de proposito, e nao embutido nele: o que sai daqui
+ * vale menos, entra com confianca menor e por isso chega destacado na revisao.
+ * Misturar os dois faria um palpite passar por leitura.
+ */
+function extractLooseTotal(text) {
+  if (typeof text !== 'string') {
+    return null;
+  }
+
+  const lines = text.split('\n');
+  const amounts = new RegExp(AMOUNT.source, 'gi');
+
+  for (const anchor of TOTAL_ANCHORS) {
+    const regex = new RegExp(anchor.source, 'i');
+
+    for (const line of lines) {
+      const match = line.match(regex);
+
+      if (!match) {
+        continue;
+      }
+
+      const rest = line.slice(match.index + match[0].length).match(amounts);
+      const cents = rest ? parseAmountToCents(rest[rest.length - 1]) : null;
+
+      if (cents !== null) {
+        return cents;
+      }
+    }
+  }
+
+  return null;
+}
+
 module.exports = {
   parseAmountToCents,
   parseDate,
   extractTotal,
+  extractLooseTotal,
   extractDate,
+  extractTime,
+  extractCity,
+  extractDocument,
   extractCnpj,
   extractItemTotals,
 };
