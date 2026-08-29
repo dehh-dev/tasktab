@@ -3,17 +3,20 @@
 const db = require('../config/database');
 
 const COLUMNS = `id, report_id, merchant_id, file_path, file_hash, page_number,
-                 issued_at, amount_cents, category, access_key, status,
-                 extraction_source, confidence, raw_text, duplicate_of_id,
-                 created_at, updated_at`;
+                 issued_at, issued_time, amount_cents, category, category_guessed,
+                 document_ref, access_key, status, extraction_source, confidence,
+                 raw_text, duplicate_of_id, created_at, updated_at`;
 
 // Colunas que a revisao pode corrigir. `report_id`, `file_hash` e
 // `page_number` ficam de fora de proposito: sao a identidade da pagina.
 const UPDATABLE_COLUMNS = [
   'merchant_id',
   'issued_at',
+  'issued_time',
   'amount_cents',
   'category',
+  'category_guessed',
+  'document_ref',
   'access_key',
   'status',
   'extraction_source',
@@ -105,8 +108,9 @@ async function summarizeByReport(reportId, { status, category } = {}) {
  */
 async function findForExport(reportId) {
   const { rows } = await db.query(
-    `SELECT r.id, r.issued_at, r.amount_cents, r.category, r.status,
-            r.duplicate_of_id, r.access_key, r.file_path, r.page_number,
+    `SELECT r.id, r.issued_at, r.issued_time, r.amount_cents, r.category,
+            r.document_ref, r.status, r.duplicate_of_id, r.access_key,
+            r.file_path, r.page_number,
             m.name AS merchant_name, m.city AS merchant_city
      FROM receipts r
      LEFT JOIN merchants m ON m.id = r.merchant_id
@@ -164,8 +168,11 @@ const EXTRACTION_COLUMNS = [
   'status',
   'extraction_source',
   'issued_at',
+  'issued_time',
   'amount_cents',
   'category',
+  'category_guessed',
+  'document_ref',
   'access_key',
   'confidence',
   'merchant_id',

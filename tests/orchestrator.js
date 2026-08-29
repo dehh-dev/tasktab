@@ -178,8 +178,10 @@ async function insertReceipt(reportId, overrides = {}) {
     file_hash: 'a'.repeat(64),
     page_number: 1,
     issued_at: null,
+    issued_time: null,
     amount_cents: null,
     category: null,
+    document_ref: null,
     status: 'pending',
     access_key: null,
     raw_text: null,
@@ -189,20 +191,23 @@ async function insertReceipt(reportId, overrides = {}) {
 
   const { rows } = await db.query(
     `INSERT INTO receipts
-       (report_id, file_path, file_hash, page_number, issued_at, amount_cents,
-        category, status, access_key, raw_text, merchant_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       (report_id, file_path, file_hash, page_number, issued_at, issued_time,
+        amount_cents, category, document_ref, status, access_key, raw_text,
+        merchant_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING id, report_id, file_path, file_hash, page_number, issued_at,
-               amount_cents, category, status, access_key, extraction_source,
-               updated_at`,
+               issued_time, amount_cents, category, document_ref, status,
+               access_key, extraction_source, updated_at`,
     [
       reportId,
       receipt.file_path,
       receipt.file_hash,
       receipt.page_number,
       receipt.issued_at,
+      receipt.issued_time,
       receipt.amount_cents,
       receipt.category,
+      receipt.document_ref,
       receipt.status,
       receipt.access_key,
       receipt.raw_text,
