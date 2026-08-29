@@ -147,3 +147,12 @@ export function reprocessReceipt(id) {
 export function receiptImageUrl(id) {
   return `${RECEIPTS_URL}/${id}/image`;
 }
+
+/**
+ * URL da planilha do relatorio, para um <a href download>. Nao passa por
+ * `request()` de proposito: baixar por fetch exigiria entregar o arquivo como
+ * `blob:`, e a CSP do projeto so libera `'self'`.
+ */
+export function reportXlsxUrl(id) {
+  return `${REPORTS_URL}/${id}/export.xlsx`;
+}
