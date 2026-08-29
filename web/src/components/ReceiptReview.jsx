@@ -60,14 +60,23 @@ export default function ReceiptReview({
 }) {
   const [values, setValues] = useState({
     issued_at: receipt.issued_at ?? '',
+    // O input `time` so aceita HH:MM; o banco devolve HH:MM:SS.
+    issued_time: (receipt.issued_time ?? '').slice(0, 5),
     amount_cents: centsToInputValue(receipt.amount_cents),
     category: receipt.category ?? '',
+    document_ref: receipt.document_ref ?? '',
   });
   const [localErrors, setLocalErrors] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [zoom, setZoom] = useState(1);
+
+  // O destaque some assim que a pessoa escolhe outra categoria: a partir dai a
+  // decisao e dela, e continuar avisando "isto e um palpite" seria mentira.
+  const guessedCategory =
+    Boolean(receipt.category_guessed) &&
+    values.category === (receipt.category ?? '');
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [dismissed, setDismissed] = useState(() => new Set());
@@ -150,8 +159,10 @@ export default function ReceiptReview({
     try {
       await api.updateReceipt(receipt.id, {
         issued_at: values.issued_at,
+        issued_time: values.issued_time || null,
         amount_cents: amountCents,
         category: values.category,
+        document_ref: values.document_ref.trim() || null,
         status: 'confirmed',
       });
       await onAction();
@@ -514,6 +525,33 @@ export default function ReceiptReview({
           </div>
 
           <div className="field">
+            <label className="field__label" htmlFor="review-time">
+              Hora
+            </label>
+            <input
+              id="review-time"
+              className="field__input"
+              type="time"
+              value={values.issued_time}
+              onChange={(event) => setField('issued_time', event.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label className="field__label" htmlFor="review-document">
+              Documento
+            </label>
+            <input
+              id="review-document"
+              className="field__input"
+              type="text"
+              placeholder="NFC-e 3210 / série 012"
+              value={values.document_ref}
+              onChange={(event) => setField('document_ref', event.target.value)}
+            />
+          </div>
+
+          <div className="field">
             <label className="field__label" htmlFor="review-category">
               Categoria
               <span className="field__required" aria-hidden="true">
@@ -522,9 +560,16 @@ export default function ReceiptReview({
             </label>
             <select
               id="review-category"
-              className="field__input"
+              className={
+                guessedCategory
+                  ? 'field__input field__input--guess'
+                  : 'field__input'
+              }
               value={values.category}
               aria-invalid={Boolean(errors.category)}
+              aria-describedby={
+                guessedCategory ? 'review-category-guess' : undefined
+              }
               onChange={(event) => setField('category', event.target.value)}
             >
               <option value="">Selecione...</option>
@@ -534,6 +579,15 @@ export default function ReceiptReview({
                 </option>
               ))}
             </select>
+            {/* O palpite vem do nome do emitente, nao do CNPJ cadastrado: dizer
+                isso e o que separa "a ferramenta leu" de "a ferramenta
+                chutou". Sem essa linha o campo chegaria com a mesma cara de um
+                dado conferido. */}
+            {guessedCategory && (
+              <span className="field__hint" id="review-category-guess">
+                Sugerida pelo nome do emitente — confira antes de confirmar.
+              </span>
+            )}
             {errors.category && (
               <span className="field__error" role="alert">
                 {errors.category}

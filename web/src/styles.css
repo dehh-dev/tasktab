@@ -710,3 +710,11 @@ textarea.field__input {
   white-space: nowrap;
   width: 1px;
 }
+
+/* Campo preenchido por palpite da extracao, ainda nao confirmado por ninguem.
+   Borda tracejada, e nao cor sozinha: a paleta do projeto nunca usa cor como
+   unico canal, e o texto de apoio abaixo do campo diz o mesmo por escrito. */
+.field__input--guess {
+  border-style: dashed;
+  border-color: var(--accent-muted, #9e6a03);
+}

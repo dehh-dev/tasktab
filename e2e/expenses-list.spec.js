@@ -69,11 +69,15 @@ test('envia um PDF por clique e ve o total atualizar', async ({
 
   // O upload responde 202 e o processamento roda em segundo plano: o total
   // so aparece depois do polling capturar o needs_review.
-  // O valor aparece duas vezes de proposito (resumo e linha do comprovante):
-  // escopar ao resumo evita o modo estrito do Playwright reclamar.
-  await expect(page.locator('.summary').getByText('R$ 37,60')).toBeVisible({
-    timeout: 15000,
-  });
+  // O valor se repete de proposito — na linha do comprovante, no total e no
+  // subtotal do tipo que a extracao adivinhou. Escopar ao item "Total" e o que
+  // mantem a assercao sobre o numero que importa aqui.
+  await expect(
+    page
+      .locator('.summary__item')
+      .filter({ hasText: 'Total' })
+      .getByText('R$ 37,60'),
+  ).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Aguardando revisao')).toBeVisible();
 });
 
@@ -107,9 +111,12 @@ test('envia um PDF arrastando para a zona de soltar', async ({
   const dropzone = page.locator('.dropzone');
   await dropzone.dispatchEvent('drop', { dataTransfer });
 
-  await expect(page.locator('.summary').getByText('R$ 48,60')).toBeVisible({
-    timeout: 15000,
-  });
+  await expect(
+    page
+      .locator('.summary__item')
+      .filter({ hasText: 'Total' })
+      .getByText('R$ 48,60'),
+  ).toBeVisible({ timeout: 15000 });
 });
 
 test('mostra erro do servidor ao subir arquivo que nao e PDF', async ({
