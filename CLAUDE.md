@@ -303,11 +303,48 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - `extractTotal` e **ancorado em palavra-chave**. Nao volte a usar "o maior
   numero da pagina": chave de acesso (44 digitos), CNPJ (14) e telefone (11)
   sao todos maiores que qualquer refeicao.
+- **`extractDate` tambem e ancorado**, e prefere a linha de autorizacao. Num
+  cupom real o texto trazia `NiC-e ... 02/06/2026` e, tres linhas abaixo,
+  `Data de Autorização 02/08/2026`: o OCR errou a primeira, "a primeira data da
+  pagina" venceu, e agosto virou junho numa prestacao ja assinada. A
+  autorizacao e carimbo do SEFAZ e vale mais que o que o equipamento imprimiu.
+- **Ancora nao atravessa quebra de linha.** `\s*` e `\s+` engolem o `\n`, e foi
+  assim que o cabecalho "Valor unit. Valor total" colou no codigo do primeiro
+  item e o total do cupom virou `001` — R$ 1,00 no lugar de R$ 165,00. O mesmo
+  bug apareceu no nome do emitente, onde o CNPJ colava na linha de endereco.
+  Use busca por linha ou `[^\S\n]*`.
+- Ha um segundo passe, `extractLooseTotal`, para a linha em que o OCR sujou o
+  espaco entre a ancora e o numero (`.. VALOR TOTAL Ri 2... 2.225,49`). Ele
+  entra com confianca 0.3, o que arrasta a confianca do comprovante para baixo
+  e faz a linha chegar destacada na revisao. **Nao junte os dois** — misturar
+  faria um palpite passar por leitura.
+- Nome do emitente vem da **razao social colada no CNPJ**, nao da primeira
+  linha da pagina. A primeira linha de um PDF escaneado e a margem do papel, e
+  era com ela que 5 dos 19 emitentes do caso-base tinham sido cadastrados
+  (`: 40) 47 DL? "o`).
+- `issued_time`, `document_ref` e a cidade do emitente saem do mesmo texto que
+  ja estava sendo extraido e jogado fora. A hora e procurada **junto da data
+  ancorada** (um cupom traz a hora da emissao, a da autorizacao e a da
+  maquininha), e nao ha hora sem data: um `09:07` solto no ruido do OCR saiu de
+  um numero de telefone.
 - **Nada e confirmado automaticamente.** A extracao troca digitar por
   conferir, nao por deixar de olhar.
-- Categoria **nunca** e adivinhada por nome ou palavra-chave — vem do CNPJ do
-  emitente cadastrado. Ha teste com um cupom de "RESTAURANTE E LANCHONETE"
-  que continua sem categoria, justamente para travar essa tentacao.
+- Categoria tem tres degraus, nesta ordem: **cadastro do emitente** (decisao
+  humana, vale sempre), **palpite por palavra-chave** no nome
+  (`category-guess.js`), e nada. O palpite grava `category_guessed = true`, a
+  revisao destaca o campo com borda tracejada e a frase "Sugerida pelo nome do
+  emitente", e editar a categoria ou confirmar o comprovante zera a marca.
+  **Palpite nunca sobrescreve cadastro** — ha teste dos dois lados.
+- Isto **inverteu** a regra anterior ("categoria nunca e adivinhada por nome"),
+  a pedido de quem usa: num lote de 30 cupons, classificar tudo a mao custa
+  mais que corrigir os poucos que o palpite erra. O que segurou a regra antiga
+  continua valendo em outra forma — o risco nao era adivinhar, era adivinhar
+  **sem dizer que adivinhou**. Se algum dia a marca sair da tela, a regra
+  antiga volta a ser a certa.
+- O palpite so dispara com indicio no nome. `K B A TEIXEIRA COMERCIO E
+SERVICOS` continua sem categoria, e ha teste disso: preencher sem certeza e
+  preencher quando ha indicio, nao sortear um tipo para o campo nao ficar
+  vazio.
 - O CNPJ confiavel e o das posicoes 7 a 20 da **chave de acesso**, nao o do
   texto: o cupom traz tambem o da credenciadora do cartao.
 - Chave que nao fecha o DV mod-11 e **descartada**. Nao ha meio termo entre
@@ -367,6 +404,19 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - O resumo e **uma aba por tipo** com lancamento, mais a aba `Resumo`, na ordem
   do enum. Ordenar por valor faria dois relatorios da mesma pessoa sairem com
   layout diferente, e comparar um mes com o outro viraria procurar a linha.
+- Colunas da aba de tipo: **Data, Local, Cidade, Hora, Documento, Valor** — as
+  mesmas da planilha manual que o projeto substitui. Cidade sai do emitente
+  (`merchants.city`), hora e documento do proprio comprovante. Enquanto as tres
+  ultimas nao existiam, exportar nao dispensava voltar ao papel.
+- A formatacao **nao e enfeite**: cabecalho branco sobre `FF1F3864`, zebra
+  `FFF2F2F2`, bordas, linha de TOTAL mesclada e invertida, cabecalho congelado
+  e autofiltro. E o layout que quem confere ja conhece da planilha antiga —
+  chegar com outro obrigaria a reaprender onde olhar. A zebra existe para a
+  vista nao escorregar de linha numa tabela de seis colunas; nenhuma cor
+  carrega informacao sozinha.
+- Ha teste afirmando o preenchimento do cabecalho, a zebra, o congelamento e a
+  mesclagem do TOTAL. Formatacao que ninguem testa e formatacao que a proxima
+  refatoracao apaga sem que a suite reclame.
 - Valor de cada tipo no `Resumo` e **formula cruzando abas**
   (`SUM('Alimentação'!D2:D9)`), nao numero repetido: dois numeros para a mesma
   conta e uma contradicao esperando um deles ser editado.

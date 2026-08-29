@@ -264,6 +264,10 @@ relatorios da mesma pessoa sairem com o mesmo layout. So entram comprovantes
 `confirmed`, o mesmo criterio do Anexo I; confirmar ja exige categoria, entao
 toda linha tem tipo.
 
+Cada aba traz **Data, Local, Cidade, Hora, Documento e Valor**, com cabecalho
+congelado, autofiltro, zebra e linha de total — o mesmo layout da planilha
+manual que o projeto substitui.
+
 O valor de cada tipo no `Resumo` e **formula cruzando abas**
 (`SUM('Alimentação'!D2:D9)`), nao numero repetido: corrigir um lancamento na
 aba do tipo muda o resumo e o total sozinho. O que ficou de fora
