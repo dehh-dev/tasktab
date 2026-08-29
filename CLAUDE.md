@@ -343,7 +343,7 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 
 ## Exportacao
 
-`src/services/export/` — resumo proprio, Anexo I oficial e PDF consolidado.
+`src/services/export/` — resumo por tipo, Anexo I oficial e PDF consolidado.
 
 - **O template em `assets/anexo-i-template.xlsx` e SINTETICO.** Nao existe
   neste projeto o arquivo real do Anexo I. Antes de qualquer uso em producao,
@@ -360,13 +360,29 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   celula (`[^>]*?`, nao `[^>]*`). Guloso consome o `/` de uma celula
   autofechada (`<c .../>`) e a substituicao apaga a celula seguinte inteira.
   Ja aconteceu uma vez — **nao volte para guloso**.
-- So `receipts.status === 'confirmed'` entra no Anexo I. O resumo proprio
-  (issue 16) mostra tudo; o Anexo I e o que vai assinado.
-- Totais do resumo proprio sao **`SUMIFS`** contra uma coluna auxiliar oculta
-  (`0`/`1` de duplicata), nao comparacao de texto de status. Verificado com um
-  motor de formulas independente durante o desenvolvimento — nao faz parte da
-  suite, mas o resultado (110,56 batendo com a soma manual) confirmou a
-  semantica antes de escrever os testes de contrato.
+- So `receipts.status === 'confirmed'` entra nas duas saidas Excel (issue 29):
+  no Anexo I porque e o que vai assinado, e no resumo por tipo pelo mesmo
+  motivo. O que ficou de fora vai contado no bloco "Fora da prestacao", sem
+  entrar em soma — some do total, nao da vista.
+- O resumo e **uma aba por tipo** com lancamento, mais a aba `Resumo`, na ordem
+  do enum. Ordenar por valor faria dois relatorios da mesma pessoa sairem com
+  layout diferente, e comparar um mes com o outro viraria procurar a linha.
+- Valor de cada tipo no `Resumo` e **formula cruzando abas**
+  (`SUM('Alimentação'!D2:D9)`), nao numero repetido: dois numeros para a mesma
+  conta e uma contradicao esperando um deles ser editado.
+- **Nome de aba em formula precisa de aspas simples** e o Excel recusa
+  `: \ / ? * [ ]` e nomes acima de 31 caracteres. `sheetName`/`sheetRange`
+  cuidam disso — uma categoria nova com acento ou barra derrubaria a planilha
+  inteira sem elas.
+- **`nao_classificado` e `NULL` sao o mesmo grupo** (`categoryKey` em
+  `labels.js`). Enquanto tinham rotulos diferentes, o subtotal procurava
+  "Nao classificado" e as linhas diziam "Sem categoria": o valor entrava no
+  total e em nenhum subtotal, e a soma dos tipos nao fechava. **Nao volte a
+  dar rotulo proprio ao `nao_classificado`.**
+- Teste de planilha **resolve a formula contra as celulas**
+  (`tests/helpers/xlsx-formula.js`), nao so compara a string. Foi a
+  comparacao de string que deixou passar o subtotal que apontava para um
+  rotulo que nenhuma linha usava.
 - O carimbo do PDF fica numa faixa **nova**, criada ao embutir a pagina
   original numa pagina maior — nunca um retangulo desenhado por cima.
   Fisicamente nao ha como cobrir o cupom.

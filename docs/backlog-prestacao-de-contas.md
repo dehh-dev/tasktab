@@ -990,3 +990,61 @@ barras, a roda do mouse e o teclado coerentes de graça.
 Zoom ancorado no cursor (hoje a roda amplia a partir da origem, não do ponto
 sob o mouse), arrasto com botão do meio e gestos de pinça em touch. São
 melhorias independentes, e nenhuma é bloqueada por esta.
+
+---
+
+## Issue 29 — Exportação Excel organizada por tipo
+
+`area:export` · `area:web` · depende de #16 e #21
+
+O resumo próprio da #16 saía como lista cronológica plana, com os subtotais por
+categoria empilhados no rodapé — e não tinha botão nenhum na interface: só
+quem soubesse a URL conseguia exportar.
+
+**A investigação achou um defeito de verdade, não só de ergonomia.** Um
+comprovante sem categoria aparecia na coluna Tipo como `Sem categoria`
+(`labels.js`), enquanto o subtotal do rodapé procurava por `Não classificado`
+(a chave do enum). Nenhuma linha casava: o valor entrava no TOTAL e em
+**nenhum** subtotal, e a soma dos tipos não fechava com o total geral. O
+relatório 22 do banco de desenvolvimento, com um único cupom de R$ 37,60 sem
+categoria, reproduzia o caso inteiro.
+
+**Escopo**
+
+`GET /api/reports/:id/export.xlsx` passa a gerar uma aba `Resumo` e **uma aba
+por tipo com lançamento**. Só entra `confirmed` — o mesmo critério do Anexo I,
+e confirmar já exige categoria, então toda linha da planilha tem tipo.
+
+O valor de cada tipo no `Resumo` é fórmula cruzando abas
+(`SUM('Alimentação'!D2:D9)`), não número repetido: corrigir um lançamento na
+aba do tipo muda o resumo e o total sozinho. Repetir o valor criaria duas
+verdades no mesmo arquivo.
+
+**Critérios de aceite**
+
+- [x] `nao_classificado` e `NULL` colapsam num rótulo só (`categoryKey`) — é
+      ausência de decisão, não um tipo de despesa
+- [x] Uma aba por tipo **com lançamento**, na ordem do enum: dois relatórios da
+      mesma pessoa saem com o mesmo layout e podem ser comparados
+- [x] Nome de aba normalizado (`: \ / ? * [ ]` e o teto de 31 caracteres) e
+      referência entre abas com aspas simples — sem isso um acento no rótulo
+      derruba a fórmula
+- [x] Relatório sem nenhum confirmado gera arquivo válido com total `0`
+      literal, não `SUM` de intervalo vazio (que abre em `#REF!`)
+- [x] O que não entrou é listado em "Fora da prestação", contado e **fora de
+      qualquer soma** — uma planilha que só mostra o confirmado esconde o
+      trabalho que falta de quem vai assinar
+- [x] Teste que **resolve** a fórmula contra as células, em
+      `tests/helpers/xlsx-formula.js`, e não só compara a string: é o que pega
+      o intervalo apontando para o lugar errado
+- [x] Botão "Exportar Excel" na tela do relatório, como `<a href download>` —
+      baixar por `fetch` exigiria `blob:`, que a CSP não libera
+- [x] Sem confirmado, o botão fica desabilitado com a razão à vista, em vez de
+      entregar planilha vazia
+- [x] Spec E2E: botão desligado antes, download com o nome certo depois de
+      confirmar
+
+**Fora de escopo**
+
+Filtro por status na URL da exportação, exportar vários relatórios de uma vez
+e agrupar por emitente. Nenhum é bloqueado por esta.
