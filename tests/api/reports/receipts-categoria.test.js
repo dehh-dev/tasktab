@@ -53,8 +53,9 @@ describe('categorizacao por emitente', () => {
 
     const [receipt] = await listReceipts(report.id);
 
-    // Sem cadastro, a categoria fica em aberto — nunca e adivinhada.
-    expect(receipt.category).toBeNull();
+    // Sem cadastro, a categoria vem de palpite e chega marcada como tal. O que
+    // o cadastro decide e o que vale sem marca nenhuma.
+    expect(receipt.category_guessed).toBe(true);
     expect(receipt.status).toBe('needs_review');
     expect(receipt.merchant_id).not.toBeNull();
 
@@ -112,14 +113,16 @@ describe('categorizacao por emitente', () => {
 
     const [receipt] = await listReceipts(report.id);
 
+    // CNPJ invalido nao vira cadastro. O palpite pelo nome e independente
+    // disso: ele nunca dependeu do CNPJ, e por isso continua preenchido.
     expect(receipt.merchant_id).toBeNull();
-    expect(receipt.category).toBeNull();
+    expect(receipt.category_guessed).toBe(true);
 
     const lista = await request('GET', '/api/merchants');
     expect(lista.body.data).toHaveLength(0);
   });
 
-  it('nunca adivinha categoria por nome do estabelecimento', async () => {
+  it('adivinha a categoria pelo nome, marcada como palpite', async () => {
     const report = await insertReport();
 
     await upload(report.id, [
@@ -134,8 +137,63 @@ describe('categorizacao por emitente', () => {
 
     const [receipt] = await listReceipts(report.id);
 
-    // "Restaurante" no nome nao vira alimentacao: chutar por palavra-chave
-    // acertaria a maioria e erraria em silencio a minoria.
+    // "Restaurante" no nome vira alimentacao — mas **marcada**. A marca e o
+    // contrato inteiro desta funcionalidade: sem ela o palpite chegaria na
+    // revisao com a mesma cara de um dado lido do documento, e e nesse ponto
+    // que uma planilha errada passa despercebida.
+    expect(receipt.category).toBe('alimentacao');
+    expect(receipt.category_guessed).toBe(true);
+    expect(receipt.status).toBe('needs_review');
+  });
+
+  it('nao adivinha o que o nome nao diz', async () => {
+    const report = await insertReport();
+
+    await upload(report.id, [
+      {
+        buffer: await makeReceiptPdf({
+          name: 'K B A TEIXEIRA COMERCIO E SERVICOS LTDA',
+          cnpj: '20.305.961/0001-11',
+        }),
+        filename: 'generico.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    // Razao social que nao diz o que foi comprado continua sem categoria.
+    // Preencher **mesmo sem certeza** e preencher quando ha indicio, nao
+    // sortear um tipo para nao deixar o campo vazio.
     expect(receipt.category).toBeNull();
+    expect(receipt.category_guessed).toBe(false);
+  });
+
+  it('palpite nunca sobrescreve a categoria ja cadastrada no emitente', async () => {
+    const report = await insertReport();
+    const cnpj = '20305961000111';
+
+    // O emitente tem "restaurante" no nome, e cadastro dizendo outra coisa.
+    await insertMerchant({
+      cnpj,
+      name: 'RESTAURANTE DO POSTO',
+      default_category: 'combustivel',
+    });
+
+    await upload(report.id, [
+      {
+        buffer: await makeReceiptPdf({
+          name: 'RESTAURANTE DO POSTO',
+          cnpj: '20.305.961/0001-11',
+        }),
+        filename: 'posto.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    // Cadastro e decisao registrada por uma pessoa; palpite e palavra-chave.
+    // Deixar o palpite vencer desfaria a classificacao que alguem ja fez.
+    expect(receipt.category).toBe('combustivel');
+    expect(receipt.category_guessed).toBe(false);
   });
 });

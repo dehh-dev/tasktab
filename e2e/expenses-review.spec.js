@@ -125,9 +125,18 @@ test('recusa confirmar sem categoria, sem chamar a API', async ({
   request,
 }) => {
   const report = await createReport(request, { title: 'Sem categoria' });
-  const pdf = await makeReceiptPdf({ total: '37,60', date: '19/06/2026' });
+  // Razao social que nao diz o que foi comprado: nao ha palpite de categoria,
+  // e o campo chega vazio. E o unico jeito de exercitar a validacao local
+  // agora que o nome do emitente sugere um tipo sempre que da para sugerir.
+  const pdf = await makeReceiptPdf({
+    name: 'K B A TEIXEIRA COMERCIO E SERVICOS LTDA',
+    total: '37,60',
+    date: '19/06/2026',
+  });
 
   await uploadAndOpenReview(page, request, report, [pdf]);
+
+  await expect(page.locator('#review-category')).toHaveValue('');
 
   let patched = false;
   page.on('request', (req) => {
@@ -232,4 +241,35 @@ test('chave de acesso invalida no formulario de exemplo', async ({
   await expect(page.getByText(chave)).toBeVisible();
   // Origem QR e a mais confiavel que a extracao produz.
   await expect(page.getByText(/QR Code/)).toBeVisible();
+});
+
+test('a revisao chega com hora, documento e o palpite de categoria a vista', async ({
+  page,
+  request,
+}) => {
+  const report = await createReport(request, { title: 'Campos extraidos' });
+  const pdf = await makeReceiptPdf({
+    total: '37,60',
+    date: '19/06/2026',
+    extra: ['NFC-e no 000009309 Serie 006'],
+  });
+
+  await uploadAndOpenReview(page, request, report, [pdf]);
+
+  // O ganho pedido: chegar preenchido. Digitar hora e numero de documento de
+  // 30 cupons a mao era o trabalho que a extracao existe para tirar.
+  await expect(page.locator('#review-time')).toHaveValue('12:34');
+  await expect(page.locator('#review-document')).toHaveValue(
+    'NFC-e 9309 / série 006',
+  );
+
+  // E a categoria vem preenchida **marcada**: a palavra "sugerida" e o que
+  // separa um palpite de um dado lido do documento.
+  await expect(page.locator('#review-category')).toHaveValue('alimentacao');
+  await expect(page.getByText(/Sugerida pelo nome do emitente/)).toBeVisible();
+
+  // Escolhida a categoria por uma pessoa, o aviso sai: a decisao passou a ser
+  // dela, e continuar avisando seria mentira.
+  await page.locator('#review-category').selectOption('outros');
+  await expect(page.getByText(/Sugerida pelo nome do emitente/)).toHaveCount(0);
 });

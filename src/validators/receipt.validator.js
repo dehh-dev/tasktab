@@ -86,6 +86,43 @@ function validateAmountCents(value, errors) {
   return value;
 }
 
+// `HH:MM` ou `HH:MM:SS`. A coluna e `time`, entao o banco recusaria lixo de
+// qualquer jeito — validar aqui e o que devolve 422 com o campo certo em vez
+// de um 500 vindo do driver.
+const TIME_FORMAT = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
+function validateIssuedTime(value, errors) {
+  if (value === null || value === '') {
+    return null;
+  }
+
+  if (typeof value !== 'string' || !TIME_FORMAT.test(value)) {
+    errors.push({
+      field: 'issued_time',
+      message: 'issued_time deve ser uma hora no formato HH:MM ou HH:MM:SS',
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
+function validateDocumentRef(value, errors) {
+  if (value === null || value === '') {
+    return null;
+  }
+
+  if (typeof value !== 'string' || value.length > 120) {
+    errors.push({
+      field: 'document_ref',
+      message: 'document_ref deve ser um texto de ate 120 caracteres',
+    });
+    return undefined;
+  }
+
+  return value.trim();
+}
+
 function assertValid(errors) {
   if (errors.length > 0) {
     throw new ValidationError({ details: errors });
@@ -128,6 +165,14 @@ function validateUpdate(body, current = {}) {
     data.category = validateCategory(body.category, errors);
   }
 
+  if (body.issued_time !== undefined) {
+    data.issued_time = validateIssuedTime(body.issued_time, errors);
+  }
+
+  if (body.document_ref !== undefined) {
+    data.document_ref = validateDocumentRef(body.document_ref, errors);
+  }
+
   if (body.status !== undefined) {
     data.status = validateStatus(body.status, errors);
   }
@@ -140,7 +185,8 @@ function validateUpdate(body, current = {}) {
       details: [
         {
           field: 'body',
-          message: 'campos aceitos: issued_at, amount_cents, category, status',
+          message:
+            'campos aceitos: issued_at, issued_time, amount_cents, category, document_ref, status',
         },
       ],
     });
@@ -156,6 +202,12 @@ function validateUpdate(body, current = {}) {
   // Correcao humana marca a origem, para a revisao saber o que ja foi olhado.
   if (REVIEWED_FIELDS.some((field) => field in data)) {
     data.extraction_source = 'manual';
+  }
+
+  // Uma pessoa mexeu na categoria, ou assinou embaixo dela ao confirmar: nos
+  // dois casos deixou de ser palpite, e o destaque da revisao tem de sumir.
+  if ('category' in data || merged.status === 'confirmed') {
+    data.category_guessed = false;
   }
 
   return data;

@@ -8,6 +8,7 @@ const parsers = require('./parsers');
 const accessKey = require('./access-key');
 const qrService = require('./qr.service');
 const ocrService = require('./ocr.service');
+const categoryGuess = require('./category-guess');
 const dedup = require('../dedup.service');
 
 // Chave lida do QR e o dado mais confiavel que a extracao produz: o codigo tem
@@ -137,9 +138,10 @@ async function processPage(receipt, page, { buffer, log }) {
     };
   }
 
-  const { merchant_id, category } = await classify(
+  const { merchant_id, category, category_guessed } = await classify(
     fields.cnpj?.value,
     parsers.merchantName(text ?? ''),
+    fields.city?.value ?? null,
   );
 
   await Receipt.applyExtraction(receipt.id, {
@@ -152,8 +154,11 @@ async function processPage(receipt, page, { buffer, log }) {
     issued_at: fields.issued_at?.value ?? null,
     amount_cents: fields.amount_cents?.value ?? null,
     access_key: key?.value ?? null,
+    issued_time: fields.issued_time?.value ?? null,
+    document_ref: fields.document_ref?.value ?? null,
     merchant_id,
     category,
+    category_guessed,
     // O OCR entra no calculo como mais um campo: se ele leu mal, a linha
     // inteira merece atencao na revisao.
     confidence: lowestConfidence(
@@ -185,35 +190,52 @@ async function processPage(receipt, page, { buffer, log }) {
  * seguinte daquele CNPJ ja entra classificado — no caso-base, 7 dos 28
  * lancamentos eram do mesmo emitente.
  *
- * Categoria **nunca** e adivinhada por nome ou palavra-chave. Sem CNPJ
- * conhecido o comprovante vai para revisao, e e uma pessoa que decide. Chutar
- * por nome acertaria a maioria e erraria em silencio a minoria — que e
- * exatamente o tipo de erro que so aparece na conferencia.
+ * Hierarquia da categoria, da mais forte para a mais fraca:
+ *
+ * 1. a categoria padrao do emitente cadastrado (decidida por uma pessoa uma
+ *    vez, aplicada a todo cupom seguinte daquele CNPJ);
+ * 2. o palpite por palavra-chave no nome (`category-guess.js`), que grava
+ *    `category_guessed` e chega destacado na revisao;
+ * 3. nada — e uma pessoa decide.
+ *
+ * O palpite **nunca** sobrescreve o passo 1: cadastro e decisao registrada, e
+ * um palpite nao desfaz decisao de ninguem.
  */
-async function classify(cnpj, name) {
+async function classify(cnpj, name, city) {
+  const guess = categoryGuess.guessCategory(name);
+  const fallback = {
+    merchant_id: null,
+    category: guess,
+    category_guessed: guess !== null,
+  };
+
   const normalized = cnpjRules.normalize(cnpj);
 
   if (normalized === null || !cnpjRules.isValid(normalized)) {
-    return { merchant_id: null, category: null };
+    return fallback;
   }
 
   const merchant = await Merchant.findOrCreate({
     cnpj: normalized,
     name: name || `Emitente ${normalized}`,
+    city,
   });
 
   if (!merchant) {
-    return { merchant_id: null, category: null };
+    return fallback;
   }
+
+  // `nao_classificado` e a ausencia de decisao, nao uma categoria: gravar isso
+  // deixaria o comprovante parecendo classificado na listagem.
+  const registered =
+    merchant.default_category === 'nao_classificado'
+      ? null
+      : merchant.default_category;
 
   return {
     merchant_id: merchant.id,
-    // `nao_classificado` e a ausencia de decisao, nao uma categoria: gravar
-    // isso deixaria o comprovante parecendo classificado na listagem.
-    category:
-      merchant.default_category === 'nao_classificado'
-        ? null
-        : merchant.default_category,
+    category: registered ?? guess,
+    category_guessed: registered === null && guess !== null,
   };
 }
 

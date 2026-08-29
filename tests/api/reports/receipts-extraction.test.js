@@ -114,9 +114,9 @@ describe('extracao no upload', () => {
 
     const [receipt] = await listReceipts(report.id);
 
-    // Extrair nao e conferir. Confirmar continua sendo ato humano.
+    // Extrair nao e conferir. Confirmar continua sendo ato humano — inclusive
+    // quando a extracao preencheu tudo, categoria adivinhada incluida.
     expect(receipt.status).toBe('needs_review');
-    expect(receipt.category).toBeNull();
   });
 
   it('nao soma no total o que ainda nao foi confirmado', async () => {
@@ -129,10 +129,13 @@ describe('extracao no upload', () => {
     await waitForProcessing(report.id);
     const response = await request('GET', `/api/reports/${report.id}/receipts`);
 
-    // O valor ja esta na linha, mas o emitente ainda nao foi classificado,
-    // entao nao ha subtotal por categoria.
+    // O valor ja esta na linha e a categoria veio de palpite, entao o subtotal
+    // aparece — mas provisorio: a linha continua em `needs_review` e carrega a
+    // marca de palpite. Subtotal nao e assinatura.
     expect(response.body.data[0].amount_cents).toBe(3760);
-    expect(response.body.meta.by_category).toEqual({});
+    expect(response.body.data[0].status).toBe('needs_review');
+    expect(response.body.data[0].category_guessed).toBe(true);
+    expect(response.body.meta.by_category).toEqual({ alimentacao: 3760 });
   });
 
   it('extrai cada arquivo do lote independentemente', async () => {

@@ -1048,3 +1048,80 @@ verdades no mesmo arquivo.
 
 Filtro por status na URL da exportação, exportar vários relatórios de uma vez
 e agrupar por emitente. Nenhum é bloqueado por esta.
+
+---
+
+## Issue 30 — Campos que já estavam no texto, e a planilha com cara de planilha
+
+`area:extracao` · `area:export` · `area:web` · depende de #29
+
+Conferência dos arquivos gerados contra as planilhas reais
+(`Prestação Contas Itapipoca Henrique.xlsx`) apontou três coisas ao mesmo
+tempo: erro de leitura, planilha crua demais, e campos que a pessoa preferia
+receber preenchidos mesmo sem certeza a ter de digitar.
+
+**O diagnóstico achou quatro defeitos, não uma limitação de OCR.** Tudo o que
+faltava já estava no `raw_text` e era descartado:
+
+1. **Data pegava a primeira do texto.** No cupom 106 o OCR leu
+   `NiC-e ... 02/06/2026` (6 no lugar do 8) e, três linhas abaixo, estava
+   `Data de Autorização 02/08/2026`. A errada venceu. Os comprovantes 101 e 106
+   foram **confirmados com a data errada** — a prova de que campo preenchido
+   sem destaque passa despercebido.
+2. **Âncora do total atravessava a quebra de linha.** `\s+` engole o `\n`: o
+   cabeçalho terminava em "Valor total", a linha seguinte começava com `001`, e
+   o total do cupom virava R$ 1,00.
+3. **Nome do emitente era "a primeira linha não vazia"** — num PDF escaneado,
+   a margem do papel. 5 dos 19 emitentes estavam cadastrados como
+   `: 40) 47 DL? "o`, e 11 dos 24 comprovantes não tinham emitente nenhum.
+4. **Cidade, hora e documento nunca foram extraídos**, embora estejam no texto
+   (`... SERRINHA FORTALEZA-CE 60714-242`, `13:59:27`,
+   `NiC-e nº 000003210 Séria 012`). `merchants.city` existia e nunca era
+   populada.
+
+**Escopo**
+
+Extração ancorada para data e hora, nome pela razão social colada ao CNPJ,
+cidade reconstruída do endereço, documento fiscal, e palpite de categoria por
+palavra-chave. Colunas `issued_time`, `document_ref` e `category_guessed` em
+`receipts`. Planilha com as seis colunas e a formatação da referência.
+
+**A decisão que inverteu uma regra**
+
+Categoria passou a ser adivinhada por nome, o que o projeto proibia. A troca
+foi consciente e a condição é a marca: `category_guessed` faz o campo chegar
+com borda tracejada e a frase "Sugerida pelo nome do emitente — confira antes
+de confirmar". O risco que a regra antiga evitava não era adivinhar; era
+adivinhar **sem dizer que adivinhou**. Editar a categoria ou confirmar zera a
+marca, e cadastro de emitente nunca é sobrescrito por palpite.
+
+**Critérios de aceite**
+
+- [x] `extractDate` prefere a data da autorização à primeira da página
+- [x] Âncora não atravessa `\n` — no total e no nome do emitente
+- [x] `extractLooseTotal` como segundo passe, com confiança 0.3, separado do
+      estrito para um palpite não passar por leitura
+- [x] Hora só quando há data: um `09:07` solto no ruído do OCR veio de telefone
+- [x] Cidade separa bairro de município (`SERRINHA FORTALEZA-CE` →
+      `Fortaleza/CE`) sem lista de municípios, e lê endereço em caixa mista
+- [x] Nome do emitente pela razão social; teste do caso em que o CNPJ termina
+      a linha e o endereço vinha no lugar
+- [x] Palpite de categoria marcado, some ao editar ou confirmar, nunca
+      sobrescreve cadastro; `null` quando o nome não diz nada
+- [x] Colunas Cidade, Hora e Documento na planilha, vazias quando o cupom não
+      as traz
+- [x] Formatação da referência, com teste de cabeçalho, zebra, congelamento e
+      mesclagem do TOTAL
+- [x] Campos de hora e documento na tela de revisão, e spec E2E do palpite
+
+**Medido nos 24 comprovantes reais do banco de desenvolvimento**
+
+Cidade saiu de 3 para 20 preenchidas; hora e documento, de 0 para 7 e 4; nome
+do emitente passou a acertar a razão social nos 7 cupons com camada de texto.
+Os 17 restantes são recibos manuscritos — continuam fora por decisão, o
+Tesseract não lê caneta sobre formulário.
+
+**Fora de escopo**
+
+Ler manuscrito, corrigir OCR por dicionário e casar cidade contra a tabela do
+IBGE. Nenhum é bloqueado por esta.
