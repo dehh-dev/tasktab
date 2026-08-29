@@ -39,7 +39,6 @@ const CATEGORY_COLUMN = {
   combustivel: 'W',
   estacionamento: 'W',
   transporte: 'W',
-  hospedagem: 'X',
   lavanderia: 'X',
   outros: 'X',
   nao_classificado: 'X',

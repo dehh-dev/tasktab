@@ -47,24 +47,6 @@ function parse(text) {
     }
   }
 
-  const time = normalize.extractTime(text);
-  if (time !== null) {
-    fields.issued_time = {
-      value: time,
-      source: 'text',
-      confidence: CONFIDENCE,
-    };
-  }
-
-  const document = normalize.extractDocument(text);
-  if (document !== null) {
-    fields.document_ref = {
-      value: document,
-      source: 'text',
-      confidence: CONFIDENCE,
-    };
-  }
-
   const city = normalize.extractCity(text);
   if (city !== null) {
     fields.city = { value: city, source: 'text', confidence: CONFIDENCE };

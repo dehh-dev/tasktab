@@ -218,8 +218,6 @@ const DATE_ANCHORS = [
 // exigir isso, e frequencia baixa demais para justificar mais que isso.
 const ANCHOR_GAP = '[^\\n]{0,12}?';
 
-const TIME = /(?:[01]?\d|2[0-3])\s*[:h]\s*[0-5]\d(?:\s*:\s*[0-5]\d)?/;
-
 /** Primeira data plausivel do texto, sem ancora nenhuma. */
 function firstDate(text) {
   for (const { regex } of DATE_PATTERNS) {
@@ -266,62 +264,6 @@ function extractDate(text) {
   }
 
   return firstDate(text);
-}
-
-/**
- * Hora impressa, no formato `HH:MM:SS` que a coluna `time` aceita.
- *
- * Procurada **junto da data ancorada**, nao solta no texto: um cupom traz hora
- * de emissao, hora de autorizacao e as vezes a hora da maquininha de cartao. A
- * que interessa e a que acompanha a data que foi escolhida acima.
- */
-function extractTime(text) {
-  if (typeof text !== 'string') {
-    return null;
-  }
-
-  for (const anchor of DATE_ANCHORS) {
-    for (const { regex } of DATE_PATTERNS) {
-      const match = text.match(
-        new RegExp(
-          anchor.source +
-            ANCHOR_GAP +
-            regex.source +
-            `[^\\n]{0,8}?(?<time>${TIME.source})`,
-          'i',
-        ),
-      );
-
-      if (match) {
-        return padTime(match.groups.time);
-      }
-    }
-  }
-
-  // Sem nenhuma data no documento, uma hora solta e quase sempre ruido do OCR:
-  // num recibo manuscrito ela saiu de um numero de telefone, e um horario
-  // errado com cara de certo e pior que um campo vazio.
-  if (extractDate(text) === null) {
-    return null;
-  }
-
-  const loose = text.match(TIME);
-
-  return loose ? padTime(loose[0]) : null;
-}
-
-/** `13:59`, `13h59` e `13:59:27` viram `13:59:00` / `13:59:27`. */
-function padTime(raw) {
-  const parts = raw
-    .replace(/\s/g, '')
-    .split(/[:h]/)
-    .map((part) => part.padStart(2, '0'));
-
-  while (parts.length < 3) {
-    parts.push('00');
-  }
-
-  return parts.slice(0, 3).join(':');
 }
 
 const UFS = [
@@ -441,39 +383,6 @@ function titleCase(word) {
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 }
 
-// `NFC-e` sai do OCR como `NiC-e`, `NEC-e`, `NFC e`... O miolo do token e o
-// que varia, e a ancora precisa aguentar isso: exigir a grafia certa devolvia
-// `null` justamente nos cupons escaneados, que sao os que dao trabalho.
-const DOCUMENT = new RegExp(
-  'n[a-zà-ú]{0,2}c\\s*-?\\s*e\\s*n?[ºo°.]?\\s*(\\d{3,12})' +
-    '(?:[^\\n]{0,6}?s[ée]ri[ea]\\s*:?\\s*(\\d{1,3}))?',
-  'i',
-);
-
-/**
- * Identificador do documento, como a planilha manual o escrevia:
- * `NFC-e 3210 / série 012`.
- *
- * Os zeros a esquerda do numero impresso saem fora — `000003210` e como o
- * equipamento imprime, `3210` e como a pessoa procura o cupom depois.
- */
-function extractDocument(text) {
-  if (typeof text !== 'string') {
-    return null;
-  }
-
-  const match = text.match(DOCUMENT);
-
-  if (!match) {
-    return null;
-  }
-
-  const number = match[1].replace(/^0+/, '') || '0';
-  const series = match[2] ? ` / série ${match[2]}` : '';
-
-  return `NFC-e ${number}${series}`;
-}
-
 /** CNPJ com 14 digitos, sem mascara. */
 function extractCnpj(text) {
   if (typeof text !== 'string') {
@@ -564,9 +473,7 @@ module.exports = {
   extractTotal,
   extractLooseTotal,
   extractDate,
-  extractTime,
   extractCity,
-  extractDocument,
   extractCnpj,
   extractItemTotals,
 };

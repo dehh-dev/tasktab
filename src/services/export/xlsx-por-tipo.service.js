@@ -35,14 +35,12 @@ const THIN_BORDER = {
 // da planilha de referencia, medidas com os nomes reais dos emitentes.
 const COLUMNS = [
   { header: 'Data', width: 12, align: 'center' },
-  { header: 'Local', width: 42 },
-  { header: 'Cidade', width: 18 },
-  { header: 'Hora', width: 10, align: 'center' },
-  { header: 'Documento', width: 34 },
-  { header: 'Valor (R$)', width: 15 },
+  { header: 'Local', width: 44 },
+  { header: 'Cidade', width: 20 },
+  { header: 'Valor (R$)', width: 16 },
 ];
 
-const VALUE_COLUMN = 'F';
+const VALUE_COLUMN = 'D';
 
 // Os que ficam de fora do somatorio, na ordem em que interessam a quem
 // confere: primeiro o que ainda da trabalho, depois o que ja foi decidido.
@@ -73,17 +71,6 @@ function formatDate(isoDate) {
   }
   const [year, month, day] = isoDate.split('-');
   return `${day}/${month}/${year}`;
-}
-
-/**
- * `13:59:00` vira `13:59`. Os segundos vem do carimbo de autorizacao e nao
- * dizem nada a quem confere — ocupam coluna e nao respondem pergunta nenhuma.
- */
-function formatTime(value) {
-  if (!value) {
-    return '';
-  }
-  return String(value).slice(0, 5);
 }
 
 /**
@@ -161,10 +148,8 @@ function addCategorySheet(workbook, group) {
     row.getCell(1).numFmt = DATE_FORMAT;
     row.getCell(2).value = receipt.merchant_name || '';
     row.getCell(3).value = receipt.merchant_city || '';
-    row.getCell(4).value = formatTime(receipt.issued_time);
-    row.getCell(5).value = receipt.document_ref || '';
-    row.getCell(6).value = (receipt.amount_cents ?? 0) / 100;
-    row.getCell(6).numFmt = CURRENCY_FORMAT;
+    row.getCell(4).value = (receipt.amount_cents ?? 0) / 100;
+    row.getCell(4).numFmt = CURRENCY_FORMAT;
 
     row.eachCell({ includeEmpty: true }, (cell, column) => {
       cell.font = { size: 10 };
@@ -187,7 +172,7 @@ function addCategorySheet(workbook, group) {
   const totalRow = lastDataRow + 1;
   const dataRange = `${VALUE_COLUMN}2:${VALUE_COLUMN}${lastDataRow}`;
 
-  sheet.mergeCells(`A${totalRow}:E${totalRow}`);
+  sheet.mergeCells(`A${totalRow}:C${totalRow}`);
   sheet.getCell(`A${totalRow}`).value = 'TOTAL';
   sheet.getCell(`${VALUE_COLUMN}${totalRow}`).value = {
     formula: `SUM(${dataRange})`,
