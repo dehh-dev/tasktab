@@ -10,9 +10,13 @@ test.beforeEach(async ({ request }) => {
   await clearReports(request);
 });
 
-async function openReviewWithImage(page, request, title) {
+async function openReviewWithImage(page, request, title, pdfOptions = {}) {
   const report = await createReport(request, { title });
-  const pdf = await makeReceiptPdf({ total: '37,60', date: '19/06/2026' });
+  const pdf = await makeReceiptPdf({
+    total: '37,60',
+    date: '19/06/2026',
+    ...pdfOptions,
+  });
 
   await page.goto('/');
   await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
@@ -167,10 +171,12 @@ test('sem zoom o painel nao se anuncia como arrastavel', async ({
   page,
   request,
 }) => {
-  await openReviewWithImage(page, request, 'Sem zoom');
+  // Pagina larga e baixa de proposito. A pagina retrato do fixture nao cabe
+  // mais na altura nem no zoom minimo: enquanto a imagem era esticada ate os
+  // 70vh do painel ela sempre "cabia" na vertical, e era isso que fazia este
+  // teste passar — pelo motivo errado.
+  await openReviewWithImage(page, request, 'Sem zoom', { size: [600, 200] });
 
-  // O cupom e alto: cabe na largura, nao na altura. Diminuir ate caber inteiro
-  // e o que tira a promessa do ponteiro.
   const zoomOut = page.getByRole('button', { name: 'Diminuir zoom' });
   for (let i = 0; i < 2; i += 1) {
     await zoomOut.click();

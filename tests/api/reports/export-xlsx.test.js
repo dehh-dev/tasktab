@@ -84,10 +84,10 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     expect(sheet.getCell('A1').value).toBe('Data');
     expect(sheet.getCell('A2').value).toEqual(new Date(Date.UTC(2026, 5, 19)));
     expect(sheet.getCell('A2').numFmt).toBe('DD/MM/YYYY');
-    expect(sheet.getCell('F2').value).toBe(37.6);
+    expect(sheet.getCell('D2').value).toBe(37.6);
     // [$R$-416] e o codigo de moeda pt-BR do Excel — sem ele o separador
     // segue o locale de quem abre o arquivo.
-    expect(sheet.getCell('F2').numFmt).toBe('[$R$-416] #,##0.00');
+    expect(sheet.getCell('D2').numFmt).toBe('[$R$-416] #,##0.00');
   });
 
   it('o resumo puxa o valor de cada tipo da aba daquele tipo', async () => {
@@ -124,7 +124,7 @@ describe('GET /api/reports/:id/export.xlsx', () => {
 
     expect(summary.getCell(`B${alimentacao}`).value).toBe(2);
     expect(summary.getCell(`C${alimentacao}`).value).toEqual({
-      formula: "SUM('Alimentação'!F2:F3)",
+      formula: "SUM('Alimentação'!D2:D3)",
     });
     // A formula e resolvida contra as celulas de verdade: se o intervalo
     // apontar para a aba errada ou para linhas de menos, isto quebra.
@@ -166,11 +166,11 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     // divergir, o arquivo se contradiz sozinho.
     const alimentacao = workbook.getWorksheet('Alimentação');
     expect(
-      evaluateSum(workbook, 'Alimentação', `F${findRow(alimentacao, 'TOTAL')}`),
+      evaluateSum(workbook, 'Alimentação', `D${findRow(alimentacao, 'TOTAL')}`),
     ).toBe(37.6);
   });
 
-  it('traz cidade, hora e documento nas colunas da aba do tipo', async () => {
+  it('traz a cidade do emitente na coluna Cidade', async () => {
     const report = await insertReport();
     const merchant = await insertMerchant({
       name: 'CEA COMERCIO DE ALIMENTOS',
@@ -181,9 +181,7 @@ describe('GET /api/reports/:id/export.xlsx', () => {
       report.id,
       confirmed({
         issued_at: '2026-08-02',
-        issued_time: '13:59:27',
         amount_cents: 16500,
-        document_ref: 'NFC-e 3210 / série 012',
         merchant_id: merchant.id,
       }),
     );
@@ -195,20 +193,14 @@ describe('GET /api/reports/:id/export.xlsx', () => {
       'Data',
       'Local',
       'Cidade',
-      'Hora',
-      'Documento',
       'Valor (R$)',
     ]);
 
     expect(sheet.getCell('B2').value).toBe('CEA COMERCIO DE ALIMENTOS');
     expect(sheet.getCell('C2').value).toBe('Fortaleza/CE');
-    // Os segundos vem do carimbo de autorizacao e nao dizem nada a quem
-    // confere — a coluna mostra HH:MM.
-    expect(sheet.getCell('D2').value).toBe('13:59');
-    expect(sheet.getCell('E2').value).toBe('NFC-e 3210 / série 012');
   });
 
-  it('deixa a coluna vazia quando o cupom nao trouxe o campo', async () => {
+  it('deixa a Cidade vazia quando o emitente nao tem endereco lido', async () => {
     const report = await insertReport();
     await insertReceipt(
       report.id,
@@ -216,12 +208,10 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     );
 
     const { workbook } = await loadWorkbook(report.id);
-    const sheet = workbook.getWorksheet('Alimentação');
 
-    // Recibo manuscrito nao tem hora nem numero de documento, e inventar
+    // Recibo manuscrito costuma nao trazer endereco legivel, e inventar
     // qualquer coisa ali seria pior que a celula em branco.
-    expect(sheet.getCell('D2').value).toBe('');
-    expect(sheet.getCell('E2').value).toBe('');
+    expect(workbook.getWorksheet('Alimentação').getCell('C2').value).toBe('');
   });
 
   it('a planilha sai formatada, nao so preenchida', async () => {
@@ -309,7 +299,7 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     // uma linha de dado so, entao o TOTAL vem logo na linha 3.
     const alimentacao = workbook.getWorksheet('Alimentação');
     expect(findRow(alimentacao, 'TOTAL')).toBe(3);
-    expect(evaluateSum(workbook, 'Alimentação', 'F3')).toBe(37.6);
+    expect(evaluateSum(workbook, 'Alimentação', 'D3')).toBe(37.6);
     expect(
       evaluateSum(workbook, 'Resumo', `C${findRow(summary, 'TOTAL')}`),
     ).toBe(37.6);

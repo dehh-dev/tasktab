@@ -322,16 +322,21 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   linha da pagina. A primeira linha de um PDF escaneado e a margem do papel, e
   era com ela que 5 dos 19 emitentes do caso-base tinham sido cadastrados
   (`: 40) 47 DL? "o`).
-- `issued_time`, `document_ref` e a cidade do emitente saem do mesmo texto que
-  ja estava sendo extraido e jogado fora. A hora e procurada **junto da data
-  ancorada** (um cupom traz a hora da emissao, a da autorizacao e a da
-  maquininha), e nao ha hora sem data: um `09:07` solto no ruido do OCR saiu de
-  um numero de telefone.
+- A **cidade do emitente** sai do mesmo texto que ja estava sendo extraido e
+  jogado fora, e vai para `merchants.city`.
+- Hora e numero do documento chegaram a ser extraidos e foram **removidos** no
+  uso real: nenhuma das duas era consultada na revisao, e campo que ninguem le
+  so alonga o formulario. Se voltarem, voltam por pedido, nao por completude.
 - **Nada e confirmado automaticamente.** A extracao troca digitar por
   conferir, nao por deixar de olhar.
 - Categoria tem tres degraus, nesta ordem: **cadastro do emitente** (decisao
   humana, vale sempre), **palpite por palavra-chave** no nome
-  (`category-guess.js`), e nada. O palpite grava `category_guessed = true`, a
+  (`category-guess.js`), e o **piso `DEFAULT_CATEGORY`** (`alimentacao`). Nao
+  existe mais comprovante sem categoria: o campo vem sempre preenchido, e
+  sempre marcado quando nao veio do cadastro. O piso e `alimentacao` porque era
+  21 de 23 lancamentos no relatorio real que motivou o ajuste — abrir o seletor
+  em cada linha custava mais que corrigir as duas erradas.
+  O palpite grava `category_guessed = true`, a
   revisao destaca o campo com borda tracejada e a frase "Sugerida pelo nome do
   emitente", e editar a categoria ou confirmar o comprovante zera a marca.
   **Palpite nunca sobrescreve cadastro** — ha teste dos dois lados.
@@ -341,10 +346,12 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   continua valendo em outra forma — o risco nao era adivinhar, era adivinhar
   **sem dizer que adivinhou**. Se algum dia a marca sair da tela, a regra
   antiga volta a ser a certa.
-- O palpite so dispara com indicio no nome. `K B A TEIXEIRA COMERCIO E
-SERVICOS` continua sem categoria, e ha teste disso: preencher sem certeza e
-  preencher quando ha indicio, nao sortear um tipo para o campo nao ficar
-  vazio.
+- `guessCategory` continua devolvendo `null` sem indicio no nome — o piso e
+  aplicado **fora** dela, no `classify`. Manter os dois separados e o que
+  permite mudar o piso sem mexer nas regras que leem o nome, e o que deixa
+  visivel no codigo qual dos dois respondeu.
+- **`hospedagem` saiu do enum** a pedido de quem usa. Remover valor de enum no
+  Postgres exige recriar o tipo; ha migration com `up` e `down` testados.
 - O CNPJ confiavel e o das posicoes 7 a 20 da **chave de acesso**, nao o do
   texto: o cupom traz tambem o da credenciadora do cartao.
 - Chave que nao fecha o DV mod-11 e **descartada**. Nao ha meio termo entre
@@ -404,10 +411,9 @@ SERVICOS` continua sem categoria, e ha teste disso: preencher sem certeza e
 - O resumo e **uma aba por tipo** com lancamento, mais a aba `Resumo`, na ordem
   do enum. Ordenar por valor faria dois relatorios da mesma pessoa sairem com
   layout diferente, e comparar um mes com o outro viraria procurar a linha.
-- Colunas da aba de tipo: **Data, Local, Cidade, Hora, Documento, Valor** — as
-  mesmas da planilha manual que o projeto substitui. Cidade sai do emitente
-  (`merchants.city`), hora e documento do proprio comprovante. Enquanto as tres
-  ultimas nao existiam, exportar nao dispensava voltar ao papel.
+- Colunas da aba de tipo: **Data, Local, Cidade, Valor**. Hora e Documento
+  chegaram a existir e sairam no uso real — ver a secao de extracao. Cidade sai
+  do emitente (`merchants.city`).
 - A formatacao **nao e enfeite**: cabecalho branco sobre `FF1F3864`, zebra
   `FFF2F2F2`, bordas, linha de TOTAL mesclada e invertida, cabecalho congelado
   e autofiltro. E o layout que quem confere ja conhece da planilha antiga —
@@ -479,6 +485,21 @@ React 19 + Vite, sem router e sem biblioteca de estado — tela unica, estado no
   canal de informacao** — todo badge carrega tambem o texto do status.
 - `web/src/constants.js` espelha o enum `task_status` do banco. Mudou o enum na
   migration? Atualize os dois.
+- A imagem do cupom (`receipt-image.service.js`) e renderizada a **4x** e
+  servida em **WebP q92**, e nao a 3x em PNG. A escala nao e chute: os PDFs
+  reais sao digitalizacoes a 257 ppi — uma pagina de 1000pt traz uma imagem
+  embutida de 3568px, ou seja 3,57x os pontos. A 3x o resultado saia com
+  3000px, **abaixo do original**, jogando fora detalhe que estava no arquivo.
+  Medido na mesma pagina: PNG a 3x = 3000x1431 e 1861 KB; WebP a 4x =
+  4000x1908 e 451 KB. Mais resolucao e quatro vezes menos bytes. Acima de 4x so
+  haveria interpolacao, porque o dado nao existe no PDF.
+- A escala do **QR** (`qr.service.js`) continua 3x e e outra coisa: la o alvo e
+  o zxing, aqui e o olho humano. Nao amarre as duas.
+- `.review__image-scroll` e um container flex, e `align-items` **precisa** ser
+  `flex-start`. Com o `stretch` padrao a imagem, como item flex, era esticada
+  ate os 70vh do painel e a proporcao do documento ia junto — o cupom aparecia
+  deformado. `height: auto` no `.review__image` e o par obrigatorio do
+  `max-width`.
 - Conteudo ampliado por `transform: scale()` dentro de um container com
   `overflow: auto` leva `transform-origin: top left`. A regiao de overflow
   rolavel so se estende para direita e baixo: escalando a partir do centro, o

@@ -60,11 +60,8 @@ export default function ReceiptReview({
 }) {
   const [values, setValues] = useState({
     issued_at: receipt.issued_at ?? '',
-    // O input `time` so aceita HH:MM; o banco devolve HH:MM:SS.
-    issued_time: (receipt.issued_time ?? '').slice(0, 5),
     amount_cents: centsToInputValue(receipt.amount_cents),
     category: receipt.category ?? '',
-    document_ref: receipt.document_ref ?? '',
   });
   const [localErrors, setLocalErrors] = useState({});
   const [serverErrors, setServerErrors] = useState({});
@@ -159,10 +156,8 @@ export default function ReceiptReview({
     try {
       await api.updateReceipt(receipt.id, {
         issued_at: values.issued_at,
-        issued_time: values.issued_time || null,
         amount_cents: amountCents,
         category: values.category,
-        document_ref: values.document_ref.trim() || null,
         status: 'confirmed',
       });
       await onAction();
@@ -469,9 +464,6 @@ export default function ReceiptReview({
         >
           <div className="task__meta">
             <ConfidenceBadge receipt={receipt} />
-            {receipt.access_key && (
-              <span className="filter__count">Chave: {receipt.access_key}</span>
-            )}
           </div>
 
           <div className="field">
@@ -522,33 +514,6 @@ export default function ReceiptReview({
                 {errors.amount_cents}
               </span>
             )}
-          </div>
-
-          <div className="field">
-            <label className="field__label" htmlFor="review-time">
-              Hora
-            </label>
-            <input
-              id="review-time"
-              className="field__input"
-              type="time"
-              value={values.issued_time}
-              onChange={(event) => setField('issued_time', event.target.value)}
-            />
-          </div>
-
-          <div className="field">
-            <label className="field__label" htmlFor="review-document">
-              Documento
-            </label>
-            <input
-              id="review-document"
-              className="field__input"
-              type="text"
-              placeholder="NFC-e 3210 / série 012"
-              value={values.document_ref}
-              onChange={(event) => setField('document_ref', event.target.value)}
-            />
           </div>
 
           <div className="field">

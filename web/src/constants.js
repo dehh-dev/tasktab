@@ -29,7 +29,6 @@ export const EXPENSE_CATEGORIES = [
   { value: 'estacionamento', label: 'Estacionamento' },
   { value: 'lavanderia', label: 'Lavanderia' },
   { value: 'transporte', label: 'Transporte' },
-  { value: 'hospedagem', label: 'Hospedagem' },
   { value: 'outros', label: 'Outros' },
   { value: 'nao_classificado', label: 'Nao classificado' },
 ];

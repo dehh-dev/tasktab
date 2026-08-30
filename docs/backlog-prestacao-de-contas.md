@@ -1125,3 +1125,86 @@ Tesseract não lê caneta sobre formulário.
 
 Ler manuscrito, corrigir OCR por dicionário e casar cidade contra a tabela do
 IBGE. Nenhum é bloqueado por esta.
+
+---
+
+## Issue 31 — Ajustes do primeiro uso real
+
+`area:extracao` · `area:export` · `area:web` · depende de #30
+
+Seis ajustes vindos de quem usa a ferramenta, depois de fechar uma prestação
+de contas de verdade com ela. Três são remoções — e é a parte mais importante
+desta issue.
+
+**O que saiu**
+
+- **Hora e Documento.** Foram acrescentados na #30 e nunca chegaram a ser
+  consultados na revisão. Campo que ninguém lê não é neutro: alonga o
+  formulário e divide a atenção de quem confere. Saíram do banco, da extração,
+  da tela e da planilha. Voltam por pedido, não por completude.
+- **Categoria `hospedagem`.** Não se aplica ao uso real. O Postgres não remove
+  valor de enum, então o tipo foi recriado — migration com `up` e `down`
+  testados nos dois sentidos, sem perda das 23 linhas existentes.
+- **Chave de acesso no topo da revisão.** São 44 dígitos que ninguém confere a
+  olho, ocupando a primeira linha acima da data. A _origem_ da extração (QR,
+  texto, OCR) continua à vista: é ela que diz o quanto confiar no que está
+  preenchido, e o número não acrescenta nada a isso.
+
+**Categoria com piso `alimentacao`**
+
+No relatório real, 21 de 23 lançamentos eram alimentação. Abrir o seletor em
+cada linha custava mais que corrigir as duas erradas. O piso é aplicado no
+`classify`, **fora** do `guessCategory` — que continua devolvendo `null` sem
+indício no nome. Manter os dois separados é o que deixa visível qual dos dois
+respondeu, e permite mudar o piso sem tocar nas regras que leem o nome.
+
+Não existe mais comprovante sem categoria, e todo palpite continua marcado.
+
+**A imagem do cupom: dois defeitos, não um**
+
+O relato foi "esticado e mal formatado, e a resolução está ruim". Eram duas
+causas independentes.
+
+1. **Deformação.** `.review__image-scroll` é um container flex, e o
+   `align-items: stretch` padrão esticava a imagem até os 70vh do painel. A
+   proporção do documento ia junto. `flex-start` mais `height: auto` resolvem.
+   De quebra, isso explicava por que o spec "sem zoom o painel não se anuncia
+   como arrastável" passava: a imagem esticada sempre "cabia" na vertical, e o
+   teste passava pelo motivo errado. Agora usa uma página larga e baixa.
+2. **Resolução.** Renderizávamos a 3×. Os PDFs reais são digitalizações a
+   257 ppi: a página de 1000pt traz uma imagem embutida de **3568px**, ou seja
+   3,57× os pontos. A 3× o resultado saía com 3000px — **abaixo do original**,
+   descartando detalhe que estava no arquivo. Passou a 4×, que cobre 288 ppi.
+   Acima disso só haveria interpolação.
+
+Medido na mesma página escaneada:
+
+| formato           | dimensões     | tamanho    |
+| ----------------- | ------------- | ---------- |
+| PNG a 3× (antes)  | 3000×1431     | 1861 KB    |
+| PNG a 4×          | 4000×1908     | 2913 KB    |
+| **WebP q92 a 4×** | **4000×1908** | **451 KB** |
+
+Mais resolução e quatro vezes menos bytes que antes. `sharp` já era dependência
+de produção, então nada novo entrou. O custo é a renderização passar de ~1,1s
+para ~2s, paga uma vez por comprovante graças ao ETag e ao `max-age` de um dia.
+
+A escala do QR (`qr.service.js`) continua 3× e ficou desamarrada desta: lá o
+alvo é o zxing, aqui é o olho humano.
+
+**Critérios de aceite**
+
+- [x] `issued_time` e `document_ref` fora do banco, da extração, da tela e da
+      planilha; migration reversível
+- [x] `hospedagem` fora do enum, com `up`/`down` testados e sem perda de dado
+- [x] Chave de acesso não aparece mais na revisão; spec E2E trava a ausência
+- [x] Piso `alimentacao` aplicado no `classify`, com `guessCategory` intacto
+- [x] Imagem não deforma mais; spec de pan corrigido para não passar pelo
+      motivo errado
+- [x] Imagem servida em WebP a 4×, com teto de 4200px no lado maior
+
+**Fora de escopo**
+
+Cache da imagem em disco (hoje ela é re-renderizada a cada requisição sem
+ETag), e escala derivada do ppi real de cada PDF em vez de fixa em 4×. Os dois
+só valem se a espera de ~2s incomodar no uso.

@@ -154,8 +154,6 @@ async function processPage(receipt, page, { buffer, log }) {
     issued_at: fields.issued_at?.value ?? null,
     amount_cents: fields.amount_cents?.value ?? null,
     access_key: key?.value ?? null,
-    issued_time: fields.issued_time?.value ?? null,
-    document_ref: fields.document_ref?.value ?? null,
     merchant_id,
     category,
     category_guessed,
@@ -194,19 +192,27 @@ async function processPage(receipt, page, { buffer, log }) {
  *
  * 1. a categoria padrao do emitente cadastrado (decidida por uma pessoa uma
  *    vez, aplicada a todo cupom seguinte daquele CNPJ);
- * 2. o palpite por palavra-chave no nome (`category-guess.js`), que grava
- *    `category_guessed` e chega destacado na revisao;
- * 3. nada — e uma pessoa decide.
+ * 2. o palpite por palavra-chave no nome (`category-guess.js`);
+ * 3. o piso `DEFAULT_CATEGORY`, quando nem o nome diz nada.
+ *
+ * Os degraus 2 e 3 gravam `category_guessed` e chegam destacados na revisao.
+ * Depois deste ajuste **nao existe mais comprovante sem categoria**: o campo
+ * vem sempre preenchido, e sempre marcado quando nao veio do cadastro.
  *
  * O palpite **nunca** sobrescreve o passo 1: cadastro e decisao registrada, e
  * um palpite nao desfaz decisao de ninguem.
  */
 async function classify(cnpj, name, city) {
-  const guess = categoryGuess.guessCategory(name);
+  // O palpite por palavra-chave e o piso `alimentacao` sao a mesma coisa para
+  // quem revisa — os dois sao chute e os dois chegam marcados. Ficam separados
+  // no codigo porque so o primeiro carrega evidencia: se um dia o piso mudar,
+  // e `DEFAULT_CATEGORY` que muda, sem mexer nas regras que leem o nome.
+  const guess =
+    categoryGuess.guessCategory(name) ?? categoryGuess.DEFAULT_CATEGORY;
   const fallback = {
     merchant_id: null,
     category: guess,
-    category_guessed: guess !== null,
+    category_guessed: true,
   };
 
   const normalized = cnpjRules.normalize(cnpj);
@@ -235,7 +241,7 @@ async function classify(cnpj, name, city) {
   return {
     merchant_id: merchant.id,
     category: registered ?? guess,
-    category_guessed: registered === null && guess !== null,
+    category_guessed: registered === null,
   };
 }
 

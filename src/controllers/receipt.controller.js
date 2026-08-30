@@ -10,7 +10,7 @@ const pdf = require('../services/pdf.service');
 const pipeline = require('../services/extraction/pipeline.service');
 const queue = require('../services/extraction/queue');
 const retention = require('../services/retention.service');
-const qrService = require('../services/extraction/qr.service');
+const receiptImage = require('../services/receipt-image.service');
 const { NotFoundError, ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const receiptValidator = require('../validators/receipt.validator');
@@ -283,8 +283,8 @@ async function image(req, res) {
     });
   }
 
-  const png = await qrService
-    .renderPageToPng(buffer, receipt.page_number)
+  const image = await receiptImage
+    .render(buffer, receipt.page_number)
     .catch((error) => {
       throw new ValidationError({
         message: 'Nao foi possivel gerar a imagem deste comprovante.',
@@ -295,10 +295,10 @@ async function image(req, res) {
 
   res
     .status(200)
-    .set('Content-Type', 'image/png')
+    .set('Content-Type', image.contentType)
     .set('Cache-Control', 'private, max-age=86400')
     .set('ETag', etag)
-    .send(png);
+    .send(image.data);
 }
 
 module.exports = { upload, index, show, update, destroy, reprocess, image };

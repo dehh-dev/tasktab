@@ -2,9 +2,7 @@
 
 const {
   extractDate,
-  extractTime,
   extractCity,
-  extractDocument,
   extractTotal,
   extractLooseTotal,
 } = require('../../../src/services/extraction/normalize');
@@ -67,21 +65,6 @@ describe('extractLooseTotal', () => {
   });
 });
 
-describe('extractTime', () => {
-  it('pega a hora que acompanha a data ancorada, nao a primeira da pagina', () => {
-    expect(extractTime(CUPOM_ESCANEADO)).toBe('13:59:27');
-  });
-
-  it('completa os segundos quando o cupom so imprime HH:MM', () => {
-    expect(extractTime('Emissao: 12/08/2026 09:07')).toBe('09:07:00');
-  });
-
-  it('nao devolve hora em documento sem data', () => {
-    // Num recibo manuscrito o unico "09:07" da pagina saiu de um telefone.
-    expect(extractTime('Contato (88) 99811.5555 ramal 09:07')).toBeNull();
-  });
-});
-
 describe('extractCity', () => {
   it('separa a cidade do bairro colado nela', () => {
     // "SERRINHA FORTALEZA-CE": SERRINHA e bairro, e so a ultima palavra e a
@@ -102,16 +85,6 @@ describe('extractCity', () => {
 
   it('ignora duas letras que nao sao UF', () => {
     expect(extractCity('Produto XPTO-ZZ')).toBeNull();
-  });
-});
-
-describe('extractDocument', () => {
-  it('le numero e serie mesmo com o token corrompido pelo OCR', () => {
-    expect(extractDocument(CUPOM_ESCANEADO)).toBe('NFC-e 3210 / série 012');
-  });
-
-  it('devolve null quando nao ha documento fiscal na pagina', () => {
-    expect(extractDocument('recibo manuscrito')).toBeNull();
   });
 });
 
@@ -143,7 +116,6 @@ describe('guessCategory', () => {
     ['Cearazim Bar, Restro e Pizzaria', 'alimentacao'],
     ['ESPETINHO DO RAIMUNDINHO', 'alimentacao'],
     ['POSTO MONTREAL JR', 'combustivel'],
-    ['HOTEL BEIRA MAR', 'hospedagem'],
     ['UBER DO BRASIL TECNOLOGIA', 'transporte'],
     ['LAVANDERIA CENTRAL', 'lavanderia'],
     ['ESTACIONAMENTO CENTRO LTDA', 'estacionamento'],

@@ -30,9 +30,13 @@ describe('GET /api/receipts/:id/image', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('content-type')).toBe('image/png');
-    // Assinatura PNG: 89 50 4E 47.
-    expect(response.buffer.subarray(0, 4).toString('hex')).toBe('89504e47');
+    // WebP e nao PNG: na pagina escaneada de 4000x1908 medida durante o ajuste,
+    // o PNG saia com 2913 KB e o WebP q92 com 451 KB — quatro vezes menos que
+    // o PNG a 3x que era servido antes, e ainda assim com mais resolucao.
+    expect(response.headers.get('content-type')).toBe('image/webp');
+    // Container RIFF com o marcador WEBP no byte 8.
+    expect(response.buffer.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(response.buffer.subarray(8, 12).toString('ascii')).toBe('WEBP');
   });
 
   it('devolve 304 quando o ETag bate', async () => {

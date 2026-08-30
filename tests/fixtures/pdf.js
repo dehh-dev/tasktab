@@ -10,12 +10,12 @@ const { PDFDocument, StandardFonts } = require('pdf-lib');
  * estrutura — numero de paginas, camada de texto, arquivo ilegivel — e isso se
  * gera em memoria, sem pesar o repositorio.
  */
-async function makePdf({ pages = 1, text, lines } = {}) {
+async function makePdf({ pages = 1, text, lines, size = [300, 400] } = {}) {
   const document = await PDFDocument.create();
   const font = await document.embedFont(StandardFonts.Helvetica);
 
   for (let index = 0; index < pages; index += 1) {
-    const page = document.addPage([300, 400]);
+    const page = document.addPage(size);
     const content = lines ?? [text ?? `Pagina ${index + 1}`];
 
     // Uma linha por vez: um texto longo desenhado de uma vez so transborda a
@@ -57,8 +57,8 @@ function receiptLines({
 
 /** PDF de um cupom com camada de texto, como os PDFs digitais reais. */
 function makeReceiptPdf(options = {}) {
-  const { pages, ...rest } = options;
-  return makePdf({ pages, lines: receiptLines(rest) });
+  const { pages, size, ...rest } = options;
+  return makePdf({ pages, size, lines: receiptLines(rest) });
 }
 
 /**

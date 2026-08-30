@@ -15,7 +15,6 @@ const CATEGORY_LABELS = {
   estacionamento: 'Estacionamento',
   lavanderia: 'Lavanderia',
   transporte: 'Transporte',
-  hospedagem: 'Hospedagem',
   outros: 'Outros',
 };
 

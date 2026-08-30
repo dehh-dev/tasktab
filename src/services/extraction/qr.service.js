@@ -15,11 +15,13 @@ const accessKey = require('./access-key');
  * texto, e importar tudo no boot cobraria a memoria de quem nunca chega aqui.
  */
 
-// Escala de renderizacao. Cupom termico tem QR pequeno; abaixo de 2x o
-// decodificador erra com frequencia, e acima de 3x o ganho nao paga o tempo.
+// Escala de renderizacao para **decodificar**. Cupom termico tem QR pequeno;
+// abaixo de 2x o decodificador erra com frequencia, e acima de 3x o ganho nao
+// paga o tempo. A escala da imagem que a revisao exibe e outra, maior, e vive
+// em `receipt-image.service.js`: aqui o alvo e o zxing, la e o olho humano.
 const RENDER_SCALE = 3;
 
-async function renderPageToPng(buffer, pageNumber) {
+async function renderPageToPng(buffer, pageNumber, scale = RENDER_SCALE) {
   const { renderPageAsImage } = require('unpdf');
 
   // O canvas entra por injecao: o pdf.js que o unpdf empacota nao resolve
@@ -27,7 +29,7 @@ async function renderPageToPng(buffer, pageNumber) {
   // "canvas is not available in this environment".
   const png = await renderPageAsImage(new Uint8Array(buffer), pageNumber, {
     canvasImport: () => import('@napi-rs/canvas'),
-    scale: RENDER_SCALE,
+    scale,
   });
 
   return Buffer.from(png);

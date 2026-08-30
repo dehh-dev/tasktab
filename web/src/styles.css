@@ -557,6 +557,10 @@ textarea.field__input {
   justify-content: center;
   max-height: 70vh;
   overflow: auto;
+  /* `stretch` e o padrao de um container flex, e era ele que esticava o cupom:
+     a imagem, como item flex, era puxada ate os 70vh do painel e a proporcao
+     do documento ia junto. `flex-start` deixa a altura ser a da imagem. */
+  align-items: flex-start;
 }
 
 /* O ponteiro so promete o arrasto quando ha o que arrastar: com o cupom
@@ -580,6 +584,9 @@ textarea.field__input {
    impossivel de ver. Ha spec E2E do caso. */
 .review__image {
   max-width: 100%;
+  /* Par obrigatorio do `max-width`: sem ele, largura limitada com altura fixa
+     deforma a imagem no mesmo eixo que o `stretch` deformava. */
+  height: auto;
   transform-origin: top left;
 }
 

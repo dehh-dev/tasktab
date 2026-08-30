@@ -24,7 +24,6 @@ const RULES = [
     'combustivel',
     /\b(posto|combust[íi]vel|gasolina|etanol|[áa]lcool|diesel|ipiranga|petrobras|shell|ale\b|texaco)/i,
   ],
-  ['hospedagem', /\b(hotel|pousada|hostel|motel|resort|flat|albergue)/i],
   ['estacionamento', /\b(estacionament|parking|zona\s*azul|p[áa]tio)/i],
   ['lavanderia', /\b(lavanderia|lavander|laundry|lava\s*e\s*seca)/i],
   [
@@ -54,4 +53,14 @@ function guessCategory(name) {
   return found ? found[0] : null;
 }
 
-module.exports = { guessCategory, RULES };
+/**
+ * Categoria usada quando nem o cadastro nem o nome dizem nada.
+ *
+ * `alimentacao` porque e a esmagadora maioria dos lancamentos reais — 21 de 23
+ * no relatorio que originou este ajuste. Chega **sempre marcada como palpite**,
+ * como qualquer outro chute: o ganho e nao ter de abrir o seletor nas linhas em
+ * que a resposta ja era essa, e o custo e uma troca nas poucas em que nao era.
+ */
+const DEFAULT_CATEGORY = 'alimentacao';
+
+module.exports = { guessCategory, DEFAULT_CATEGORY, RULES };
