@@ -4,84 +4,20 @@ const fs = require('fs/promises');
 const path = require('path');
 
 const Receipt = require('../models/receipt.model');
-const Report = require('../models/report.model');
 const env = require('../config/env');
 const pdf = require('../services/pdf.service');
 const pipeline = require('../services/extraction/pipeline.service');
 const queue = require('../services/extraction/queue');
 const retention = require('../services/retention.service');
 const receiptImage = require('../services/receipt-image.service');
-const ownership = require('../services/auth/ownership');
-const { NotFoundError, ValidationError } = require('../../infra/errors');
+const {
+  loadReport,
+  loadReceipt,
+  receiptNotFound,
+} = require('../services/auth/access.service');
+const { ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const receiptValidator = require('../validators/receipt.validator');
-
-function reportNotFound(id) {
-  return new NotFoundError({
-    message: `Report ${id} nao encontrado.`,
-    action: 'Verifique o id informado ou liste os relatorios disponiveis.',
-  });
-}
-
-function receiptNotFound(id) {
-  return new NotFoundError({
-    message: `Receipt ${id} nao encontrado.`,
-    action: 'Verifique o id informado ou liste os comprovantes do relatorio.',
-  });
-}
-
-/**
- * Carrega o comprovante conferindo a posse do **relatorio pai**.
- *
- * Comprovante nao tem dono proprio: pertence a quem presta as contas em que
- * ele foi lancado. Custa uma consulta a mais por requisicao, e ela paga por
- * si: sem o relatorio em maos nao ha como saber de quem e a pagina, e a rota
- * de imagem — a que devolve o cupom com CNPJ e as vezes CPF de terceiros —
- * passa por aqui como todas as outras.
- *
- * Quando a pessoa nao alcanca o relatorio, a resposta e 404 do **comprovante**:
- * dizer "esse relatorio nao e seu" ja entregaria que a pagina existe e a qual
- * relatorio pertence.
- */
-async function loadReceipt(req, id, { write = false } = {}) {
-  const receipt = await Receipt.findById(id);
-
-  if (!receipt) {
-    throw receiptNotFound(id);
-  }
-
-  const report = await Report.findById(receipt.report_id);
-
-  if (!report || !ownership.canReadReport(req.user, report)) {
-    throw receiptNotFound(id);
-  }
-
-  // Ja leu o recurso, entao esconder a existencia dele nao adianta mais: aqui
-  // o 403 e honesto e diz o que falta. E o caso do auditor, que le o
-  // comprovante dos outros e nao escreve em nenhum.
-  if (write) {
-    ownership.assertCanWriteReport(req.user, report);
-  }
-
-  return receipt;
-}
-
-/** Carrega o relatorio pai de uma rota aninhada, conferindo a posse. */
-async function loadReport(req, id, { write = false } = {}) {
-  const report = await Report.findById(id);
-
-  if (!report) {
-    throw reportNotFound(id);
-  }
-
-  if (write) {
-    ownership.assertCanWriteReport(req.user, report);
-  } else {
-    ownership.assertCanReadReport(req.user, report);
-  }
-
-  return report;
-}
 
 async function discard(filePath) {
   await fs.unlink(filePath).catch(() => {});
@@ -97,7 +33,7 @@ async function upload(req, res) {
   const reportId = validator.validateId(req.params.id);
 
   try {
-    await loadReport(req, reportId, { write: true });
+    await loadReport(req.user, reportId, { write: true });
   } catch (error) {
     // O multer ja gravou os arquivos antes de sabermos que o relatorio nao
     // existe — ou que nao e desta pessoa. Nos dois casos o que chegou ao disco
@@ -209,7 +145,7 @@ async function upload(req, res) {
 async function index(req, res) {
   const reportId = validator.validateId(req.params.id);
 
-  await loadReport(req, reportId);
+  await loadReport(req.user, reportId);
 
   const filters = receiptValidator.validateListQuery(req.query);
   const [data, meta] = await Promise.all([
@@ -223,7 +159,7 @@ async function index(req, res) {
 /** GET /api/receipts/:id */
 async function show(req, res) {
   const id = receiptValidator.validateId(req.params.id);
-  const receipt = await loadReceipt(req, id);
+  const receipt = await loadReceipt(req.user, id);
 
   res.json({ data: receipt });
 }
@@ -234,7 +170,7 @@ async function update(req, res) {
 
   // O registro atual entra na validacao: confirmar depende do conjunto final,
   // e nao so do que veio no corpo.
-  const current = await loadReceipt(req, id, { write: true });
+  const current = await loadReceipt(req.user, id, { write: true });
 
   const data = receiptValidator.validateUpdate(req.body, current);
   const receipt = await Receipt.update(id, data);
@@ -246,7 +182,7 @@ async function update(req, res) {
 async function destroy(req, res) {
   const id = receiptValidator.validateId(req.params.id);
 
-  await loadReceipt(req, id, { write: true });
+  await loadReceipt(req.user, id, { write: true });
 
   const deleted = await Receipt.remove(id);
 
@@ -271,7 +207,7 @@ async function destroy(req, res) {
  */
 async function reprocess(req, res) {
   const id = receiptValidator.validateId(req.params.id);
-  const receipt = await loadReceipt(req, id, { write: true });
+  const receipt = await loadReceipt(req.user, id, { write: true });
 
   const filePath = path.join(env.upload.dir, receipt.file_path);
   const buffer = await fs.readFile(filePath).catch(() => null);
@@ -306,7 +242,7 @@ async function reprocess(req, res) {
  */
 async function image(req, res) {
   const id = receiptValidator.validateId(req.params.id);
-  const receipt = await loadReceipt(req, id);
+  const receipt = await loadReceipt(req.user, id);
 
   const etag = `"${receipt.file_hash}-${receipt.page_number}"`;
 

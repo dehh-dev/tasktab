@@ -267,6 +267,42 @@ describe('posse dos relatorios', () => {
     expect(response.status).toBe(404);
   });
 
+  it('o 404 do alheio e identico ao do que nao existe, fora o id', async () => {
+    // Qualquer campo diferente entre as duas respostas bastaria para varrer
+    // os ids e descobrir quais relatorios e comprovantes existem.
+    const owner = await createUserWithSession({ role: 'user' });
+    const stranger = await createUserWithSession({ role: 'user' });
+
+    const report = await insertReport({ owner_id: owner.user.id });
+    const receipt = await insertReceipt(report.id);
+
+    for (const [collection, id] of [
+      ['reports', report.id],
+      ['receipts', receipt.id],
+    ]) {
+      const missingId = id + 1000;
+
+      const foreign = await request(
+        'GET',
+        `/api/${collection}/${id}`,
+        undefined,
+        { token: stranger.token },
+      );
+      const missing = await request(
+        'GET',
+        `/api/${collection}/${missingId}`,
+        undefined,
+        { token: stranger.token },
+      );
+
+      expect(foreign.status).toBe(404);
+      expect(foreign.body).toEqual({
+        ...missing.body,
+        message: missing.body.message.replace(String(missingId), String(id)),
+      });
+    }
+  });
+
   it('nao aceita `owner_id` vindo do corpo', async () => {
     // O dono sai da sessao. Aceita-lo do cliente deixaria qualquer um criar
     // relatorio em nome de outra pessoa.

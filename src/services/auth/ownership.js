@@ -116,6 +116,7 @@ function assertCanWriteUser(actor, targetId) {
 }
 
 module.exports = {
+  reportNotFound,
   canReadReport,
   canWriteReport,
   assertCanReadReport,
