@@ -16,8 +16,11 @@
 
 const db = require('../src/config/database');
 const User = require('../src/models/user.model');
+const Session = require('../src/models/session.model');
 const password = require('../src/services/auth/password');
+const validator = require('../src/validators/user.validator');
 const { ROLES } = require('../src/services/auth/scopes');
+const { ValidationError } = require('../infra/errors');
 
 const USAGE = `
 Uso: npm run users:create -- --email <email> --name <nome> [opcoes]
@@ -26,7 +29,8 @@ Uso: npm run users:create -- --email <email> --name <nome> [opcoes]
   --name <nome>         obrigatorio
   --role <papel>        ${ROLES.join(' | ')} (padrao: user)
   --password <senha>    padrao: sorteada e impressa uma vez
-  --replace             redefine a senha e o papel se o e-mail ja existir
+  --replace             redefine a senha de um e-mail ja cadastrado e encerra
+                        as sessoes abertas dele; o papel so muda com --role
 `;
 
 function parseArgs(argv) {
@@ -60,45 +64,77 @@ function fail(message) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const email = String(args.email || '')
-    .trim()
-    .toLowerCase();
-  const name = String(args.name || '').trim();
-  const role = args.role || 'user';
 
-  if (!email || !name) {
-    return fail('Informe --email e --name.');
+  let data;
+
+  try {
+    // As mesmas regras da API (tamanho minimo da senha, formato do e-mail,
+    // papel valido). Um segundo conjunto so para a linha de comando
+    // divergiria na primeira vez que uma delas mudasse.
+    data = validator.validateCreate({
+      name: args.name,
+      email: args.email,
+      password: args.password || password.generate(),
+      role: args.role,
+    });
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return fail(
+        error.details
+          .map((detail) => `${detail.field}: ${detail.message}`)
+          .join('\n'),
+      );
+    }
+
+    throw error;
   }
 
-  if (!ROLES.includes(role)) {
-    return fail(`Papel invalido: ${role}.`);
-  }
-
-  const senha = args.password || password.generate();
   const gerada = !args.password;
-  const hash = await password.hash(senha);
-
-  const existente = await User.findByEmailWithSecret(email);
+  const hash = await password.hash(data.password);
+  const existente = await User.findByEmail(data.email);
 
   if (existente && !args.replace) {
-    return fail(`Ja existe um usuario com o e-mail ${email}. Use --replace.`);
+    return fail(
+      `Ja existe um usuario com o e-mail ${data.email}. Use --replace.`,
+    );
   }
 
   let user;
+  let revoked = 0;
 
   if (existente) {
     await User.updatePassword(existente.id, hash);
-    user = await User.update(existente.id, { name, role });
+
+    // Sem --role o papel fica como esta: redefinir a senha de quem perdeu o
+    // acesso nao pode, de quebra, rebaixar o unico administrador a `user`.
+    const fields = { name: data.name };
+
+    if (data.role) {
+      fields.role = data.role;
+    }
+
+    user = await User.update(existente.id, fields);
+
+    // Redefinir pelo script e o caminho de quem recupera uma conta, as vezes
+    // comprometida. Sem isto, quem estava dentro continuaria dentro ate o
+    // token vencer — a troca de senha pela API ja derruba as outras sessoes.
+    revoked = await Session.removeByUser(existente.id);
   } else {
-    user = await User.create({ name, email, password_hash: hash, role });
+    user = await User.create({
+      name: data.name,
+      email: data.email,
+      password_hash: hash,
+      role: data.role,
+    });
   }
 
   // Unica vez que a senha aparece. Vai para a saida padrao de proposito: se
   // fosse para o log, ficaria gravada em disco no agregador.
   process.stdout.write(
     `\nUsuario ${existente ? 'atualizado' : 'criado'}: ${user.email} (${user.role}, id ${user.id})\n` +
+      (existente ? `Sessoes encerradas: ${revoked}\n` : '') +
       (gerada
-        ? `Senha sorteada: ${senha}\nGuarde-a agora — ela nao e recuperavel.\n`
+        ? `Senha sorteada: ${data.password}\nGuarde-a agora — ela nao e recuperavel.\n`
         : 'Senha definida pelo argumento --password.\n'),
   );
 }

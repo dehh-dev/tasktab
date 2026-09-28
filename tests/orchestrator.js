@@ -1,6 +1,6 @@
 'use strict';
 
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const db = require('../src/config/database');
@@ -81,6 +81,25 @@ function runPendingMigrations() {
         `\n\n${output}`,
     );
   }
+}
+
+/**
+ * Roda um script de `scripts/` contra o banco de teste e devolve o que ele
+ * imprimiu. O script e o de verdade, num processo proprio — o mesmo caminho
+ * de quem o chama pela linha de comando, sem importar nada dele no teste.
+ */
+function runScript(file, args = []) {
+  const result = spawnSync('node', [file, ...args], {
+    cwd: ROOT,
+    env: { ...process.env, NODE_ENV: 'test' },
+    encoding: 'utf8',
+  });
+
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 /**
@@ -493,6 +512,7 @@ module.exports = {
   createUserWithSession,
   waitForAllServices,
   runPendingMigrations,
+  runScript,
   clearDatabase,
   closeDatabase,
   insertTask,

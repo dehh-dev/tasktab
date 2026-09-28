@@ -36,6 +36,14 @@ async function findById(id) {
   return rows[0] || null;
 }
 
+async function findByEmail(email) {
+  const { rows } = await db.query(
+    `SELECT ${COLUMNS} FROM users WHERE email = $1`,
+    [email],
+  );
+  return rows[0] || null;
+}
+
 /**
  * Os dois unicos caminhos que devolvem o hash: o login (que so tem o e-mail) e
  * a troca da propria senha (que precisa conferir a atual). Qualquer outra
@@ -137,6 +145,7 @@ module.exports = {
   findAll,
   count,
   findById,
+  findByEmail,
   findByEmailWithSecret,
   findByIdWithSecret,
   existsByEmail,
