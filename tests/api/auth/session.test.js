@@ -35,6 +35,16 @@ describe('GET /api/auth/me', () => {
     expect(response.status).toBe(401);
   });
 
+  it('trata cookie malformado como sessao ausente, e nao como erro interno', async () => {
+    // `%E0%A4%A` nao decodifica. Antes isso virava 500 em toda a API.
+    const response = await request('GET', '/api/auth/me', undefined, {
+      token: '%E0%A4%A',
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body.name).toBe('UnauthorizedError');
+  });
+
   it('o auditor recebe os escopos de leitura e nenhum de escrita', async () => {
     const { token } = await createUserWithSession({ role: 'auditor' });
     const response = await request('GET', '/api/auth/me', undefined, { token });

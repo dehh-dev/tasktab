@@ -92,11 +92,25 @@ function readToken(req) {
     }
 
     if (part.slice(0, separator).trim() === env.session.cookieName) {
-      return decodeURIComponent(part.slice(separator + 1).trim()) || null;
+      return decodeToken(part.slice(separator + 1).trim());
     }
   }
 
   return null;
+}
+
+/**
+ * Valor com `%` quebrado nao e sessao nenhuma. Deixar o `URIError` do
+ * `decodeURIComponent` estourar transformava um cookie adulterado num 500 em
+ * toda a API — inclusive no login, que e justamente onde a pessoa sairia da
+ * situacao entrando de novo.
+ */
+function decodeToken(raw) {
+  try {
+    return decodeURIComponent(raw) || null;
+  } catch {
+    return null;
+  }
 }
 
 /**

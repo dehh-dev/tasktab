@@ -116,6 +116,19 @@ describe('POST /api/auth/login', () => {
     expect(response.status).toBe(200);
   });
 
+  it('entra mesmo com um cookie de sessao malformado no navegador', async () => {
+    // O login e a saida de quem tem um cookie ruim: se ele tambem caisse, a
+    // pessoa so se livraria do problema limpando os cookies na mao.
+    const response = await request(
+      'POST',
+      '/api/auth/login',
+      { email: DEFAULT_USER.email, password: DEFAULT_PASSWORD },
+      { token: '%E0%A4%A' },
+    );
+
+    expect(response.status).toBe(200);
+  });
+
   it('recusa corpo sem e-mail ou senha com 422 por campo', async () => {
     const response = await request(
       'POST',
