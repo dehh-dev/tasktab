@@ -16,49 +16,122 @@ const {
  * Vale mais que a soma dos testes de cada rota: uma rota nova entra na API
  * sem `requireScope` e passa em todos os testes dela mesma — e so aqui, ao
  * chegar autenticada como um papel que nao deveria alcanca-la, que a falta
- * aparece.
+ * aparece. Por isso a lista tem **todas** as rotas que exigem sessao: a que
+ * ficar de fora e uma rota que ninguem confere.
  */
-const ROTAS_PROTEGIDAS = [
-  ['GET', '/api/tasks'],
-  ['POST', '/api/tasks'],
-  ['GET', '/api/reports'],
-  ['POST', '/api/reports'],
-  ['GET', '/api/merchants'],
-  ['POST', '/api/merchants'],
-  ['GET', '/api/users'],
-  ['POST', '/api/users'],
+const EVERYONE = ['admin', 'user', 'auditor'];
+const WRITERS = ['admin', 'user'];
+const ADMIN = ['admin'];
+
+// [metodo, caminho, papeis que passam do portao da rota]
+//
+// Os ids nao existem (a suite trunca com RESTART IDENTITY), entao quem passa
+// do portao recebe 404 ou 422 — o que importa aqui e so nao ser 401 nem 403.
+// A excecao e o `/api/users/1`: e o admin padrao, que para os papeis criados
+// em cada teste e sempre o cadastro de outra pessoa.
+const ROUTES = [
+  ['POST', '/api/auth/logout', EVERYONE],
+  ['GET', '/api/auth/me', EVERYONE],
+
+  ['GET', '/api/users', ADMIN],
+  ['POST', '/api/users', ADMIN],
+  ['GET', '/api/users/1', ADMIN],
+  ['PATCH', '/api/users/1', ADMIN],
+  ['DELETE', '/api/users/1', ADMIN],
+
+  ['GET', '/api/tasks', EVERYONE],
+  ['POST', '/api/tasks', WRITERS],
+  ['GET', '/api/tasks/1', EVERYONE],
+  ['PUT', '/api/tasks/1', WRITERS],
+  ['PATCH', '/api/tasks/1', WRITERS],
+  ['DELETE', '/api/tasks/1', WRITERS],
+
+  ['GET', '/api/reports', EVERYONE],
+  ['POST', '/api/reports', WRITERS],
+  ['GET', '/api/reports/1', EVERYONE],
+  ['PATCH', '/api/reports/1', WRITERS],
+  ['DELETE', '/api/reports/1', WRITERS],
+  ['GET', '/api/reports/1/receipts', EVERYONE],
+  ['POST', '/api/reports/1/receipts', WRITERS],
+  ['GET', '/api/reports/1/validation', EVERYONE],
+  ['GET', '/api/reports/1/export.xlsx', EVERYONE],
+  ['GET', '/api/reports/1/export/anexo-i.xlsx', EVERYONE],
+  ['GET', '/api/reports/1/export.pdf', EVERYONE],
+
+  ['GET', '/api/receipts/1', EVERYONE],
+  ['PATCH', '/api/receipts/1', WRITERS],
+  ['DELETE', '/api/receipts/1', WRITERS],
+  ['POST', '/api/receipts/1/reprocess', WRITERS],
+  ['GET', '/api/receipts/1/image', EVERYONE],
+
+  ['GET', '/api/merchants', EVERYONE],
+  ['GET', '/api/merchants/by-cnpj/26048802000165', EVERYONE],
+  ['POST', '/api/merchants', WRITERS],
+  ['PATCH', '/api/merchants/1', WRITERS],
 ];
 
+/** Resume a resposta ao que a matriz confere: barrou no portao, ou passou. */
+function gate(response) {
+  return response.status === 401 || response.status === 403
+    ? `${response.status} ${response.body?.name}`
+    : 'passa';
+}
+
 describe('autenticacao obrigatoria', () => {
-  it.each(ROTAS_PROTEGIDAS)(
-    'responde 401 em %s %s sem sessao',
-    async (method, path) => {
-      const response = await request(method, path, undefined, { token: null });
+  it.each(ROUTES)('responde 401 em %s %s sem sessao', async (method, path) => {
+    const response = await request(method, path, undefined, { token: null });
 
-      expect(response.status).toBe(401);
-      expect(response.body.name).toBe('UnauthorizedError');
-      // O `action` diz o que fazer a seguir, e a interface o exibe.
-      expect(response.body.action).toBeTruthy();
-    },
-  );
+    expect(response.status).toBe(401);
+    expect(response.body.name).toBe('UnauthorizedError');
+    // O `action` diz o que fazer a seguir, e a interface o exibe.
+    expect(response.body.action).toBeTruthy();
+  });
 
-  it('o health check continua publico', async () => {
-    // O probe do container consulta esta rota; exigir sessao nela faria o
+  it('o health check e o login continuam publicos', async () => {
+    // O probe do container consulta o health; exigir sessao nele faria o
     // HEALTHCHECK do Dockerfile derrubar o container que esta saudavel.
-    const response = await request('GET', '/api/health', undefined, {
+    const health = await request('GET', '/api/health', undefined, {
       token: null,
     });
+    expect(health.status).toBe(200);
 
-    expect(response.status).toBe(200);
+    // Sem corpo o login recusa por validacao, e nao por falta de sessao.
+    const login = await request('POST', '/api/auth/login', {}, { token: null });
+    expect(login.status).toBe(422);
   });
 
   it('rota inexistente continua respondendo 404, com ou sem sessao', async () => {
-    const semSessao = await request('GET', '/api/nao-existe', undefined, {
+    const withoutSession = await request('GET', '/api/nao-existe', undefined, {
       token: null,
     });
+    const withSession = await request('GET', '/api/nao-existe');
 
-    expect(semSessao.status).toBe(404);
+    expect(withoutSession.status).toBe(404);
+    expect(withSession.status).toBe(404);
   });
+});
+
+describe('escopo exigido em cada rota', () => {
+  it.each(ROUTES)(
+    '%s %s so deixa passar os papeis com o escopo',
+    async (method, path, allowed) => {
+      const actual = {};
+      const expected = {};
+
+      for (const role of EVERYONE) {
+        const { token } = await createUserWithSession({ role });
+        const response = await request(method, path, undefined, { token });
+
+        actual[role] = gate(response);
+        expected[role] = allowed.includes(role)
+          ? 'passa'
+          : '403 ForbiddenError';
+      }
+
+      // Comparar o mapa inteiro mostra, na falha, qual papel escapou.
+      expect(actual).toEqual(expected);
+    },
+  );
 });
 
 describe('papel user', () => {
@@ -87,14 +160,6 @@ describe('papel user', () => {
       ).status,
     ).toBe(201);
   });
-
-  it('nao alcanca a administracao de usuarios', async () => {
-    const { token } = await createUserWithSession({ role: 'user' });
-
-    expect(
-      (await request('GET', '/api/users', undefined, { token })).status,
-    ).toBe(403);
-  });
 });
 
 describe('papel auditor', () => {
@@ -113,31 +178,6 @@ describe('papel auditor', () => {
     expect(
       (await request('GET', '/api/reports', undefined, { token })).status,
     ).toBe(200);
-  });
-
-  it('nao escreve em nada', async () => {
-    const { token } = await createUserWithSession({ role: 'auditor' });
-
-    const escritas = [
-      ['POST', '/api/tasks', { title: 'Nao deveria entrar' }],
-      [
-        'POST',
-        '/api/reports',
-        {
-          title: 'Nao deveria entrar',
-          period_start: '2026-06-01',
-          period_end: '2026-06-30',
-        },
-      ],
-      ['POST', '/api/merchants', { cnpj: '26048802000165', name: 'Padaria' }],
-    ];
-
-    for (const [method, path, body] of escritas) {
-      const response = await request(method, path, body, { token });
-
-      expect(response.status).toBe(403);
-      expect(response.body.name).toBe('ForbiddenError');
-    }
   });
 
   it('le o relatorio de outra pessoa, mas nao o edita', async () => {
@@ -300,7 +340,7 @@ describe('posse herdada pelos comprovantes', () => {
         { token: ana.token },
       );
 
-      expect([404]).toContain(response.status);
+      expect(response.status).toBe(404);
     }
   });
 
