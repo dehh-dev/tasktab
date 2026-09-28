@@ -65,6 +65,25 @@ de popular as 5 tarefas de exemplo.
 No navegador, use a porta **5173**: e o Vite, que serve a interface e encaminha
 `/api` para o Express.
 
+### Primeiro usuario
+
+A API nao tem auto-cadastro, e sem usuario nao ha como entrar. O primeiro sai
+pela linha de comando:
+
+```bash
+npm run users:create -- --email voce@exemplo.com --name "Seu Nome" --role admin
+```
+
+Sem `--password` o script sorteia uma senha forte e a imprime **uma unica vez**
+— e o caminho recomendado, porque senha em argumento fica no historico do
+shell. Papeis aceitos: `admin`, `user`, `auditor`.
+
+Depois disso, novos cadastros saem por `POST /api/users` (exige `users:write`).
+
+Para redefinir a senha de quem perdeu o acesso, repita o comando com
+`--replace`. A senha nova passa a valer, as sessoes abertas daquela pessoa sao
+encerradas e o papel so muda se vier `--role`.
+
 O `compose.yaml` cria dois bancos: `tasktab_development` e `tasktab_test`
 (este ultimo via `docker/initdb/`, executado na primeira subida do volume).
 
@@ -77,6 +96,7 @@ O `compose.yaml` cria dois bancos: `tasktab_development` e `tasktab_test`
 | `build`                     | Gera o build de producao da interface em `web/dist`   |
 | `start`                     | So o servidor (assume banco pronto — uso em producao) |
 | `seed`                      | Servicos + espera + migrations + 5 tarefas de exemplo |
+| `users:create`              | Cadastra um usuario (o primeiro acesso sai por aqui)  |
 | `services:up`               | Sobe os containers em background                      |
 | `services:stop`             | Para os containers, preservando os dados              |
 | `services:down`             | Remove os containers (`-v` tambem apaga o volume)     |
@@ -97,28 +117,55 @@ existencia do database, que e do que as migrations dependem. Ele respeita o
 em `process.env`, entao em producao basta injetar as variaveis reais pelo
 ambiente (nao existe `env.production` versionado).
 
-| Variavel                                              | Descricao                           |
-| ----------------------------------------------------- | ----------------------------------- |
-| `PORT`                                                | Porta HTTP                          |
-| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | Conexao usada pela aplicacao        |
-| `DATABASE_URL`                                        | Consumida pelo `node-pg-migrate`    |
-| `RATE_LIMIT_WINDOW_MS`                                | Janela do limitador (padrao 15min)  |
-| `RATE_LIMIT_MAX`                                      | Teto de leitura (padrao 600)        |
-| `RATE_LIMIT_WRITE_MAX`                                | Teto de escrita (padrao 100)        |
-| `RATE_LIMIT_BATCH_WRITE_MAX`                          | Teto das rotas em lote (padrao 600) |
-| `UPLOAD_DIR`                                          | Onde os PDFs sao gravados           |
-| `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo          |
-| `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao             |
-| `OCR_ENABLED`                                         | `false` desliga o degrau de OCR     |
-| `OCR_LANGUAGE`                                        | Idioma do tesseract (padrao `por`)  |
-| `OCR_CACHE_DIR`                                       | Cache dos dados de idioma           |
-| `OCR_TIMEOUT_MS`                                      | Teto por pagina (padrao 20s)        |
-| `LOG_LEVEL`                                           | Nivel do `pino` (padrao `info`)     |
+| Variavel                                              | Descricao                                 |
+| ----------------------------------------------------- | ----------------------------------------- |
+| `PORT`                                                | Porta HTTP                                |
+| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | Conexao usada pela aplicacao              |
+| `DATABASE_URL`                                        | Consumida pelo `node-pg-migrate`          |
+| `RATE_LIMIT_WINDOW_MS`                                | Janela do limitador (padrao 15min)        |
+| `RATE_LIMIT_MAX`                                      | Teto de leitura (padrao 600)              |
+| `RATE_LIMIT_WRITE_MAX`                                | Teto de escrita (padrao 100)              |
+| `RATE_LIMIT_BATCH_WRITE_MAX`                          | Teto das rotas em lote (padrao 600)       |
+| `UPLOAD_DIR`                                          | Onde os PDFs sao gravados                 |
+| `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo                |
+| `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao                   |
+| `OCR_ENABLED`                                         | `false` desliga o degrau de OCR           |
+| `OCR_LANGUAGE`                                        | Idioma do tesseract (padrao `por`)        |
+| `OCR_CACHE_DIR`                                       | Cache dos dados de idioma                 |
+| `OCR_TIMEOUT_MS`                                      | Teto por pagina (padrao 20s)              |
+| `RATE_LIMIT_AUTH_MAX`                                 | Teto do login (padrao 20)                 |
+| `SESSION_COOKIE_NAME`                                 | Nome do cookie (padrao `tasktab_session`) |
+| `SESSION_TTL_HOURS`                                   | Validade da sessao (padrao 168h)          |
+| `SESSION_COOKIE_SECURE`                               | Forca (ou desliga) o `Secure` do cookie   |
+| `LOG_LEVEL`                                           | Nivel do `pino` (padrao `info`)           |
 
 O `.npmrc` liga `engine-strict`: sem ele o campo `engines` seria so um aviso e a
 instalacao seguiria numa versao de Node incompativel.
 
 ## Endpoints
+
+**Toda rota de `/api` exige sessao**, com duas excecoes: `GET /api/health` (o
+probe do container) e `POST /api/auth/login`. Sem sessao, a resposta e `401`;
+com sessao mas sem permissao, `403` — e `404` quando o recurso pertence a outra
+pessoa (ver "Autenticacao e autorizacao" abaixo).
+
+Base: `/api/auth`
+
+| Metodo | Rota      | Descricao                           | Sucesso |
+| ------ | --------- | ----------------------------------- | ------- |
+| `POST` | `/login`  | Abre a sessao e grava o cookie      | 200     |
+| `POST` | `/logout` | Encerra a sessao (apaga do banco)   | 204     |
+| `GET`  | `/me`     | Quem esta na sessao, com os escopos | 200     |
+
+Base: `/api/users` (`users:read` / `users:write`; o proprio cadastro dispensa)
+
+| Metodo   | Rota   | Descricao                         | Sucesso |
+| -------- | ------ | --------------------------------- | ------- |
+| `GET`    | `/`    | Lista (paginada)                  | 200     |
+| `GET`    | `/:id` | Detalhe                           | 200     |
+| `POST`   | `/`    | Cadastra                          | 201     |
+| `PATCH`  | `/:id` | Altera nome, senha ou papel       | 200     |
+| `DELETE` | `/:id` | Remove (os relatorios dele ficam) | 204     |
 
 Base: `/api/tasks`
 
@@ -351,9 +398,9 @@ plano, sempre no mesmo formato:
 O `action` diz o que fazer a seguir, e o `details` (so em `422`) aponta o campo
 culpado — e o que permite a interface exibir o erro no campo certo.
 
-Codigos: `400` (id/JSON invalido), `404` (inexistente), `422` (falha de
-validacao), `429` (limite de requisicoes), `500` (erro interno), `503`
-(dependencia fora do ar).
+Codigos: `400` (id/JSON invalido), `401` (sem sessao), `403` (sem permissao),
+`404` (inexistente), `422` (falha de validacao), `429` (limite de
+requisicoes), `500` (erro interno), `503` (dependencia fora do ar).
 
 ### Logs
 
@@ -369,15 +416,55 @@ nao entra.
 `LOG_LEVEL` controla o nivel (padrao `info`, e `silent` em teste). Em
 desenvolvimento a saida passa pelo `pino-pretty`; em producao sai em JSON.
 
+### Autenticacao e autorizacao
+
+Sessao por cookie `httpOnly`, gravada no banco. Entrar cria a linha, sair a
+apaga — o token morre na hora, e nao quando venceria. A senha e derivada com
+`scrypt` (biblioteca padrao do Node), com os parametros de custo dentro do
+proprio hash, para que endurece-los depois nao invalide as senhas existentes.
+
+`sameSite=lax` no cookie e o que **dispensa token de CSRF**: sob Lax o cookie
+so acompanha navegacao de topo por GET, e toda escrita da API e POST, PATCH ou
+DELETE.
+
+A autorizacao tem dois eixos, e os dois valem sempre:
+
+- **Escopo** — que acao, sobre que classe de recurso. Declarado na rota
+  (`requireScope('reports:write')`).
+- **Posse** — quais linhas. Conferida no controller, com o registro em maos.
+
+| Papel     | Alcance                                             |
+| --------- | --------------------------------------------------- |
+| `admin`   | tudo, inclusive relatorio de outra pessoa           |
+| `user`    | cria e revisa **os seus** relatorios                |
+| `auditor` | le tudo (inclusive o alheio) e **nao escreve nada** |
+
+A posse pertence ao **relatorio**; comprovante, imagem e exportacao herdam a
+dele. Quando o recurso e de outra pessoa a resposta e `404`, e nao `403`:
+responder 403 confirmaria que aquele id existe, e permitiria varrer os ids para
+mapear o sistema. O `403` fica para quando a **acao** e negada e nao o
+registro — o auditor que le o relatorio e tenta edita-lo.
+
+O `merchants` e cadastro compartilhado (a categoria de um CNPJ vale para todo
+mundo) e o quadro de `tasks` tambem, por decisao de produto.
+
+Na interface, as abas e os botoes seguem os escopos da sessao: o auditor ve a
+revisao de comprovantes em modo somente leitura. Quando a sessao cai no meio
+do uso — venceu, ou foi revogada por uma troca de senha em outro navegador —,
+a tela volta para o login dizendo por que.
+
 ### Protecoes HTTP
 
 O `helmet` aplica os headers de seguranca com a politica padrao — front e back
 ficam sempre na mesma origem, entao a CSP `'self'` atende o build do Vite sem
 excecoes.
 
-O limitador tem dois tetos sobrepostos: um geral, generoso porque a interface
-recarrega a lista a cada mutacao, e um mais apertado so para escrita. Ambos
-respondem `429` no mesmo formato dos demais erros.
+O limitador tem tetos sobrepostos: um geral, generoso porque a interface
+recarrega a lista a cada mutacao; um mais apertado so para escrita; um proprio
+para as rotas em lote da prestacao de contas; e o mais apertado de todos no
+`POST /api/auth/login`, que e a unica rota onde repetir a requisicao com outro
+valor serve a quem nao deveria estar aqui. Todos respondem `429` no mesmo
+formato dos demais erros.
 
 O limitador **fica desligado em `NODE_ENV=test`**: a suite dispara dezenas de
 requisicoes em segundos e trombaria em qualquer teto realista. Para conferir

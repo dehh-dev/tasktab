@@ -10,7 +10,7 @@ import ReportDetail from './ReportDetail';
  * de proposito (backlog Issue 19) — a navegacao entre lista e detalhe e so
  * estado local, sem URL propria por relatorio.
  */
-export default function ExpensesApp() {
+export default function ExpensesApp({ canWrite = true }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -66,6 +66,7 @@ export default function ExpensesApp() {
       <ReportDetail
         reportId={openReportId}
         onBack={() => setOpenReportId(null)}
+        canWrite={canWrite}
       />
     );
   }
@@ -97,7 +98,7 @@ export default function ExpensesApp() {
         <ReportList
           reports={reports}
           onOpen={setOpenReportId}
-          onCreate={() => setCreating(true)}
+          onCreate={canWrite ? () => setCreating(true) : undefined}
         />
       )}
     </>

@@ -1,10 +1,12 @@
 'use strict';
 
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const db = require('../src/config/database');
 const env = require('../src/config/env');
+const password = require('../src/services/auth/password');
+const sessions = require('../src/services/auth/session.service');
 
 const ROOT = path.resolve(__dirname, '..');
 const BASE_URL = `http://localhost:${env.port}`;
@@ -82,6 +84,25 @@ function runPendingMigrations() {
 }
 
 /**
+ * Roda um script de `scripts/` contra o banco de teste e devolve o que ele
+ * imprimiu. O script e o de verdade, num processo proprio — o mesmo caminho
+ * de quem o chama pela linha de comando, sem importar nada dele no teste.
+ */
+function runScript(file, args = []) {
+  const result = spawnSync('node', [file, ...args], {
+    cwd: ROOT,
+    env: { ...process.env, NODE_ENV: 'test' },
+    encoding: 'utf8',
+  });
+
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
+}
+
+/**
  * Espera a fila de extracao do servidor esvaziar.
  *
  * A fila vive no processo da API, nao no do Jest: sem esperar, o trabalho
@@ -108,12 +129,118 @@ async function waitForQueue({ timeoutMs = 30000 } = {}) {
   throw new Error(`A fila de extracao nao esvaziou em ${timeoutMs}ms.`);
 }
 
-// CASCADE porque receipts referencia reports e merchants; sem ele o TRUNCATE
-// recusa a tabela que tem dependente.
+// CASCADE porque receipts referencia reports e merchants, e sessions
+// referencia users; sem ele o TRUNCATE recusa a tabela que tem dependente.
 function clearDatabase() {
   return db.query(
-    'TRUNCATE TABLE tasks, receipts, reports, merchants RESTART IDENTITY CASCADE',
+    `TRUNCATE TABLE tasks, receipts, reports, merchants, sessions, users
+     RESTART IDENTITY CASCADE`,
   );
+}
+
+/**
+ * Arranjo de autenticacao.
+ *
+ * Toda rota da API passou a exigir sessao, entao cada arquivo de teste precisa
+ * de uma. Duas escolhas fazem isso custar quase nada:
+ *
+ * 1. O hash da senha e calculado **uma vez por processo**. `scrypt` custa
+ *    ~30 ms de proposito, e paga-lo a cada `beforeEach` somaria dezenas de
+ *    segundos ao longo da suite.
+ * 2. O token e sorteado uma vez e reaproveitado. O que o TRUNCATE apaga e a
+ *    linha da sessao, recriada com o mesmo token — entao `request()` manda
+ *    sempre o mesmo cookie e nenhum teste precisa saber que ele existe.
+ */
+const DEFAULT_USER = {
+  name: 'Admin de Teste',
+  email: 'admin@tasktab.test',
+  role: 'admin',
+};
+
+const DEFAULT_PASSWORD = 'senha-de-teste-123';
+const DEFAULT_TOKEN = sessions.generateToken();
+
+let cachedHash = null;
+
+async function hashDefaultPassword() {
+  if (!cachedHash) {
+    cachedHash = await password.hash(DEFAULT_PASSWORD);
+  }
+
+  return cachedHash;
+}
+
+/** Insere um usuario direto no banco, sem passar pela API. */
+async function insertUser(overrides = {}) {
+  const user = { ...DEFAULT_USER, ...overrides };
+
+  const { rows } = await db.query(
+    `INSERT INTO users (name, email, password_hash, role)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, name, email, role, created_at, updated_at`,
+    [user.name, user.email, await hashDefaultPassword(), user.role],
+  );
+
+  return rows[0];
+}
+
+/** Abre uma sessao direto no banco e devolve o token cru. */
+async function insertSession(userId, token = sessions.generateToken()) {
+  await db.query(
+    `INSERT INTO sessions (user_id, token_hash, expires_at)
+     VALUES ($1, $2, now() + interval '1 day')`,
+    [userId, sessions.hashToken(token)],
+  );
+
+  return token;
+}
+
+/**
+ * Usuario com sessao aberta, para testar papel diferente do padrao.
+ * Devolve `{ user, token }` — o token vai no `options.token` de `request()`.
+ */
+async function createUserWithSession(overrides = {}) {
+  const user = await insertUser({
+    name: 'Pessoa de Teste',
+    email: `pessoa-${Date.now()}-${Math.random().toString(36).slice(2)}@tasktab.test`,
+    role: 'user',
+    ...overrides,
+  });
+
+  return { user, token: await insertSession(user.id) };
+}
+
+/**
+ * Recria o usuario padrao e a sessao dele. Chamado pelo `tests/setup.js`
+ * depois do TRUNCATE — e o que faz `request()` chegar autenticado sem que
+ * nenhum arquivo de teste precise de preambulo.
+ */
+let defaultUser = null;
+
+async function seedDefaultUser() {
+  defaultUser = await insertUser();
+  await insertSession(defaultUser.id, DEFAULT_TOKEN);
+
+  return { user: defaultUser, token: DEFAULT_TOKEN };
+}
+
+/** O usuario padrao da execucao corrente (admin), ja gravado pelo setup. */
+function currentUser() {
+  return defaultUser;
+}
+
+/**
+ * Header de cookie da sessao. `token: null` manda a requisicao sem sessao
+ * nenhuma, que e como se testa o 401.
+ */
+function authHeaders(token) {
+  if (token === null) {
+    return {};
+  }
+
+  return {
+    Cookie: `${env.session.cookieName}=${token || DEFAULT_TOKEN}`,
+  };
 }
 
 function closeDatabase() {
@@ -143,7 +270,14 @@ async function insertTask(overrides = {}) {
   return rows[0];
 }
 
-/** Insere um relatorio direto no banco, sem passar pela API. */
+/**
+ * Insere um relatorio direto no banco, sem passar pela API.
+ *
+ * Sem `owner_id` o relatorio nasce sem dono — o mesmo estado dos que existiam
+ * antes de haver usuarios. So quem tem `reports:read:any` o enxerga, e o
+ * usuario padrao da suite e admin justamente para que o arranjo antigo
+ * continue valendo.
+ */
 async function insertReport(overrides = {}) {
   const report = {
     title: 'Viagem de teste',
@@ -151,20 +285,23 @@ async function insertReport(overrides = {}) {
     period_end: '2026-06-30',
     advance_cents: 0,
     status: 'open',
+    owner_id: null,
     ...overrides,
   };
 
   const { rows } = await db.query(
-    `INSERT INTO reports (title, period_start, period_end, advance_cents, status)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO reports
+       (title, period_start, period_end, advance_cents, status, owner_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING id, title, period_start, period_end, advance_cents, status,
-               created_at, updated_at`,
+               owner_id, created_at, updated_at`,
     [
       report.title,
       report.period_start,
       report.period_end,
       report.advance_cents,
       report.status,
+      report.owner_id,
     ],
   );
 
@@ -252,10 +389,10 @@ async function updateTaskTitleDirectly(id, title) {
  * Requisicao HTTP real contra a API. Um `body` string e enviado cru, o que
  * permite testar payload malformado.
  */
-async function request(method, pathname, body) {
+async function request(method, pathname, body, { token } = {}) {
   const response = await fetch(apiUrl(pathname), {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body:
       body === undefined
         ? undefined
@@ -277,7 +414,7 @@ async function request(method, pathname, body) {
  * Envio multipart, para as rotas de upload. O `fetch` monta o boundary sozinho
  * a partir do FormData — definir Content-Type na mao quebraria isso.
  */
-async function requestUpload(pathname, files) {
+async function requestUpload(pathname, files, { token } = {}) {
   const form = new FormData();
 
   for (const { buffer, filename } of files) {
@@ -290,6 +427,7 @@ async function requestUpload(pathname, files) {
 
   const response = await fetch(apiUrl(pathname), {
     method: 'POST',
+    headers: authHeaders(token),
     body: form,
   });
   const text = await response.text();
@@ -333,8 +471,11 @@ async function waitForProcessing(reportId, { timeoutMs = 30000 } = {}) {
  * Requisicao HTTP para resposta binaria (xlsx, pdf). `request()` sempre faz
  * `JSON.parse` no corpo, o que quebra para esses content-types.
  */
-async function requestBinary(method, pathname) {
-  const response = await fetch(apiUrl(pathname), { method });
+async function requestBinary(method, pathname, { token, headers } = {}) {
+  const response = await fetch(apiUrl(pathname), {
+    method,
+    headers: { ...authHeaders(token), ...headers },
+  });
   const buffer = Buffer.from(await response.arrayBuffer());
 
   return { status: response.status, headers: response.headers, buffer };
@@ -361,8 +502,17 @@ function uploadedFileExists(fileHash) {
 
 module.exports = {
   apiUrl,
+  DEFAULT_USER,
+  DEFAULT_PASSWORD,
+  DEFAULT_TOKEN,
+  seedDefaultUser,
+  currentUser,
+  insertUser,
+  insertSession,
+  createUserWithSession,
   waitForAllServices,
   runPendingMigrations,
+  runScript,
   clearDatabase,
   closeDatabase,
   insertTask,

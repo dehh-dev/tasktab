@@ -84,6 +84,43 @@ class NotFoundError extends BaseError {
 }
 
 /**
+ * 401 — nao ha sessao valida na requisicao.
+ *
+ * Distinto do 403: aqui a resposta muda se o cliente se identificar. O
+ * `WWW-Authenticate` fica de fora de proposito — a autenticacao e por cookie
+ * de sessao, e o header faria o browser abrir a caixa de Basic Auth.
+ */
+class UnauthorizedError extends BaseError {
+  constructor({ message, action, cause } = {}) {
+    super({
+      message: message || 'Sessao ausente ou expirada.',
+      action: action || 'Entre com seu e-mail e senha para continuar.',
+      statusCode: 401,
+      cause,
+    });
+  }
+}
+
+/**
+ * 403 — a sessao e valida, mas nao alcanca este recurso.
+ *
+ * A mensagem nao diz **se** o recurso existe: responder "relatorio 7 nao e
+ * seu" confirmaria a existencia do relatorio 7 para quem so queria descobrir
+ * isso. Quando a diferenca entre 403 e 404 vazaria informacao, o controller
+ * escolhe o 404 — ver `src/services/auth/ownership.js`.
+ */
+class ForbiddenError extends BaseError {
+  constructor({ message, action, cause } = {}) {
+    super({
+      message: message || 'Voce nao tem permissao para esta operacao.',
+      action: action || 'Peca a um administrador o acesso necessario.',
+      statusCode: 403,
+      cause,
+    });
+  }
+}
+
+/**
  * 422 — a requisicao esta bem formada, mas o conteudo nao passa nas regras.
  * O `details` traz `{ field, message }` por campo: e o que permite a interface
  * exibir cada erro no campo correspondente em vez de um alerta generico.
@@ -107,5 +144,7 @@ module.exports = {
   ServiceError,
   BadRequestError,
   NotFoundError,
+  UnauthorizedError,
+  ForbiddenError,
   ValidationError,
 };

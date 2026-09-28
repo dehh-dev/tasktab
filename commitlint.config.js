@@ -20,6 +20,9 @@ const SCOPES = [
   'extracao',
   'export',
   'upload',
+  // Autenticacao e autorizacao
+  'auth',
+  'users',
 ];
 
 module.exports = {

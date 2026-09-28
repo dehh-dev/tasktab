@@ -6,7 +6,6 @@ const {
   requestUpload,
   waitForProcessing,
   insertReport,
-  apiUrl,
 } = require('../../orchestrator');
 const { makeReceiptPdf } = require('../../fixtures/pdf');
 
@@ -50,9 +49,11 @@ describe('GET /api/receipts/:id/image', () => {
     const etag = first.headers.get('etag');
     expect(etag).toBeTruthy();
 
-    const response = await fetch(apiUrl(`/api/receipts/${receipt.id}/image`), {
-      headers: { 'If-None-Match': etag },
-    });
+    const response = await requestBinary(
+      'GET',
+      `/api/receipts/${receipt.id}/image`,
+      { headers: { 'If-None-Match': etag } },
+    );
 
     expect(response.status).toBe(304);
   });

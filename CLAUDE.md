@@ -25,6 +25,7 @@ Node **24.18.0** (`.nvmrc`) — rode `nvm use` antes de qualquer coisa.
 | Criar migration                          | `npm run migrations:create -- nome`       |
 | Aplicar / reverter migrations            | `npm run migrations:up` / `:down`         |
 | Popular 5 tarefas de exemplo             | `npm run seed`                            |
+| Cadastrar usuario (primeiro acesso)      | `npm run users:create -- --email ... `    |
 | Subir / parar / remover servicos         | `services:up` / `services:stop` / `:down` |
 | Build de producao da interface           | `npm run build` (gera `web/dist`)         |
 | Commitar guiado pelo Conventional        | `npm run commit`                          |
@@ -59,7 +60,9 @@ enquanto estiver iterando.
 ## Arquitetura
 
 ```
-routes → asyncHandler → controller → validator → model → Postgres
+routes → authenticate → requireScope → asyncHandler → controller → validator
+                                                          ↓  ↓
+                                                  ownership  model → Postgres
                              ↓
                          BaseError → onError → { name, message, action, ... }
 ```
@@ -100,6 +103,8 @@ Toda resposta de erro nasce de uma classe em `infra/errors.js` que estende
 | ---------------------- | ------ | ---------------------------------------------- |
 | `BadRequestError`      | 400    | id invalido, JSON malformado, corpo nao-objeto |
 | `NotFoundError`        | 404    | recurso ou rota inexistente                    |
+| `UnauthorizedError`    | 401    | sem sessao valida                              |
+| `ForbiddenError`       | 403    | ha sessao, mas ela nao alcanca a operacao      |
 | `ValidationError`      | 422    | falha de validacao; carrega `details`          |
 | `TooManyRequestsError` | 429    | teto de requisicoes estourado                  |
 | `ServiceError`         | 503    | dependencia fora do ar (banco)                 |
@@ -124,6 +129,151 @@ Os handlers ficam em `infra/controller.js` e sao plugados no Express via
 argumentos (`error, req, res, next`) — e a assinatura que marca o middleware
 como handler de erro. Nao remova o `next`.
 
+## Autenticacao e autorizacao
+
+A API era aberta ate a issue 32: qualquer um que alcancasse a porta listava os
+relatorios e baixava a imagem de qualquer cupom — que traz CNPJ e, as vezes,
+CPF de terceiros. Agora **toda** rota de `/api` exige sessao, menos duas:
+`/api/health` (o probe do container) e `POST /api/auth/login`.
+
+### Os dois eixos
+
+Autorizacao aqui tem **escopo** e **posse**, e separa-los e o que evita a
+mistura que costuma virar bug de permissao:
+
+| Eixo       | Pergunta                | Onde                                           |
+| ---------- | ----------------------- | ---------------------------------------------- |
+| **Escopo** | que acao, em que classe | `requireScope` na **rota**                     |
+| **Posse**  | quais linhas            | `loadReport` / `loadReceipt` no **controller** |
+
+O escopo fica na rota porque e o unico lugar onde da para ler, de cima a
+baixo, o que cada endpoint exige — um controller novo que esqueca a checagem
+passaria despercebido, uma rota sem `requireScope` salta aos olhos ao lado das
+vizinhas. `requireScope` confere o nome contra `SCOPES` **na carga do modulo**:
+um erro de digitacao derruba o processo no boot em vez de liberar a rota em
+silencio.
+
+Os escopos `:any` (`reports:read:any`, `reports:write:any`) sao a ponte entre
+os dois eixos: quem os tem dispensa a checagem de posse. Sem eles, "admin"
+viraria um `if` espalhado por cada controller.
+
+### Papeis
+
+| Papel     | O que e               | Alcance                          |
+| --------- | --------------------- | -------------------------------- |
+| `admin`   | administra pessoas    | tudo, inclusive relatorio alheio |
+| `user`    | quem presta contas    | **os seus** relatorios           |
+| `auditor` | quem confere e assina | le tudo, escreve nada            |
+
+O `auditor` e o unico papel com `:any` de leitura sem o par de escrita, e e a
+razao de os dois serem separados. **Nao junte os dois num escopo so.**
+
+- A posse e do **relatorio**. Comprovante, imagem e exportacao herdam a dele:
+  um cupom nao tem dono proprio, tem o dono da prestacao de contas em que foi
+  lancado.
+- `merchants` e cadastro **compartilhado** — a categoria de um CNPJ e a mesma
+  para todo mundo, e duplicar por pessoa faria a mesma padaria ser classificada
+  de dois jeitos.
+- `tasks` tambem e compartilhada: o quadro e um so. Se um dia cada pessoa
+  precisar do seu, o caminho e `tasks.owner_id` mais `tasks:read:any`,
+  espelhando o que ja existe para relatorios.
+- `reports.owner_id` e **anulavel**. Relatorio sem dono e legado (existia antes
+  dos usuarios) e so quem tem `reports:read:any` o enxerga — cai fora do filtro
+  naturalmente, porque `owner_id = $1` nunca casa com NULL.
+- O dono sai da **sessao**, nunca do corpo, e `owner_id` nao esta em
+  `UPDATABLE_COLUMNS`: transferir posse por um PATCH que passou por acaso seria
+  a forma mais silenciosa de burlar tudo isto.
+
+### 404 e nao 403 quando o recurso e de outra pessoa
+
+Responder 403 confirmaria que o relatorio 7 existe para quem so queria
+descobrir isso — dava para varrer os ids e mapear o sistema. O 403 fica para
+quando **a acao** e negada e nao o registro (o auditor que le e tenta editar):
+ali esconder nada adianta, porque ele acabou de ler o recurso. Ha teste dos
+dois lados.
+
+`loadReport` e `loadReceipt` (`src/services/auth/access.service.js`) carregam
+o registro ja aplicando o `ownership`, e sao o unico lugar de onde sai o 404 de
+relatorio e de comprovante. A igualdade entre "nao existe" e "nao e seu"
+depende de nao haver uma segunda copia desse 404 — ja houve tres. Ha teste
+comparando as duas respostas campo a campo.
+
+### Senha e sessao
+
+- Senha com **`scrypt` do proprio Node** (`src/services/auth/password.js`).
+  Nao entra `bcrypt` nem `argon2`: os dois trazem binario nativo para o que a
+  biblioteca padrao ja faz. Os parametros vao **dentro** do hash
+  (`scrypt$N$r$p$salt$hash`), entao endurecer o custo depois nao invalida as
+  senhas ja cadastradas.
+- A comparacao e `timingSafeEqual`, e o login roda `dummyVerify` quando o
+  e-mail nao existe: sem isso a resposta instantanea entregaria quais e-mails
+  estao cadastrados. Pelo mesmo motivo, e-mail inexistente e senha errada
+  devolvem **a mesma** mensagem. Ha teste comparando as duas respostas.
+- Sessao no **banco**, cookie `httpOnly` + `sameSite=lax`. O que se ganha e
+  revogacao: sair apaga a linha e o token morre na hora, e trocar a senha
+  derruba as outras sessoes. Um JWT so expira — revoga-lo antes exigiria uma
+  lista de bloqueio consultada a cada requisicao, que e o custo que o JWT
+  prometia evitar.
+- **`sameSite=lax` e o que dispensa token de CSRF.** Sob Lax o cookie so
+  acompanha navegacao de topo por GET, e toda escrita daqui e POST, PATCH ou
+  DELETE. Trocar para `none` reintroduz o CSRF e passaria a exigir token.
+- O que vai para o banco e o **SHA-256** do token, nunca o token. SHA-256 basta
+  aqui e nao bastaria para senha: nao ha dicionario de tokens de 32 bytes
+  aleatorios para uma GPU percorrer.
+- O cookie e lido do header cru em dez linhas (`session.service.js`), sem
+  `cookie-parser`. Nao ha assinatura a conferir — o valor ja e um segredo de
+  256 bits guardado como hash, e assinar so acrescentaria uma chave para vazar.
+- `POST /api/auth/login` tem teto proprio (`authLimiter`), bem mais apertado
+  que o de escrita: e a unica rota onde repetir com outro valor tem serventia
+  para quem nao deveria estar aqui.
+
+### Cadastro de pessoas
+
+**Nao existe auto-cadastro.** Criar usuario exige `users:write`; o primeiro de
+todos sai por `npm run users:create`, que roda fora do processo do servidor —
+so quem ja tem acesso a maquina e ao banco. Sem `--password`, o script sorteia
+uma senha forte e a imprime uma vez (argumento fica no historico do shell).
+Com `--replace` ele redefine a senha de quem ja existe e **encerra as sessoes
+abertas** dessa pessoa — e por ali que se recupera uma conta, as vezes
+comprometida —, e o papel so muda se vier `--role`: redefinir a senha do unico
+administrador nao pode rebaixa-lo de quebra. As regras de campo sao as do
+mesmo validator da API.
+
+- Qualquer pessoa le e edita **o proprio** cadastro sem `users:*` — trocar a
+  propria senha nao pode depender de um administrador. O que ela **nao** pode
+  mudar em si mesma e o `role`: e a escalada de privilegio mais comum que
+  existe, e ha teste dela.
+- Trocar a **propria** senha exige `current_password`; um administrador
+  redefinindo a de outra pessoa nao tem como saber a atual.
+- `email` nao muda por `PATCH`: trocar o e-mail troca a identidade de login.
+- Nao da para apagar a si mesmo nem rebaixar/apagar o **unico** administrador —
+  sem isso o sistema fica sem quem cadastre pessoas, e o conserto seria um
+  UPDATE direto no banco.
+- Apagar um usuario **nao** apaga os relatorios dele: `owner_id` e
+  `ON DELETE SET NULL`. Prestacao de contas assinada e evidencia, pela mesma
+  razao que nao ha expiracao automatica dos arquivos.
+- `password_hash` nao existe em `User.COLUMNS`. Os dois unicos caminhos que o
+  trazem sao `findByEmailWithSecret` (login) e `findByIdWithSecret` (troca da
+  propria senha). **Nao acrescente um terceiro.**
+
+### Na interface
+
+`App.jsx` pergunta `GET /api/auth/me` ao abrir: sem sessao, mostra o
+`LoginScreen`. As abas e os botoes de escrita seguem os escopos da resposta —
+um auditor nao ve "Novo relatorio". Isso e **conveniencia de tela, nao
+autorizacao**: o servidor confere de novo a cada requisicao, e ha teste de API
+provando cada recusa.
+
+- Um 401 no meio do uso (sessao vencida ou revogada) devolve a tela de login
+  com o motivo. O `request` de `web/src/api.js` avisa o App por
+  `onSessionLost`, menos nas rotas de `/api/auth`, que tratam o proprio 401 —
+  no login ele e senha errada. O App so escuta enquanto ha alguem logado:
+  quem clica em "Sair" nao recebe aviso de sessao perdida.
+- Sem escrita, a revisao de comprovantes e **somente leitura**: campos num
+  `fieldset` desabilitado, sem "Confirmar", "Deletar" nem "Marcar como
+  duplicata", e a lista sem acoes. Ha spec E2E entrando como auditor
+  (`e2e/expenses-readonly.spec.js`).
+
 ## Testes
 
 So integracao, em `tests/`. Sem mock de banco, sem mock de `fetch`, sem teste
@@ -136,32 +286,51 @@ nao se importa `src/app` dentro de teste.
 
 Os arquivos espelham as rotas: `tests/api/tasks/get.test.js`,
 `post.test.js`, `put.test.js`, `delete.test.js`, mais `tests/api/health.test.js`
-e `tests/api/not-found.test.js`.
+e `tests/api/not-found.test.js`. Os scripts de linha de comando tem os seus em
+`tests/scripts/`, rodados de verdade por `runScript`.
 
 Tudo que e infraestrutura de teste vive em **`tests/orchestrator.js`**:
 
-| Funcao                    | Para que                                     |
-| ------------------------- | -------------------------------------------- |
-| `waitForAllServices()`    | espera o `/api/health` responder 200         |
-| `runPendingMigrations()`  | aplica as migrations no banco de teste       |
-| `clearDatabase()`         | trunca `tasks` reiniciando a identidade      |
-| `insertTask(overrides)`   | arranjo direto no banco, sem passar pela API |
-| `updateTaskTitleDirectly` | escrita crua, para provar garantia do banco  |
-| `request(m, path, body)`  | requisicao HTTP; `body` string vai cru       |
+| Funcao                              | Para que                                                |
+| ----------------------------------- | ------------------------------------------------------- |
+| `waitForAllServices()`              | espera o `/api/health` responder 200                    |
+| `runPendingMigrations()`            | aplica as migrations no banco de teste                  |
+| `runScript(file, args)`             | roda um script de `scripts/` contra o banco de teste    |
+| `clearDatabase()`                   | trunca todas as tabelas reiniciando a identidade        |
+| `insertTask(overrides)`             | arranjo direto no banco, sem passar pela API            |
+| `insertUser` / `insertSession`      | usuario e sessao direto no banco                        |
+| `createUserWithSession`             | usuario de outro papel, devolve `{ user, token }`       |
+| `seedDefaultUser()`                 | recria o admin padrao e a sessao dele                   |
+| `updateTaskTitleDirectly`           | escrita crua, para provar garantia do banco             |
+| `request(m, path, body, { token })` | HTTP; `body` string vai cru, `token: null` = sem sessao |
 
 **Um arquivo de teste novo nao precisa de preambulo nenhum** — so `require` do
 orchestrator e os `describe`. O ciclo esta dividido em dois lugares:
 
-| Onde                    | Quando roda          | O que faz                       |
-| ----------------------- | -------------------- | ------------------------------- |
-| `tests/global-setup.js` | uma vez por execucao | espera a API, aplica migrations |
-| `tests/setup.js`        | por arquivo de teste | trunca a tabela, fecha o pool   |
+| Onde                    | Quando roda          | O que faz                                                |
+| ----------------------- | -------------------- | -------------------------------------------------------- |
+| `tests/global-setup.js` | uma vez por execucao | espera a API, aplica migrations                          |
+| `tests/setup.js`        | por arquivo de teste | trunca as tabelas, recria o usuario padrao, fecha o pool |
 
 O que e caro fica no `global-setup`: `runPendingMigrations()` custa um processo
 `npx`, e chama-lo por arquivo multiplicaria o custo a cada arquivo novo.
 Deduplicar com marca em `process.env` **nao** funciona — o Jest entrega a cada
 arquivo a sua propria copia de `process.env`.
 
+- **Toda rota exige sessao, e `request()` ja chega autenticada** como o admin
+  padrao — nenhum arquivo de teste precisa de preambulo. O hash da senha e
+  calculado uma vez por processo (o `scrypt` custa ~30 ms de proposito) e o
+  token e sorteado uma vez; o que o TRUNCATE apaga e so a linha da sessao,
+  recriada com o mesmo token. Para testar 401, `{ token: null }`; para testar
+  outro papel, `createUserWithSession({ role })`.
+- O usuario padrao e **admin** para que o arranjo antigo continue valendo:
+  `insertReport()` cria relatorio sem dono, e so `reports:read:any` o enxerga.
+- `tests/api/auth/scopes.test.js` e a **matriz de autorizacao**, endpoint a
+  endpoint. Vale mais que a soma dos testes de cada rota: uma rota nova sem
+  `requireScope` passa em todos os testes dela mesma, e so ali, ao chegar com
+  um papel que nao deveria alcanca-la, e que a falta aparece. **Toda rota nova
+  entra nessa lista.** Cada entrada diz quais papeis passam do portao da rota,
+  e a falha compara o mapa inteiro, mostrando qual papel escapou.
 - Rodam com `--runInBand`: compartilham a mesma tabela e nao podem paralelizar.
 - Use `insertTask()` para preparar estado — arranjo fora da rota evita que um
   teste de leitura quebre por causa de um bug na escrita.
@@ -209,6 +378,10 @@ use `logger` (fora de requisicao) ou `req.log` (dentro dela, que ja vem com o
 - Em teste o logger e `silent`, para nao poluir a saida da suite.
 - Os serializers sao enxutos de proposito: o padrao do `pino-http` despeja
   todos os headers em cada linha.
+- **Nunca logue senha, token de sessao nem cookie.** O `redact` do pino ja
+  cobre `req.headers.cookie` e `authorization`, mas log manual escreve o que
+  mandarem. Para investigar acesso, logue o `user_id` — o `authenticate` ja o
+  anexa a cada linha da requisicao.
 - **Nunca logue `raw_text`, `access_key` ou o comprovante inteiro.** Os
   serializers nao despejam corpo de requisicao, mas log manual escreve o que
   mandarem — e um cupom traz CNPJ e as vezes CPF de terceiros. Para investigar
@@ -243,6 +416,9 @@ funcionam com `--ignore-scripts` — todas trazem binario musl pre-compilado.
 - As rotas de prestacao de contas usam o `batchWriteLimiter`, com teto proprio:
   revisar um lote de 30 cupons sao dezenas de escritas seguidas de uma pessoa
   so, e o teto geral cortaria no meio do trabalho.
+- `POST /api/auth/login` usa o `authLimiter`, o teto mais apertado dos quatro.
+  E a unica rota onde repetir a requisicao com outro valor serve a quem nao
+  deveria estar aqui.
 
 ## Ambientes
 
@@ -250,6 +426,11 @@ funcionam com `--ignore-scripts` — todas trazem binario musl pre-compilado.
 `env.development` e `env.test`, ambos versionados de proposito (valores locais).
 O dotenv **nao sobrescreve** variaveis ja presentes em `process.env`, entao em
 producao basta injetar as reais pelo ambiente. Nao existe `env.production`.
+
+Variaveis da sessao (`src/config/env.js`): `SESSION_TTL_HOURS` (padrao 168),
+`SESSION_COOKIE_NAME` e `SESSION_COOKIE_SECURE`. O `Secure` do cookie so liga
+sozinho em producao — em desenvolvimento e no E2E o acesso e por
+`http://localhost`, e um cookie `Secure` ali seria descartado pelo cliente.
 
 Dev usa `tasktab_development`; testes usam `tasktab_test`, criado pelo
 `docker/initdb/` apenas na **primeira** subida do volume — se o banco de teste
@@ -515,12 +696,20 @@ React 19 + Vite, sem router e sem biblioteca de estado — tela unica, estado no
 - Nao concatene valor em SQL. Placeholder sempre.
 - Nao faca commit sem `npm test` e `npm run lint` passando.
 - Nao adicione dependencia so para resolver algo que 20 linhas resolvem — o
-  projeto e deliberadamente enxuto (3 dependencias de producao).
+  projeto e deliberadamente enxuto (16 dependencias de producao).
 - Nao escreva mensagem de commit fora do padrao **Conventional Commits** — o
   commitlint rejeita no hook do husky, inclusive escopo fora do enum de
   `commitlint.config.js`. Prefira `npm run commit`.
 - Nao coloque `npm test` no `pre-commit`: o `posttest` derruba o Docker e
   mataria os containers em uso. O hook roda so `lint` + `format:check`.
+- Nao crie rota em `/api` sem `requireScope` (ou `requireAuth`, para o que so
+  precisa de sessao). `authenticate` **nao barra ninguem** de proposito.
+- Nao carregue um relatorio ou comprovante sem passar por `loadReport` /
+  `loadReceipt` (`src/services/auth/access.service.js`): e por fora deles que
+  um vazamento entra.
+- Nao aceite `owner_id` do cliente, em corpo nem em query. O dono sai da sessao.
+- Nao troque `sameSite=lax` por `none` sem introduzir token de CSRF junto.
+- Nao acrescente caminho novo que leia `password_hash`.
 
 ## Conflitos com o `~/.claude/CLAUDE.md` global
 

@@ -4,30 +4,20 @@ const fs = require('fs/promises');
 const path = require('path');
 
 const Receipt = require('../models/receipt.model');
-const Report = require('../models/report.model');
 const env = require('../config/env');
 const pdf = require('../services/pdf.service');
 const pipeline = require('../services/extraction/pipeline.service');
 const queue = require('../services/extraction/queue');
 const retention = require('../services/retention.service');
 const receiptImage = require('../services/receipt-image.service');
-const { NotFoundError, ValidationError } = require('../../infra/errors');
+const {
+  loadReport,
+  loadReceipt,
+  receiptNotFound,
+} = require('../services/auth/access.service');
+const { ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const receiptValidator = require('../validators/receipt.validator');
-
-function reportNotFound(id) {
-  return new NotFoundError({
-    message: `Report ${id} nao encontrado.`,
-    action: 'Verifique o id informado ou liste os relatorios disponiveis.',
-  });
-}
-
-function receiptNotFound(id) {
-  return new NotFoundError({
-    message: `Receipt ${id} nao encontrado.`,
-    action: 'Verifique o id informado ou liste os comprovantes do relatorio.',
-  });
-}
 
 async function discard(filePath) {
   await fs.unlink(filePath).catch(() => {});
@@ -41,12 +31,16 @@ async function discard(filePath) {
  */
 async function upload(req, res) {
   const reportId = validator.validateId(req.params.id);
-  const report = await Report.findById(reportId);
 
-  if (!report) {
-    // O multer ja gravou os arquivos antes de sabermos que o report nao existe.
+  try {
+    await loadReport(req.user, reportId, { write: true });
+  } catch (error) {
+    // O multer ja gravou os arquivos antes de sabermos que o relatorio nao
+    // existe — ou que nao e desta pessoa. Nos dois casos o que chegou ao disco
+    // sai dele: um PDF orfao no volume e um documento com CNPJ de terceiros
+    // que ninguem mais alcanca pela API.
     await Promise.all((req.files || []).map((file) => discard(file.path)));
-    throw reportNotFound(reportId);
+    throw error;
   }
 
   const files = req.files || [];
@@ -150,11 +144,8 @@ async function upload(req, res) {
 /** GET /api/reports/:id/receipts */
 async function index(req, res) {
   const reportId = validator.validateId(req.params.id);
-  const report = await Report.findById(reportId);
 
-  if (!report) {
-    throw reportNotFound(reportId);
-  }
+  await loadReport(req.user, reportId);
 
   const filters = receiptValidator.validateListQuery(req.query);
   const [data, meta] = await Promise.all([
@@ -168,11 +159,7 @@ async function index(req, res) {
 /** GET /api/receipts/:id */
 async function show(req, res) {
   const id = receiptValidator.validateId(req.params.id);
-  const receipt = await Receipt.findById(id);
-
-  if (!receipt) {
-    throw receiptNotFound(id);
-  }
+  const receipt = await loadReceipt(req.user, id);
 
   res.json({ data: receipt });
 }
@@ -183,11 +170,7 @@ async function update(req, res) {
 
   // O registro atual entra na validacao: confirmar depende do conjunto final,
   // e nao so do que veio no corpo.
-  const current = await Receipt.findById(id);
-
-  if (!current) {
-    throw receiptNotFound(id);
-  }
+  const current = await loadReceipt(req.user, id, { write: true });
 
   const data = receiptValidator.validateUpdate(req.body, current);
   const receipt = await Receipt.update(id, data);
@@ -198,6 +181,9 @@ async function update(req, res) {
 /** DELETE /api/receipts/:id */
 async function destroy(req, res) {
   const id = receiptValidator.validateId(req.params.id);
+
+  await loadReceipt(req.user, id, { write: true });
+
   const deleted = await Receipt.remove(id);
 
   if (!deleted) {
@@ -221,11 +207,7 @@ async function destroy(req, res) {
  */
 async function reprocess(req, res) {
   const id = receiptValidator.validateId(req.params.id);
-  const receipt = await Receipt.findById(id);
-
-  if (!receipt) {
-    throw receiptNotFound(id);
-  }
+  const receipt = await loadReceipt(req.user, id, { write: true });
 
   const filePath = path.join(env.upload.dir, receipt.file_path);
   const buffer = await fs.readFile(filePath).catch(() => null);
@@ -260,11 +242,7 @@ async function reprocess(req, res) {
  */
 async function image(req, res) {
   const id = receiptValidator.validateId(req.params.id);
-  const receipt = await Receipt.findById(id);
-
-  if (!receipt) {
-    throw receiptNotFound(id);
-  }
+  const receipt = await loadReceipt(req.user, id);
 
   const etag = `"${receipt.file_hash}-${receipt.page_number}"`;
 

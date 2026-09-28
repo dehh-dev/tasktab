@@ -57,6 +57,7 @@ export default function ReceiptReview({
   onBack,
   onAction,
   onDelete,
+  canWrite = true,
 }) {
   const [values, setValues] = useState({
     issued_at: receipt.issued_at ?? '',
@@ -323,14 +324,16 @@ export default function ReceiptReview({
         {/* Descartar e decisao que se toma olhando a imagem, nao a lista: o
             cupom que nao deveria estar aqui so se revela quando aparece na
             tela. O dialogo e o estado ficam na ReportDetail. */}
-        <button
-          type="button"
-          className="btn btn--sm btn--danger"
-          onClick={() => onDelete(receipt)}
-          disabled={submitting}
-        >
-          Deletar
-        </button>
+        {canWrite && (
+          <button
+            type="button"
+            className="btn btn--sm btn--danger"
+            onClick={() => onDelete(receipt)}
+            disabled={submitting}
+          >
+            Deletar
+          </button>
+        )}
       </div>
 
       {visibleAlerts.length > 0 && (
@@ -347,7 +350,7 @@ export default function ReceiptReview({
               </div>
               <div>{alert.message}</div>
               <div className="alert__actions">
-                {alert.rule === 'possivel_duplicata' && (
+                {canWrite && alert.rule === 'possivel_duplicata' && (
                   <button
                     type="button"
                     className="btn btn--sm btn--danger"
@@ -466,111 +469,127 @@ export default function ReceiptReview({
             <ConfidenceBadge receipt={receipt} />
           </div>
 
-          <div className="field">
-            <label className="field__label" htmlFor="review-date">
-              Data
-              <span className="field__required" aria-hidden="true">
-                *
-              </span>
-            </label>
-            <input
-              id="review-date"
-              className="field__input"
-              type="date"
-              value={values.issued_at}
-              aria-invalid={Boolean(errors.issued_at)}
-              onChange={(event) => setField('issued_at', event.target.value)}
-            />
-            {errors.issued_at && (
-              <span className="field__error" role="alert">
-                {errors.issued_at}
-              </span>
-            )}
-            {receipt.issued_at && (
-              <span className="field__hint">
-                Extraido: {formatDate(receipt.issued_at)}
-              </span>
-            )}
-          </div>
+          {/* Um fieldset desabilitado trava os tres campos de uma vez, com a
+              semantica nativa: o leitor de tela anuncia os campos como
+              indisponiveis, e nenhum Enter confirma por acidente. */}
+          <fieldset className="review__fieldset" disabled={!canWrite}>
+            <div className="field">
+              <label className="field__label" htmlFor="review-date">
+                Data
+                <span className="field__required" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <input
+                id="review-date"
+                className="field__input"
+                type="date"
+                value={values.issued_at}
+                aria-invalid={Boolean(errors.issued_at)}
+                onChange={(event) => setField('issued_at', event.target.value)}
+              />
+              {errors.issued_at && (
+                <span className="field__error" role="alert">
+                  {errors.issued_at}
+                </span>
+              )}
+              {receipt.issued_at && (
+                <span className="field__hint">
+                  Extraido: {formatDate(receipt.issued_at)}
+                </span>
+              )}
+            </div>
 
-          <div className="field">
-            <label className="field__label" htmlFor="review-amount">
-              Valor (R$)
-              <span className="field__required" aria-hidden="true">
-                *
-              </span>
-            </label>
-            <input
-              id="review-amount"
-              className="field__input"
-              type="text"
-              inputMode="decimal"
-              value={values.amount_cents}
-              aria-invalid={Boolean(errors.amount_cents)}
-              onChange={(event) => setField('amount_cents', event.target.value)}
-            />
-            {errors.amount_cents && (
-              <span className="field__error" role="alert">
-                {errors.amount_cents}
-              </span>
-            )}
-          </div>
+            <div className="field">
+              <label className="field__label" htmlFor="review-amount">
+                Valor (R$)
+                <span className="field__required" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <input
+                id="review-amount"
+                className="field__input"
+                type="text"
+                inputMode="decimal"
+                value={values.amount_cents}
+                aria-invalid={Boolean(errors.amount_cents)}
+                onChange={(event) =>
+                  setField('amount_cents', event.target.value)
+                }
+              />
+              {errors.amount_cents && (
+                <span className="field__error" role="alert">
+                  {errors.amount_cents}
+                </span>
+              )}
+            </div>
 
-          <div className="field">
-            <label className="field__label" htmlFor="review-category">
-              Categoria
-              <span className="field__required" aria-hidden="true">
-                *
-              </span>
-            </label>
-            <select
-              id="review-category"
-              className={
-                guessedCategory
-                  ? 'field__input field__input--guess'
-                  : 'field__input'
-              }
-              value={values.category}
-              aria-invalid={Boolean(errors.category)}
-              aria-describedby={
-                guessedCategory ? 'review-category-guess' : undefined
-              }
-              onChange={(event) => setField('category', event.target.value)}
-            >
-              <option value="">Selecione...</option>
-              {EXPENSE_CATEGORIES.map((category) => (
-                <option key={category.value} value={category.value}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
-            {/* O palpite vem do nome do emitente, nao do CNPJ cadastrado: dizer
+            <div className="field">
+              <label className="field__label" htmlFor="review-category">
+                Categoria
+                <span className="field__required" aria-hidden="true">
+                  *
+                </span>
+              </label>
+              <select
+                id="review-category"
+                className={
+                  guessedCategory
+                    ? 'field__input field__input--guess'
+                    : 'field__input'
+                }
+                value={values.category}
+                aria-invalid={Boolean(errors.category)}
+                aria-describedby={
+                  guessedCategory ? 'review-category-guess' : undefined
+                }
+                onChange={(event) => setField('category', event.target.value)}
+              >
+                <option value="">Selecione...</option>
+                {EXPENSE_CATEGORIES.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+              {/* O palpite vem do nome do emitente, nao do CNPJ cadastrado: dizer
                 isso e o que separa "a ferramenta leu" de "a ferramenta
                 chutou". Sem essa linha o campo chegaria com a mesma cara de um
                 dado conferido. */}
-            {guessedCategory && (
-              <span className="field__hint" id="review-category-guess">
-                Sugerida pelo nome do emitente — confira antes de confirmar.
-              </span>
-            )}
-            {errors.category && (
-              <span className="field__error" role="alert">
-                {errors.category}
-              </span>
-            )}
-          </div>
+              {guessedCategory && (
+                <span className="field__hint" id="review-category-guess">
+                  Sugerida pelo nome do emitente — confira antes de confirmar.
+                </span>
+              )}
+              {errors.category && (
+                <span className="field__error" role="alert">
+                  {errors.category}
+                </span>
+              )}
+            </div>
+          </fieldset>
 
           <div className="form__actions">
-            <span className="field__hint">
-              Atalhos: Enter confirma · Esc volta · Alt+← / Alt+→ navega
-            </span>
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={submitting}
-            >
-              {submitting ? 'Salvando...' : 'Confirmar'}
-            </button>
+            {canWrite ? (
+              <>
+                <span className="field__hint">
+                  Atalhos: Enter confirma · Esc volta · Alt+← / Alt+→ navega
+                </span>
+                <button
+                  type="submit"
+                  className="btn btn--primary"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Salvando...' : 'Confirmar'}
+                </button>
+              </>
+            ) : (
+              <span className="field__hint">
+                Somente leitura: seu acesso confere os comprovantes, mas nao os
+                altera. Atalhos: Esc volta · Alt+← / Alt+→ navega
+              </span>
+            )}
           </div>
         </form>
       </div>

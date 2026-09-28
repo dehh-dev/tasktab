@@ -78,18 +78,24 @@ Os três primeiros são exigidos pelo hook de pre-commit; o CI roda os quatro.
 
 ## Marcos
 
-| Marco            | Issues      | Entrega                                        |
-| ---------------- | ----------- | ---------------------------------------------- |
-| M0 — Terreno     | 0           | Ferramental destravado para o resto do backlog |
-| M1 — Fundação    | 1 a 5, 22   | Upload, CRUD e revisão manual ponta a ponta    |
-| M2 — Digital     | 6 a 8       | PDFs digitais preenchem sozinhos               |
-| M3 — Cupom       | 25, 9 a 11  | QR Code + emitentes + categoria automática     |
-| M4 — OCR         | 12 a 13     | Cupom térmico escaneado                        |
-| M5 — Conferência | 14 a 15     | Deduplicação e validações                      |
-| M6 — Saídas      | 26, 16 a 18 | Excel e PDF consolidado                        |
-| M7 — Interface   | 19 a 21     | Aba completa com tela de revisão               |
+| Marco            | Issues      | Entrega                                        | PR  |
+| ---------------- | ----------- | ---------------------------------------------- | --- |
+| M0 — Terreno     | 0           | Ferramental destravado para o resto do backlog | #10 |
+| M1 — Fundação    | 1 a 5, 22   | Upload, CRUD e revisão manual ponta a ponta    | #10 |
+| M2 — Digital     | 6 a 8       | PDFs digitais preenchem sozinhos               | #11 |
+| M3 — Cupom       | 25, 9 a 11  | QR Code + emitentes + categoria automática     | #12 |
+| M4 — OCR         | 12 a 13     | Cupom térmico escaneado                        | #13 |
+| M5 — Conferência | 14 a 15     | Deduplicação e validações                      | #13 |
+| M6 — Saídas      | 26, 16 a 18 | Excel e PDF consolidado                        | #14 |
+| M7 — Interface   | 19 a 21     | Aba completa com tela de revisão               | #15 |
 
-Transversais (23, 24) entram a qualquer momento depois do M1.
+Transversais (23, 24) entram a qualquer momento depois do M1 — entraram no
+#16.
+
+Os critérios das issues 0 a 22, 25 e 26 ficaram sem marcação: foram escritos
+antes da execução, e alguns mudaram depois dela — a regra de categoria da #11,
+por exemplo, foi invertida pela #30. Da #23 em diante, cada issue foi marcada
+ao fechar.
 
 ---
 
@@ -1208,3 +1214,184 @@ alvo é o zxing, aqui é o olho humano.
 Cache da imagem em disco (hoje ela é re-renderizada a cada requisição sem
 ETag), e escala derivada do ppi real de cada PDF em vez de fixa em 4×. Os dois
 só valem se a espera de ~2s incomodar no uso.
+
+---
+
+## Issue 32 — Autenticação e autorização
+
+`area:api` · `area:db` · `area:web` · `infra` · depende de #31
+
+Até aqui a API era **aberta**. Qualquer um que alcançasse a porta listava os
+relatórios, baixava o Anexo I assinado e puxava a imagem de qualquer cupom —
+justamente onde estão o CNPJ do emitente e, às vezes, o CPF de terceiros. O
+`CLAUDE.md` já proibia logar `raw_text` e `access_key`, mas a mesma informação
+saía inteira pela rota. Enquanto rodou em `localhost` não houve dano; no
+instante em que isso subisse para qualquer lugar acessível, seria vazamento.
+
+Esta issue fecha isso, e a decisão que estrutura tudo é **separar os dois eixos
+da autorização**.
+
+**Escopo e posse são coisas diferentes**
+
+| Eixo       | Pergunta                   | Onde vive                       |
+| ---------- | -------------------------- | ------------------------------- |
+| **Escopo** | que ação, sobre que classe | `requireScope` na **rota**      |
+| **Posse**  | quais linhas               | `ownership.*` no **controller** |
+
+O escopo fica na rota porque é o único lugar onde se lê, de cima a baixo, o que
+cada endpoint exige. Um controller novo que esqueça a checagem passa
+despercebido; uma rota sem `requireScope` salta aos olhos ao lado das vizinhas.
+`requireScope` confere o nome contra a lista **na carga do módulo**: um erro de
+digitação (`report:read`) derruba o processo no boot, em vez de liberar a rota
+em silêncio — que é o pior desfecho possível para uma checagem de permissão.
+
+A posse não cabe na rota: só dá para decidir com o registro em mãos. Os escopos
+`:any` são a ponte entre os dois — quem os tem dispensa a checagem de posse.
+Sem eles, "admin" viraria um `if` espalhado por cada controller, que é
+exatamente onde uma permissão passa batida.
+
+**Três papéis, e o auditor é o que justifica o desenho**
+
+| Papel     | Alcance                                             |
+| --------- | --------------------------------------------------- |
+| `admin`   | tudo, inclusive relatório de outra pessoa           |
+| `user`    | cria e revisa **os seus** relatórios                |
+| `auditor` | lê tudo (inclusive o alheio) e **não escreve nada** |
+
+O `auditor` é o único papel com `reports:read:any` **sem** o par de escrita — é
+quem confere e assina. Se leitura e escrita cruzada fossem um escopo só, esse
+papel não existiria.
+
+A posse é do **relatório**. Comprovante, imagem e exportação herdam a dele: um
+cupom não tem dono próprio, tem o dono da prestação de contas em que foi
+lançado. `merchants` fica compartilhado de propósito (a categoria de um CNPJ é
+a mesma para todo mundo) e `tasks` também — o quadro é um só.
+
+**404, e não 403, quando o recurso é de outra pessoa**
+
+Responder 403 confirmaria que o relatório 7 existe para quem só queria
+descobrir isso, e daria para varrer os ids mapeando o sistema inteiro. Quem não
+alcança o registro recebe a mesma resposta que receberia se ele não existisse.
+O 403 continua valendo quando **a ação** é negada e não o registro — o auditor
+que lê o relatório e tenta editá-lo. Ali esconder não adianta: ele acabou de
+ler o recurso.
+
+**Senha e sessão, sem dependência nova**
+
+O projeto tem 16 dependências de produção e a regra de não acrescentar pacote
+para o que cabe em vinte linhas. Nenhuma entrou aqui:
+
+- Senha com **`scrypt` da biblioteca padrão**. `bcrypt` e `argon2` trazem
+  binário nativo para fazer o que o Node já faz. Os parâmetros de custo vão
+  **dentro** do hash (`scrypt$N$r$p$salt$hash`), então endurecê-los depois vale
+  para as senhas novas sem invalidar as antigas.
+- Sessão **no banco**, não JWT. O que se ganha é revogação: sair apaga a linha
+  e o token morre na hora; trocar a senha derruba as outras sessões. Revogar um
+  JWT exigiria uma lista de bloqueio consultada a cada requisição — o custo que
+  o JWT prometia evitar. Com o Postgres já no caminho, a troca não paga.
+- Cookie lido do header cru em dez linhas, sem `cookie-parser`. Não há
+  assinatura a conferir: o valor já é um segredo de 256 bits guardado como
+  hash, e assinar só acrescentaria uma chave para vazar.
+- `sameSite=lax` é o que **dispensa token de CSRF**: sob Lax o cookie só
+  acompanha navegação de topo por GET, e toda escrita da API é POST, PATCH ou
+  DELETE.
+
+O login gasta o mesmo tempo com e-mail inexistente e com senha errada
+(`dummyVerify` contra um hash descartável), e devolve a mesma mensagem nos dois
+casos. Sem isso, o login vira um verificador de quem tem conta aqui.
+
+**Não existe auto-cadastro**
+
+Criar pessoa exige `users:write`. O primeiro usuário sai por
+`npm run users:create`, fora do processo do servidor — só quem já tem acesso à
+máquina e ao banco. Sem `--password`, o script sorteia uma senha forte e a
+imprime uma vez: argumento fica no histórico do shell.
+
+Quem não é administrador ainda lê e edita **o próprio** cadastro — trocar a
+própria senha não pode depender de terceiros. O que não muda em si mesmo é o
+`role`: é a escalada de privilégio mais comum que existe. Trocar a própria
+senha exige a atual e derruba as **outras** sessões, poupando a corrente para
+não expulsar justamente quem acabou de fazer a coisa certa.
+
+Duas travas fecham a porta por dentro: ninguém apaga a si mesmo, e o **único**
+administrador não pode ser rebaixado nem removido. Sem elas o conserto seria um
+UPDATE direto no banco.
+
+**Os relatórios de quem sai ficam**
+
+`reports.owner_id` é `ON DELETE SET NULL`, não cascade. Prestação de contas
+assinada é evidência — mesma razão pela qual não há expiração automática dos
+arquivos enviados (#24). A coluna também é **anulável**: não havia usuários
+quando os relatórios existentes foram criados, e inventar um dono para eles
+seria gravar uma mentira. Relatório sem dono é legado e só quem tem
+`reports:read:any` o enxerga, o que cai fora do filtro naturalmente —
+`owner_id = $1` nunca casa com NULL.
+
+**Na interface**
+
+`App.jsx` pergunta `GET /api/auth/me` ao abrir; sem sessão, mostra o login. As
+abas e os botões de escrita seguem os escopos da resposta — um auditor não vê
+"Novo relatório". É **conveniência de tela, não autorização**: o servidor
+confere de novo a cada requisição, e há teste de API provando cada recusa.
+
+**O que a suíte passou a exigir**
+
+Toda rota exige sessão, então cada arquivo de teste precisa de uma. Duas
+escolhas fizeram isso custar quase nada: o hash da senha é calculado **uma vez
+por processo** (`scrypt` custa ~30 ms de propósito) e o token é sorteado uma
+vez — o TRUNCATE apaga só a linha da sessão, recriada com o mesmo token. Nenhum
+arquivo de teste precisou de preâmbulo novo.
+
+`tests/api/auth/scopes.test.js` é a **matriz de autorização**, endpoint a
+endpoint, e vale mais que a soma dos testes de cada rota: uma rota nova sem
+`requireScope` passa em todos os testes dela mesma, e só ali, ao chegar com um
+papel que não deveria alcançá-la, é que a falta aparece.
+
+No E2E, o login roda num **projeto de setup** e o cookie é reaproveitado pelas
+specs. O `globalSetup` não serviria: ele acontece antes de o `webServer` subir.
+As specs de logout usam sessão própria — a sessão do `storageState` é uma linha
+no banco, e um logout de verdade a revogaria para todas as specs seguintes.
+Aconteceu na primeira execução.
+
+**Critérios de aceite**
+
+- [x] Migration reversível com `users`, `sessions` e `reports.owner_id`, mais
+      as constraints de e-mail minúsculo e nome não vazio
+- [x] `POST /api/auth/login|logout` e `GET /api/auth/me`; CRUD de `/api/users`
+- [x] Toda rota de `/api` exige sessão, exceto `health` e `login`
+- [x] `requireScope` em cada rota, com o nome validado na carga do módulo
+- [x] Posse conferida em relatório, comprovante, imagem e as três exportações
+- [x] 404 (e não 403) para recurso de outra pessoa, com teste dos dois lados
+- [x] `scrypt` sem dependência nova; hash nunca sai na resposta
+- [x] Sessão revogável; troca de senha derruba as outras
+- [x] `npm run users:create` para o primeiro acesso
+- [x] Tela de login e gate de sessão na interface, com abas por escopo
+- [x] Matriz de autorização em `tests/api/auth/scopes.test.js`
+
+**Fora de escopo**
+
+Recuperação de senha por e-mail (exigiria um serviço de envio, que o projeto
+não tem), segundo fator, `tasks.owner_id`, tela de administração de usuários na
+interface (hoje o CRUD é só de API) e transferência de posse de um relatório.
+Nenhum é bloqueado por esta.
+
+**Revisão antes do merge**
+
+Lida a issue inteira antes de abrir o PR, seis pontos foram corrigidos, todos
+com teste que os trava:
+
+- Cookie de sessão com `%` quebrado derrubava a API inteira com 500, inclusive
+  o login — quem tivesse o cookie não conseguia nem entrar para trocá-lo. Agora
+  vale como sessão ausente.
+- Quando a sessão caía no meio do uso, cada painel mostrava o próprio alerta e
+  a pessoa só saía dele recarregando a página. Agora a tela volta ao login,
+  com o motivo.
+- O auditor via "Deletar", "Confirmar" e campos editáveis na revisão, e cada
+  um respondia 403. Agora a revisão é somente leitura para quem não escreve.
+- A matriz de autorização cobria 8 das 33 rotas que exigem sessão. Agora cobre
+  todas, e uma mutação nas rotas confirmou que ela acusa a falta.
+- `users:create --replace` não encerrava as sessões abertas, rebaixava a
+  `user` quando vinha sem `--role` e aceitava senha curta.
+- `loadReport` tinha duas cópias e o 404 de relatório, três. A igualdade entre
+  "não existe" e "não é seu" dependia de elas nunca divergirem; agora há um
+  lugar só, e um teste comparando as duas respostas.

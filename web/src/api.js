@@ -1,3 +1,4 @@
+const AUTH_URL = '/api/auth';
 const TASKS_URL = '/api/tasks';
 const REPORTS_URL = '/api/reports';
 const RECEIPTS_URL = '/api/receipts';
@@ -7,11 +8,14 @@ const RECEIPTS_URL = '/api/receipts';
  * (status 422), para que o formulario possa exibi-los no campo correto.
  */
 export class ApiError extends Error {
-  constructor(message, { action, details } = {}) {
+  constructor(message, { action, details, status } = {}) {
     super(message);
     this.name = 'ApiError';
     this.action = action ?? null;
     this.details = details ?? [];
+    // E pelo status que o `request` reconhece a sessao que caiu (401) e avisa
+    // o App — ver `onSessionLost`.
+    this.status = status ?? null;
   }
 
   /** Converte os detalhes em { campo: mensagem } para consumo do formulario. */
@@ -25,6 +29,25 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Quem precisa saber que a sessao caiu. O App se inscreve enquanto ha alguem
+ * logado: um 401 no meio do uso quer dizer que a sessao venceu ou foi
+ * revogada (troca de senha em outro navegador, conta removida), e a unica
+ * saida util e a tela de login. Sem isso cada painel mostrava o proprio alerta
+ * de "sessao ausente", e a pessoa so saia dele recarregando a pagina.
+ */
+let sessionLostListener = null;
+
+export function onSessionLost(listener) {
+  sessionLostListener = listener;
+
+  return () => {
+    if (sessionLostListener === listener) {
+      sessionLostListener = null;
+    }
+  };
+}
+
 async function request(url, options = {}) {
   let response;
 
@@ -36,7 +59,13 @@ async function request(url, options = {}) {
       : { 'Content-Type': 'application/json', ...options.headers };
 
   try {
-    response = await fetch(url, { ...options, headers });
+    // `same-origin` e o padrao do fetch e ja mandaria o cookie de sessao;
+    // explicito aqui porque e do que a autenticacao inteira depende.
+    response = await fetch(url, {
+      credentials: 'same-origin',
+      ...options,
+      headers,
+    });
   } catch {
     throw new ApiError('Nao foi possivel falar com o servidor.', {
       action: 'Verifique sua conexao e se a API esta no ar.',
@@ -52,14 +81,53 @@ async function request(url, options = {}) {
   // O backend serializa erro em { name, message, action, status_code,
   // details? } — o `action` diz ao usuario o que fazer a seguir.
   if (!response.ok) {
-    throw new ApiError(
+    const error = new ApiError(
       body?.message ?? `Falha na requisicao (${response.status})`,
-      { action: body?.action, details: body?.details },
+      {
+        action: body?.action,
+        details: body?.details,
+        status: response.status,
+      },
     );
+
+    // As rotas de /api/auth tratam o proprio 401: no login ele e senha errada,
+    // no logout e sessao que ja nao existia, e no `me` da abertura e so
+    // ninguem logado ainda. Nenhum deles e sessao perdida no meio do uso.
+    if (error.status === 401 && !url.startsWith(AUTH_URL)) {
+      sessionLostListener?.(error);
+    }
+
+    throw error;
   }
 
   return body;
 }
+
+// ---------- sessao ----------
+
+/**
+ * Quem esta na sessao, com os escopos do papel.
+ *
+ * A interface usa os escopos para nao oferecer o que a API vai recusar — um
+ * auditor nao ve o botao de criar relatorio. E conveniencia de tela, e nao
+ * autorizacao: quem decide continua sendo o servidor, a cada requisicao.
+ */
+export function getMe() {
+  return request(`${AUTH_URL}/me`);
+}
+
+export function login(email, password) {
+  return request(`${AUTH_URL}/login`, {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function logout() {
+  return request(`${AUTH_URL}/logout`, { method: 'POST' });
+}
+
+// ---------- tarefas ----------
 
 export function listTasks({ status } = {}) {
   const params = new URLSearchParams();

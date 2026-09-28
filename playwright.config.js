@@ -1,6 +1,7 @@
 'use strict';
 
 const { defineConfig, devices } = require('@playwright/test');
+const { STORAGE_STATE } = require('./e2e/constants');
 
 // A API sobe em NODE_ENV=test, ou seja, na porta e no banco de env.test. O E2E
 // nunca toca no banco de desenvolvimento.
@@ -29,7 +30,21 @@ module.exports = defineConfig({
     screenshot: 'only-on-failure',
   },
 
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // Faz o login uma vez e grava o cookie; o projeto de baixo o reaproveita.
+    // Sem isso, cada spec comecaria na tela de login.
+    { name: 'setup', testMatch: /auth\.setup\.js/ },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Vale para o `page` e tambem para o `request`, que e por onde as
+        // specs fazem o arranjo pela API publica.
+        storageState: STORAGE_STATE,
+      },
+      dependencies: ['setup'],
+    },
+  ],
 
   webServer: [
     {

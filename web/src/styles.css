@@ -73,9 +73,54 @@ body {
 }
 
 .app__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--border-default);
   padding-bottom: 16px;
   margin-bottom: 24px;
+}
+
+.app__session {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app__user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 600;
+}
+
+/* O papel acompanha o nome sempre em texto: a paleta do projeto nunca usa cor
+   como unico canal de informacao, e "e auditor" muda o que a tela oferece. */
+.app__role {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* ---------- login ---------- */
+
+.login {
+  display: flex;
+  justify-content: center;
+  padding: 48px 16px;
+}
+
+.login__form {
+  width: 100%;
+  max-width: 360px;
+}
+
+.login__title {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .app__title {
@@ -312,6 +357,13 @@ a.btn {
 
 .field__input[aria-invalid='true'] {
   border-color: var(--danger-fg);
+}
+
+/* Campo travado para quem so confere. O texto mantem o contraste normal — ele
+   existe para ser lido —, e o que muda e o fundo e o cursor. */
+.field__input:disabled {
+  background: transparent;
+  cursor: default;
 }
 
 textarea.field__input {
@@ -596,6 +648,19 @@ textarea.field__input {
   flex-direction: column;
   gap: 16px;
   margin-bottom: 0;
+}
+
+/* O fieldset so existe para travar os campos de quem nao escreve; sem isto
+   ele traria borda e recuo proprios e viraria um item so no flex do form,
+   levando embora o espaco entre os campos. */
+.review__fieldset {
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
 }
 
 /* ---------- dialogo de confirmacao ---------- */

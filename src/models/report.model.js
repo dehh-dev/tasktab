@@ -2,9 +2,12 @@
 
 const db = require('../config/database');
 
-const COLUMNS = `id, title, period_start, period_end, advance_cents, status, created_at, updated_at`;
+const COLUMNS = `id, title, period_start, period_end, advance_cents, status,
+                 owner_id, created_at, updated_at`;
 
-// Colunas que o cliente pode alterar via update parcial.
+// Colunas que o cliente pode alterar via update parcial. `owner_id` fica de
+// fora: transferir a posse de um relatorio nao pode acontecer por um PATCH que
+// passou por acaso — seria a forma mais silenciosa de burlar a autorizacao.
 const UPDATABLE_COLUMNS = [
   'title',
   'period_start',
@@ -13,13 +16,34 @@ const UPDATABLE_COLUMNS = [
   'status',
 ];
 
-async function findAll({ status, limit = 50, offset = 0 } = {}) {
+/**
+ * `ownerId` indefinido significa **sem filtro de dono**, e e o que o
+ * controller passa para quem tem `reports:read:any`. Relatorio de dono nulo
+ * (legado, anterior aos usuarios) cai fora do filtro naturalmente: `owner_id =
+ * $1` nunca casa com NULL.
+ */
+function buildOwnerFilter(ownerId, params, conditions) {
+  if (ownerId !== undefined) {
+    params.push(ownerId);
+    conditions.push(`owner_id = $${params.length}`);
+  }
+}
+
+async function findAll({ status, ownerId, limit = 50, offset = 0 } = {}) {
   const params = [];
-  let sql = `SELECT ${COLUMNS} FROM reports`;
+  const conditions = [];
 
   if (status) {
     params.push(status);
-    sql += ` WHERE status = $${params.length}`;
+    conditions.push(`status = $${params.length}`);
+  }
+
+  buildOwnerFilter(ownerId, params, conditions);
+
+  let sql = `SELECT ${COLUMNS} FROM reports`;
+
+  if (conditions.length > 0) {
+    sql += ` WHERE ${conditions.join(' AND ')}`;
   }
 
   params.push(limit);
@@ -32,13 +56,21 @@ async function findAll({ status, limit = 50, offset = 0 } = {}) {
   return rows;
 }
 
-async function count({ status } = {}) {
+async function count({ status, ownerId } = {}) {
   const params = [];
-  let sql = 'SELECT COUNT(*)::int AS total FROM reports';
+  const conditions = [];
 
   if (status) {
     params.push(status);
-    sql += ` WHERE status = $${params.length}`;
+    conditions.push(`status = $${params.length}`);
+  }
+
+  buildOwnerFilter(ownerId, params, conditions);
+
+  let sql = 'SELECT COUNT(*)::int AS total FROM reports';
+
+  if (conditions.length > 0) {
+    sql += ` WHERE ${conditions.join(' AND ')}`;
   }
 
   const { rows } = await db.query(sql, params);
@@ -59,18 +91,28 @@ async function create({
   period_end,
   advance_cents,
   status,
+  owner_id,
 }) {
   const { rows } = await db.query(
-    `INSERT INTO reports (title, period_start, period_end, advance_cents, status)
+    `INSERT INTO reports
+       (title, period_start, period_end, advance_cents, status, owner_id)
      VALUES (
        $1,
        $2::date,
        $3::date,
        COALESCE($4, 0),
-       COALESCE($5::report_status, 'open'::report_status)
+       COALESCE($5::report_status, 'open'::report_status),
+       $6
      )
      RETURNING ${COLUMNS}`,
-    [title, period_start, period_end, advance_cents ?? null, status || null],
+    [
+      title,
+      period_start,
+      period_end,
+      advance_cents ?? null,
+      status || null,
+      owner_id ?? null,
+    ],
   );
   return rows[0];
 }

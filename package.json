@@ -22,6 +22,7 @@
     "migrations:up": "node-pg-migrate --envPath env.development up",
     "migrations:down": "node-pg-migrate --envPath env.development down",
     "migrations:create": "node-pg-migrate create",
+    "users:create": "node scripts/create-user.js",
     "seed": "npm run services:up && npm run services:wait:database && npm run migrations:up && node seeds/seed.js",
     "generate:anexo-i-template": "node scripts/generate-anexo-i-template.js",
     "pretest": "npm run services:up && cross-env NODE_ENV=test npm run services:wait:database",
