@@ -14,5 +14,8 @@ const orchestrator = require('./orchestrator');
 beforeEach(async () => {
   await orchestrator.waitForQueue();
   await orchestrator.clearDatabase();
+  // Toda rota exige sessao. O usuario padrao e recriado aqui para que
+  // `request()` continue chegando autenticado sem preambulo em cada arquivo.
+  await orchestrator.seedDefaultUser();
 });
 afterAll(orchestrator.closeDatabase);

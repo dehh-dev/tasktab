@@ -48,9 +48,21 @@ const batchWriteLimiter = build({
   skipRead: true,
 });
 
+/**
+ * Teto do login, bem mais apertado que o de escrita.
+ *
+ * E a unica rota do sistema onde repetir a requisicao com outro valor tem
+ * serventia para quem nao deveria estar aqui: 20 tentativas por janela nao
+ * incomodam quem errou a senha e inviabilizam percorrer uma lista de senhas.
+ * O custo do `scrypt` ja atrasa cada tentativa; o limitador e o que impede
+ * que essa mesma lentidao vire uma forma de ocupar a CPU do servidor.
+ */
+const authLimiter = build({ max: env.rateLimit.authMax });
+
 module.exports = {
   readLimiter,
   writeLimiter,
   batchWriteLimiter,
+  authLimiter,
   TooManyRequestsError,
 };

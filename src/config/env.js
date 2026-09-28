@@ -24,6 +24,7 @@ const MINUTE = 60 * 1000;
 module.exports = {
   nodeEnv,
   isTest: nodeEnv === 'test',
+  isProduction: nodeEnv === 'production',
   port: Number(process.env.PORT || 3000),
   rateLimit: {
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * MINUTE),
@@ -34,6 +35,21 @@ module.exports = {
     // Prestacao de contas trabalha em lote: um relatorio de 30 cupons sao
     // dezenas de escritas seguidas, feitas por uma pessoa so.
     batchWriteMax: Number(process.env.RATE_LIMIT_BATCH_WRITE_MAX || 600),
+    // Login tem teto proprio e apertado: e a unica rota onde tentar de novo
+    // com outro valor tem serventia para quem nao deveria estar aqui.
+    authMax: Number(process.env.RATE_LIMIT_AUTH_MAX || 20),
+  },
+  session: {
+    cookieName: process.env.SESSION_COOKIE_NAME || 'tasktab_session',
+    // Uma semana. Revisar um lote de 30 cupons e trabalho de varios dias, e
+    // uma sessao curta expulsaria a pessoa no meio dele. Como a sessao vive no
+    // banco, encurtar isso e trocar a variavel — nao ha token solto por ai.
+    ttlHours: Number(process.env.SESSION_TTL_HOURS || 168),
+    // `Secure` so em producao: em desenvolvimento e no E2E o acesso e por
+    // http://localhost, e um cookie Secure ali seria descartado pelo cliente.
+    cookieSecure: process.env.SESSION_COOKIE_SECURE
+      ? process.env.SESSION_COOKIE_SECURE === 'true'
+      : nodeEnv === 'production',
   },
   upload: {
     // Relativo a raiz do projeto quando nao absoluto. Em container e um volume:
