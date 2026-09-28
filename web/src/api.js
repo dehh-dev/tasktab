@@ -1,5 +1,4 @@
 const AUTH_URL = '/api/auth';
-const USERS_URL = '/api/users';
 const TASKS_URL = '/api/tasks';
 const REPORTS_URL = '/api/reports';
 const RECEIPTS_URL = '/api/receipts';
@@ -126,17 +125,6 @@ export function login(email, password) {
 
 export function logout() {
   return request(`${AUTH_URL}/logout`, { method: 'POST' });
-}
-
-export function listUsers() {
-  return request(USERS_URL);
-}
-
-export function changePassword(id, { password, current_password }) {
-  return request(`${USERS_URL}/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ password, current_password }),
-  });
 }
 
 // ---------- tarefas ----------

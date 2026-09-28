@@ -19,7 +19,7 @@
  * herdam a do relatorio a que pertencem: um cupom nao tem dono proprio, tem o
  * dono da prestacao de contas em que foi lancado.
  *
- * Emitentes (`merchants`) sao cadastro **compartilhado** de propositio: a
+ * Emitentes (`merchants`) sao cadastro **compartilhado** de proposito: a
  * categoria de um CNPJ e a mesma para todo mundo, e duplicar o cadastro por
  * pessoa faria a mesma padaria ser classificada de dois jeitos.
  *

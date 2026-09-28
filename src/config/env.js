@@ -24,7 +24,6 @@ const MINUTE = 60 * 1000;
 module.exports = {
   nodeEnv,
   isTest: nodeEnv === 'test',
-  isProduction: nodeEnv === 'production',
   port: Number(process.env.PORT || 3000),
   rateLimit: {
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * MINUTE),
