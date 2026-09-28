@@ -68,4 +68,47 @@ async function createReport(request, overrides = {}) {
   return readData(response, 'criar relatorio');
 }
 
-module.exports = { clearTasks, createTask, clearReports, createReport };
+/** Envia um PDF ao relatorio no campo `files`, o mesmo que a tela usa. */
+async function uploadReceipt(request, reportId, buffer) {
+  const response = await request.post(`/api/reports/${reportId}/receipts`, {
+    multipart: {
+      files: { name: 'cupom.pdf', mimeType: 'application/pdf', buffer },
+    },
+  });
+
+  return readData(response, 'enviar comprovante');
+}
+
+/**
+ * Cadastra uma pessoa e devolve o registro junto da senha, para entrar com
+ * ela na tela. O e-mail leva sufixo unico porque o E2E nao trunca `users`:
+ * um e-mail fixo quebraria a segunda execucao por cadastro repetido.
+ */
+async function createUser(request, overrides = {}) {
+  const password = 'senha-do-e2e-123';
+  const response = await request.post('/api/users', {
+    data: {
+      name: 'Pessoa do E2E',
+      email: `pessoa-${Date.now()}-${Math.random().toString(36).slice(2)}@tasktab.test`,
+      password,
+      role: 'user',
+      ...overrides,
+    },
+  });
+
+  return { ...(await readData(response, 'cadastrar usuario')), password };
+}
+
+async function deleteUser(request, id) {
+  await request.delete(`/api/users/${id}`);
+}
+
+module.exports = {
+  clearTasks,
+  createTask,
+  clearReports,
+  createReport,
+  uploadReceipt,
+  createUser,
+  deleteUser,
+};

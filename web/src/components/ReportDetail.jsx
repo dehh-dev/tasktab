@@ -204,6 +204,7 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
           onBack={() => setReviewingId(null)}
           onAction={handleAction}
           onDelete={setPendingDelete}
+          canWrite={canWrite}
         />
         {deleteDialog}
       </>
@@ -282,7 +283,7 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
       <ReceiptList
         receipts={receipts}
         onOpen={setReviewingId}
-        onDelete={setPendingDelete}
+        onDelete={canWrite ? setPendingDelete : undefined}
         busy={deleting}
       />
 

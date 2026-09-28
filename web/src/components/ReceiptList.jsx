@@ -30,25 +30,35 @@ function ReceiptRow({ receipt, onOpen, onDelete, busy }) {
         </div>
       </div>
 
-      <div className="list-item__actions">
-        <button
-          type="button"
-          className="btn btn--sm btn--danger"
-          onClick={() => onDelete(receipt)}
-          disabled={busy}
-        >
-          Deletar
-        </button>
-      </div>
+      {
+        // Sem `onDelete` a sessao so le o relatorio (auditor), e a linha sai
+        // sem acoes — o mesmo contrato da TaskList.
+        onDelete && (
+          <div className="list-item__actions">
+            <button
+              type="button"
+              className="btn btn--sm btn--danger"
+              onClick={() => onDelete(receipt)}
+              disabled={busy}
+            >
+              Deletar
+            </button>
+          </div>
+        )
+      }
     </li>
   );
 }
 
 export default function ReceiptList({ receipts, onOpen, onDelete, busy }) {
   if (receipts.length === 0) {
+    // Mandar enviar um PDF a quem so le o relatorio seria oferecer o que a
+    // API vai recusar.
     return (
       <p className="state">
-        Nenhum comprovante ainda — envie um PDF para comecar.
+        {onDelete
+          ? 'Nenhum comprovante ainda — envie um PDF para comecar.'
+          : 'Nenhum comprovante ainda.'}
       </p>
     );
   }

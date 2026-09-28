@@ -359,6 +359,13 @@ a.btn {
   border-color: var(--danger-fg);
 }
 
+/* Campo travado para quem so confere. O texto mantem o contraste normal — ele
+   existe para ser lido —, e o que muda e o fundo e o cursor. */
+.field__input:disabled {
+  background: transparent;
+  cursor: default;
+}
+
 textarea.field__input {
   min-height: 72px;
   resize: vertical;
@@ -641,6 +648,19 @@ textarea.field__input {
   flex-direction: column;
   gap: 16px;
   margin-bottom: 0;
+}
+
+/* O fieldset so existe para travar os campos de quem nao escreve; sem isto
+   ele traria borda e recuo proprios e viraria um item so no flex do form,
+   levando embora o espaco entre os campos. */
+.review__fieldset {
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
 }
 
 /* ---------- dialogo de confirmacao ---------- */
