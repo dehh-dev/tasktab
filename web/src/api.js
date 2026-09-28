@@ -14,9 +14,8 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.action = action ?? null;
     this.details = details ?? [];
-    // O status permite ao App distinguir "sessao expirou" (401) de qualquer
-    // outra falha e voltar para a tela de login em vez de mostrar um alerta
-    // que a pessoa nao tem como resolver.
+    // E pelo status que o `request` reconhece a sessao que caiu (401) e avisa
+    // o App — ver `onSessionLost`.
     this.status = status ?? null;
   }
 
@@ -29,6 +28,25 @@ export class ApiError extends Error {
       return acc;
     }, {});
   }
+}
+
+/**
+ * Quem precisa saber que a sessao caiu. O App se inscreve enquanto ha alguem
+ * logado: um 401 no meio do uso quer dizer que a sessao venceu ou foi
+ * revogada (troca de senha em outro navegador, conta removida), e a unica
+ * saida util e a tela de login. Sem isso cada painel mostrava o proprio alerta
+ * de "sessao ausente", e a pessoa so saia dele recarregando a pagina.
+ */
+let sessionLostListener = null;
+
+export function onSessionLost(listener) {
+  sessionLostListener = listener;
+
+  return () => {
+    if (sessionLostListener === listener) {
+      sessionLostListener = null;
+    }
+  };
 }
 
 async function request(url, options = {}) {
@@ -64,7 +82,7 @@ async function request(url, options = {}) {
   // O backend serializa erro em { name, message, action, status_code,
   // details? } — o `action` diz ao usuario o que fazer a seguir.
   if (!response.ok) {
-    throw new ApiError(
+    const error = new ApiError(
       body?.message ?? `Falha na requisicao (${response.status})`,
       {
         action: body?.action,
@@ -72,6 +90,15 @@ async function request(url, options = {}) {
         status: response.status,
       },
     );
+
+    // As rotas de /api/auth tratam o proprio 401: no login ele e senha errada,
+    // no logout e sessao que ja nao existia, e no `me` da abertura e so
+    // ninguem logado ainda. Nenhum deles e sessao perdida no meio do uso.
+    if (error.status === 401 && !url.startsWith(AUTH_URL)) {
+      sessionLostListener?.(error);
+    }
+
+    throw error;
   }
 
   return body;

@@ -21,6 +21,8 @@ const TABS = [
 export default function App() {
   // undefined = ainda perguntando ao servidor | null = sem sessao | objeto = logado
   const [user, setUser] = useState(undefined);
+  // Por que a pessoa voltou ao login, quando nao foi ela quem saiu.
+  const [notice, setNotice] = useState(null);
   const [tab, setTab] = useState('tasks');
 
   const loadSession = useCallback(async () => {
@@ -38,6 +40,25 @@ export default function App() {
     loadSession();
   }, [loadSession]);
 
+  // So escuta enquanto ha alguem logado: uma resposta atrasada de uma tela que
+  // ja fechou nao pode enfeitar o login de quem saiu por vontade propria com
+  // um aviso de sessao perdida.
+  useEffect(() => {
+    if (!user) {
+      return undefined;
+    }
+
+    return api.onSessionLost((error) => {
+      setNotice({ message: error.message, action: error.action });
+      setUser(null);
+    });
+  }, [user]);
+
+  function handleAuthenticated(authenticated) {
+    setNotice(null);
+    setUser(authenticated);
+  }
+
   async function handleLogout() {
     await api.logout().catch(() => {});
     setUser(null);
@@ -48,7 +69,9 @@ export default function App() {
   }
 
   if (user === null) {
-    return <LoginScreen onAuthenticated={setUser} />;
+    return (
+      <LoginScreen onAuthenticated={handleAuthenticated} notice={notice} />
+    );
   }
 
   const tabs = TABS.filter((item) => user.scopes.includes(item.scope));

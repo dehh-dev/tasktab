@@ -59,6 +59,27 @@ test.describe('sessao', () => {
 
     await expect(page.getByText(E2E_USER.name)).toBeVisible();
   });
+
+  test('quando a sessao cai no meio do uso, volta ao login e diz por que', async ({
+    page,
+  }) => {
+    await entrar(page);
+
+    // Revoga a sessao por fora da tela, como fariam a troca de senha em outro
+    // navegador ou o fim do prazo. O `page.request` divide os cookies com a
+    // pagina, entao o logout derruba justamente a sessao dela.
+    await page.request.post('/api/auth/logout');
+
+    // E a proxima conversa com a API que descobre a queda.
+    await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Entrar no tasktab' }),
+    ).toBeVisible();
+    await expect(page.getByRole('alert')).toContainText(
+      'Sessao ausente ou expirada',
+    );
+  });
 });
 
 test.describe('sair', () => {
@@ -70,6 +91,8 @@ test.describe('sair', () => {
     await expect(
       page.getByRole('heading', { name: 'Entrar no tasktab' }),
     ).toBeVisible();
+    // Quem saiu por vontade propria nao recebe aviso de sessao perdida.
+    await expect(page.getByRole('alert')).toHaveCount(0);
   });
 
   test('depois de sair, recarregar nao devolve a sessao', async ({ page }) => {

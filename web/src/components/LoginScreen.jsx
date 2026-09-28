@@ -7,10 +7,12 @@ import * as api from '../api';
  * (`npm run users:create`). Numa ferramenta que guarda cupom fiscal com CNPJ
  * de terceiros, um "criar conta" aberto seria uma porta para qualquer um.
  */
-export default function LoginScreen({ onAuthenticated }) {
+export default function LoginScreen({ onAuthenticated, notice = null }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
+  // O aviso de sessao encerrada ocupa o lugar do erro de login: um alerta de
+  // cada vez, e a primeira tentativa de entrar ja o substitui.
+  const [error, setError] = useState(notice);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event) {
