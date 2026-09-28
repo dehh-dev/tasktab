@@ -12,7 +12,7 @@ import ConfirmDialog from './ConfirmDialog';
  * nada aqui — as specs de e2e/tasks.spec.js e companhia continuam valendo
  * como estavam.
  */
-export default function TasksApp() {
+export default function TasksApp({ canWrite = true }) {
   const [tasks, setTasks] = useState([]);
   const [total, setTotal] = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
@@ -122,14 +122,21 @@ export default function TasksApp() {
           onChange={setStatusFilter}
           total={total}
         />
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={openCreate}
-          disabled={editing === 'new'}
-        >
-          Nova tarefa
-        </button>
+        {
+          // Sem `tasks:write` o botao nao aparece: oferecer o que a API vai
+          // recusar troca uma permissao clara por um 403 no meio do caminho.
+          // A tela nao e a autorizacao — o servidor confere de novo, sempre.
+          canWrite && (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={openCreate}
+              disabled={editing === 'new'}
+            >
+              Nova tarefa
+            </button>
+          )
+        }
       </div>
 
       {editing && (
@@ -148,8 +155,8 @@ export default function TasksApp() {
       ) : (
         <TaskList
           tasks={tasks}
-          onEdit={openEdit}
-          onDelete={setPendingDelete}
+          onEdit={canWrite ? openEdit : undefined}
+          onDelete={canWrite ? setPendingDelete : undefined}
           busy={deleting}
         />
       )}

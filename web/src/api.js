@@ -1,3 +1,5 @@
+const AUTH_URL = '/api/auth';
+const USERS_URL = '/api/users';
 const TASKS_URL = '/api/tasks';
 const REPORTS_URL = '/api/reports';
 const RECEIPTS_URL = '/api/receipts';
@@ -7,11 +9,15 @@ const RECEIPTS_URL = '/api/receipts';
  * (status 422), para que o formulario possa exibi-los no campo correto.
  */
 export class ApiError extends Error {
-  constructor(message, { action, details } = {}) {
+  constructor(message, { action, details, status } = {}) {
     super(message);
     this.name = 'ApiError';
     this.action = action ?? null;
     this.details = details ?? [];
+    // O status permite ao App distinguir "sessao expirou" (401) de qualquer
+    // outra falha e voltar para a tela de login em vez de mostrar um alerta
+    // que a pessoa nao tem como resolver.
+    this.status = status ?? null;
   }
 
   /** Converte os detalhes em { campo: mensagem } para consumo do formulario. */
@@ -36,7 +42,13 @@ async function request(url, options = {}) {
       : { 'Content-Type': 'application/json', ...options.headers };
 
   try {
-    response = await fetch(url, { ...options, headers });
+    // `same-origin` e o padrao do fetch e ja mandaria o cookie de sessao;
+    // explicito aqui porque e do que a autenticacao inteira depende.
+    response = await fetch(url, {
+      credentials: 'same-origin',
+      ...options,
+      headers,
+    });
   } catch {
     throw new ApiError('Nao foi possivel falar com o servidor.', {
       action: 'Verifique sua conexao e se a API esta no ar.',
@@ -54,12 +66,53 @@ async function request(url, options = {}) {
   if (!response.ok) {
     throw new ApiError(
       body?.message ?? `Falha na requisicao (${response.status})`,
-      { action: body?.action, details: body?.details },
+      {
+        action: body?.action,
+        details: body?.details,
+        status: response.status,
+      },
     );
   }
 
   return body;
 }
+
+// ---------- sessao ----------
+
+/**
+ * Quem esta na sessao, com os escopos do papel.
+ *
+ * A interface usa os escopos para nao oferecer o que a API vai recusar — um
+ * auditor nao ve o botao de criar relatorio. E conveniencia de tela, e nao
+ * autorizacao: quem decide continua sendo o servidor, a cada requisicao.
+ */
+export function getMe() {
+  return request(`${AUTH_URL}/me`);
+}
+
+export function login(email, password) {
+  return request(`${AUTH_URL}/login`, {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function logout() {
+  return request(`${AUTH_URL}/logout`, { method: 'POST' });
+}
+
+export function listUsers() {
+  return request(USERS_URL);
+}
+
+export function changePassword(id, { password, current_password }) {
+  return request(`${USERS_URL}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ password, current_password }),
+  });
+}
+
+// ---------- tarefas ----------
 
 export function listTasks({ status } = {}) {
   const params = new URLSearchParams();

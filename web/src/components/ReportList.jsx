@@ -7,9 +7,18 @@ export default function ReportList({ reports, onOpen, onCreate }) {
         <span className="filter__count" aria-live="polite">
           {reports.length} {reports.length === 1 ? 'relatorio' : 'relatorios'}
         </span>
-        <button type="button" className="btn btn--primary" onClick={onCreate}>
-          Novo relatorio
-        </button>
+        {
+          // Sem `onCreate` a pessoa nao tem `reports:write`, e o botao some.
+          onCreate && (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={onCreate}
+            >
+              Novo relatorio
+            </button>
+          )
+        }
       </div>
 
       {reports.length === 0 ? (

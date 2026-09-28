@@ -32,7 +32,7 @@ function receiptLabel(receipt) {
   return details.length > 0 ? `${name} — ${details.join(' · ')}` : name;
 }
 
-export default function ReportDetail({ reportId, onBack }) {
+export default function ReportDetail({ reportId, onBack, canWrite = true }) {
   const [report, setReport] = useState(null);
   const [receipts, setReceipts] = useState([]);
   const [meta, setMeta] = useState(EMPTY_META);
@@ -274,7 +274,10 @@ export default function ReportDetail({ reportId, onBack }) {
         </div>
       )}
 
-      <ReceiptUpload reportId={reportId} onUploaded={load} />
+      {
+        // Quem so confere (auditor) le o relatorio inteiro e nao anexa nada.
+        canWrite && <ReceiptUpload reportId={reportId} onUploaded={load} />
+      }
       <ReceiptSummary meta={meta} />
       <ReceiptList
         receipts={receipts}

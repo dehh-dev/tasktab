@@ -19,24 +19,35 @@ function TaskItem({ task, onEdit, onDelete, busy }) {
         </div>
       </div>
 
-      <div className="task__actions">
-        <button
-          type="button"
-          className="btn btn--sm"
-          onClick={() => onEdit(task)}
-          disabled={busy}
-        >
-          Editar
-        </button>
-        <button
-          type="button"
-          className="btn btn--sm btn--danger"
-          onClick={() => onDelete(task)}
-          disabled={busy}
-        >
-          Deletar
-        </button>
-      </div>
+      {
+        // Sem os dois callbacks a sessao nao tem `tasks:write`, e a linha sai
+        // sem acoes. Renderizar botao que chamaria `undefined` trocaria um
+        // limite de permissao por um erro de JavaScript no console.
+        (onEdit || onDelete) && (
+          <div className="task__actions">
+            {onEdit && (
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={() => onEdit(task)}
+                disabled={busy}
+              >
+                Editar
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                className="btn btn--sm btn--danger"
+                onClick={() => onDelete(task)}
+                disabled={busy}
+              >
+                Deletar
+              </button>
+            )}
+          </div>
+        )
+      }
     </li>
   );
 }
