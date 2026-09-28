@@ -80,6 +80,10 @@ shell. Papeis aceitos: `admin`, `user`, `auditor`.
 
 Depois disso, novos cadastros saem por `POST /api/users` (exige `users:write`).
 
+Para redefinir a senha de quem perdeu o acesso, repita o comando com
+`--replace`. A senha nova passa a valer, as sessoes abertas daquela pessoa sao
+encerradas e o papel so muda se vier `--role`.
+
 O `compose.yaml` cria dois bancos: `tasktab_development` e `tasktab_test`
 (este ultimo via `docker/initdb/`, executado na primeira subida do volume).
 
@@ -443,6 +447,11 @@ registro — o auditor que le o relatorio e tenta edita-lo.
 
 O `merchants` e cadastro compartilhado (a categoria de um CNPJ vale para todo
 mundo) e o quadro de `tasks` tambem, por decisao de produto.
+
+Na interface, as abas e os botoes seguem os escopos da sessao: o auditor ve a
+revisao de comprovantes em modo somente leitura. Quando a sessao cai no meio
+do uso — venceu, ou foi revogada por uma troca de senha em outro navegador —,
+a tela volta para o login dizendo por que.
 
 ### Protecoes HTTP
 

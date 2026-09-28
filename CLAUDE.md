@@ -141,10 +141,10 @@ CPF de terceiros. Agora **toda** rota de `/api` exige sessao, menos duas:
 Autorizacao aqui tem **escopo** e **posse**, e separa-los e o que evita a
 mistura que costuma virar bug de permissao:
 
-| Eixo       | Pergunta                | Onde                            |
-| ---------- | ----------------------- | ------------------------------- |
-| **Escopo** | que acao, em que classe | `requireScope` na **rota**      |
-| **Posse**  | quais linhas            | `ownership.*` no **controller** |
+| Eixo       | Pergunta                | Onde                                           |
+| ---------- | ----------------------- | ---------------------------------------------- |
+| **Escopo** | que acao, em que classe | `requireScope` na **rota**                     |
+| **Posse**  | quais linhas            | `loadReport` / `loadReceipt` no **controller** |
 
 O escopo fica na rota porque e o unico lugar onde da para ler, de cima a
 baixo, o que cada endpoint exige — um controller novo que esqueca a checagem
@@ -192,6 +192,12 @@ quando **a acao** e negada e nao o registro (o auditor que le e tenta editar):
 ali esconder nada adianta, porque ele acabou de ler o recurso. Ha teste dos
 dois lados.
 
+`loadReport` e `loadReceipt` (`src/services/auth/access.service.js`) carregam
+o registro ja aplicando o `ownership`, e sao o unico lugar de onde sai o 404 de
+relatorio e de comprovante. A igualdade entre "nao existe" e "nao e seu"
+depende de nao haver uma segunda copia desse 404 — ja houve tres. Ha teste
+comparando as duas respostas campo a campo.
+
 ### Senha e sessao
 
 - Senha com **`scrypt` do proprio Node** (`src/services/auth/password.js`).
@@ -227,6 +233,11 @@ dois lados.
 todos sai por `npm run users:create`, que roda fora do processo do servidor —
 so quem ja tem acesso a maquina e ao banco. Sem `--password`, o script sorteia
 uma senha forte e a imprime uma vez (argumento fica no historico do shell).
+Com `--replace` ele redefine a senha de quem ja existe e **encerra as sessoes
+abertas** dessa pessoa — e por ali que se recupera uma conta, as vezes
+comprometida —, e o papel so muda se vier `--role`: redefinir a senha do unico
+administrador nao pode rebaixa-lo de quebra. As regras de campo sao as do
+mesmo validator da API.
 
 - Qualquer pessoa le e edita **o proprio** cadastro sem `users:*` — trocar a
   propria senha nao pode depender de um administrador. O que ela **nao** pode
@@ -253,6 +264,16 @@ um auditor nao ve "Novo relatorio". Isso e **conveniencia de tela, nao
 autorizacao**: o servidor confere de novo a cada requisicao, e ha teste de API
 provando cada recusa.
 
+- Um 401 no meio do uso (sessao vencida ou revogada) devolve a tela de login
+  com o motivo. O `request` de `web/src/api.js` avisa o App por
+  `onSessionLost`, menos nas rotas de `/api/auth`, que tratam o proprio 401 —
+  no login ele e senha errada. O App so escuta enquanto ha alguem logado:
+  quem clica em "Sair" nao recebe aviso de sessao perdida.
+- Sem escrita, a revisao de comprovantes e **somente leitura**: campos num
+  `fieldset` desabilitado, sem "Confirmar", "Deletar" nem "Marcar como
+  duplicata", e a lista sem acoes. Ha spec E2E entrando como auditor
+  (`e2e/expenses-readonly.spec.js`).
+
 ## Testes
 
 So integracao, em `tests/`. Sem mock de banco, sem mock de `fetch`, sem teste
@@ -265,7 +286,8 @@ nao se importa `src/app` dentro de teste.
 
 Os arquivos espelham as rotas: `tests/api/tasks/get.test.js`,
 `post.test.js`, `put.test.js`, `delete.test.js`, mais `tests/api/health.test.js`
-e `tests/api/not-found.test.js`.
+e `tests/api/not-found.test.js`. Os scripts de linha de comando tem os seus em
+`tests/scripts/`, rodados de verdade por `runScript`.
 
 Tudo que e infraestrutura de teste vive em **`tests/orchestrator.js`**:
 
@@ -273,7 +295,8 @@ Tudo que e infraestrutura de teste vive em **`tests/orchestrator.js`**:
 | ----------------------------------- | ------------------------------------------------------- |
 | `waitForAllServices()`              | espera o `/api/health` responder 200                    |
 | `runPendingMigrations()`            | aplica as migrations no banco de teste                  |
-| `clearDatabase()`                   | trunca `tasks` reiniciando a identidade                 |
+| `runScript(file, args)`             | roda um script de `scripts/` contra o banco de teste    |
+| `clearDatabase()`                   | trunca todas as tabelas reiniciando a identidade        |
 | `insertTask(overrides)`             | arranjo direto no banco, sem passar pela API            |
 | `insertUser` / `insertSession`      | usuario e sessao direto no banco                        |
 | `createUserWithSession`             | usuario de outro papel, devolve `{ user, token }`       |
@@ -306,7 +329,8 @@ arquivo a sua propria copia de `process.env`.
   endpoint. Vale mais que a soma dos testes de cada rota: uma rota nova sem
   `requireScope` passa em todos os testes dela mesma, e so ali, ao chegar com
   um papel que nao deveria alcanca-la, e que a falta aparece. **Toda rota nova
-  entra nessa lista.**
+  entra nessa lista.** Cada entrada diz quais papeis passam do portao da rota,
+  e a falha compara o mapa inteiro, mostrando qual papel escapou.
 - Rodam com `--runInBand`: compartilham a mesma tabela e nao podem paralelizar.
 - Use `insertTask()` para preparar estado — arranjo fora da rota evita que um
   teste de leitura quebre por causa de um bug na escrita.
@@ -672,7 +696,7 @@ React 19 + Vite, sem router e sem biblioteca de estado — tela unica, estado no
 - Nao concatene valor em SQL. Placeholder sempre.
 - Nao faca commit sem `npm test` e `npm run lint` passando.
 - Nao adicione dependencia so para resolver algo que 20 linhas resolvem — o
-  projeto e deliberadamente enxuto (3 dependencias de producao).
+  projeto e deliberadamente enxuto (16 dependencias de producao).
 - Nao escreva mensagem de commit fora do padrao **Conventional Commits** — o
   commitlint rejeita no hook do husky, inclusive escopo fora do enum de
   `commitlint.config.js`. Prefira `npm run commit`.
@@ -681,7 +705,8 @@ React 19 + Vite, sem router e sem biblioteca de estado — tela unica, estado no
 - Nao crie rota em `/api` sem `requireScope` (ou `requireAuth`, para o que so
   precisa de sessao). `authenticate` **nao barra ninguem** de proposito.
 - Nao carregue um relatorio ou comprovante sem passar por `loadReport` /
-  `loadReceipt`: e por fora deles que um vazamento entra.
+  `loadReceipt` (`src/services/auth/access.service.js`): e por fora deles que
+  um vazamento entra.
 - Nao aceite `owner_id` do cliente, em corpo nem em query. O dono sai da sessao.
 - Nao troque `sameSite=lax` por `none` sem introduzir token de CSRF junto.
 - Nao acrescente caminho novo que leia `password_hash`.

@@ -78,18 +78,24 @@ Os três primeiros são exigidos pelo hook de pre-commit; o CI roda os quatro.
 
 ## Marcos
 
-| Marco            | Issues      | Entrega                                        |
-| ---------------- | ----------- | ---------------------------------------------- |
-| M0 — Terreno     | 0           | Ferramental destravado para o resto do backlog |
-| M1 — Fundação    | 1 a 5, 22   | Upload, CRUD e revisão manual ponta a ponta    |
-| M2 — Digital     | 6 a 8       | PDFs digitais preenchem sozinhos               |
-| M3 — Cupom       | 25, 9 a 11  | QR Code + emitentes + categoria automática     |
-| M4 — OCR         | 12 a 13     | Cupom térmico escaneado                        |
-| M5 — Conferência | 14 a 15     | Deduplicação e validações                      |
-| M6 — Saídas      | 26, 16 a 18 | Excel e PDF consolidado                        |
-| M7 — Interface   | 19 a 21     | Aba completa com tela de revisão               |
+| Marco            | Issues      | Entrega                                        | PR  |
+| ---------------- | ----------- | ---------------------------------------------- | --- |
+| M0 — Terreno     | 0           | Ferramental destravado para o resto do backlog | #10 |
+| M1 — Fundação    | 1 a 5, 22   | Upload, CRUD e revisão manual ponta a ponta    | #10 |
+| M2 — Digital     | 6 a 8       | PDFs digitais preenchem sozinhos               | #11 |
+| M3 — Cupom       | 25, 9 a 11  | QR Code + emitentes + categoria automática     | #12 |
+| M4 — OCR         | 12 a 13     | Cupom térmico escaneado                        | #13 |
+| M5 — Conferência | 14 a 15     | Deduplicação e validações                      | #13 |
+| M6 — Saídas      | 26, 16 a 18 | Excel e PDF consolidado                        | #14 |
+| M7 — Interface   | 19 a 21     | Aba completa com tela de revisão               | #15 |
 
-Transversais (23, 24) entram a qualquer momento depois do M1.
+Transversais (23, 24) entram a qualquer momento depois do M1 — entraram no
+#16.
+
+Os critérios das issues 0 a 22, 25 e 26 ficaram sem marcação: foram escritos
+antes da execução, e alguns mudaram depois dela — a regra de categoria da #11,
+por exemplo, foi invertida pela #30. Da #23 em diante, cada issue foi marcada
+ao fechar.
 
 ---
 
@@ -1272,7 +1278,7 @@ ler o recurso.
 
 **Senha e sessão, sem dependência nova**
 
-O projeto tem 12 dependências de produção e a regra de não acrescentar pacote
+O projeto tem 16 dependências de produção e a regra de não acrescentar pacote
 para o que cabe em vinte linhas. Nenhuma entrou aqui:
 
 - Senha com **`scrypt` da biblioteca padrão**. `bcrypt` e `argon2` trazem
@@ -1368,3 +1374,24 @@ Recuperação de senha por e-mail (exigiria um serviço de envio, que o projeto
 não tem), segundo fator, `tasks.owner_id`, tela de administração de usuários na
 interface (hoje o CRUD é só de API) e transferência de posse de um relatório.
 Nenhum é bloqueado por esta.
+
+**Revisão antes do merge**
+
+Lida a issue inteira antes de abrir o PR, seis pontos foram corrigidos, todos
+com teste que os trava:
+
+- Cookie de sessão com `%` quebrado derrubava a API inteira com 500, inclusive
+  o login — quem tivesse o cookie não conseguia nem entrar para trocá-lo. Agora
+  vale como sessão ausente.
+- Quando a sessão caía no meio do uso, cada painel mostrava o próprio alerta e
+  a pessoa só saía dele recarregando a página. Agora a tela volta ao login,
+  com o motivo.
+- O auditor via "Deletar", "Confirmar" e campos editáveis na revisão, e cada
+  um respondia 403. Agora a revisão é somente leitura para quem não escreve.
+- A matriz de autorização cobria 8 das 33 rotas que exigem sessão. Agora cobre
+  todas, e uma mutação nas rotas confirmou que ela acusa a falta.
+- `users:create --replace` não encerrava as sessões abertas, rebaixava a
+  `user` quando vinha sem `--role` e aceitava senha curta.
+- `loadReport` tinha duas cópias e o 404 de relatório, três. A igualdade entre
+  "não existe" e "não é seu" dependia de elas nunca divergirem; agora há um
+  lugar só, e um teste comparando as duas respostas.
