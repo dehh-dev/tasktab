@@ -33,6 +33,7 @@
     "posttest:e2e": "npm run services:stop",
     "test:e2e:ui": "cross-env NODE_ENV=test playwright test --ui",
     "test:watch": "cross-env NODE_ENV=test concurrently -n api,jest -c blue,magenta --hide api -k \"node src/server.js\" \"jest --runInBand --verbose --watchAll\"",
+    "test:pure": "cross-env NODE_ENV=test jest --selectProjects puros",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
