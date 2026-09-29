@@ -59,21 +59,6 @@ describe('extracao no upload', () => {
     ).toBe(true);
   });
 
-  it('desce para o OCR quando nao ha camada de texto util', async () => {
-    const report = await insertReport();
-
-    await upload(report.id, [
-      { buffer: await makePdf({ text: '2' }), filename: 'escaneado.pdf' },
-    ]);
-
-    const [receipt] = await listReceipts(report.id);
-
-    // Ate o M3 a pagina parava aqui com extraction_source nulo. Com o OCR no
-    // fim da cascata, ela passa a ser lida como imagem.
-    expect(receipt.extraction_source).toBe('ocr');
-    expect(receipt.status).toBe('needs_review');
-  });
-
   it('nao tenta extrair de um PDF que nem abriu', async () => {
     const report = await insertReport();
 
@@ -85,38 +70,6 @@ describe('extracao no upload', () => {
 
     expect(receipt.status).toBe('failed');
     expect(receipt.raw_text).toMatch(/Falha ao ler o PDF/);
-  });
-
-  it('preenche data e valor sozinho, a partir do texto', async () => {
-    const report = await insertReport();
-
-    await upload(report.id, [
-      {
-        buffer: await makeReceiptPdf({ total: '37,60', date: '19/06/2026' }),
-        filename: 'cupom.pdf',
-      },
-    ]);
-
-    const [receipt] = await listReceipts(report.id);
-
-    // O ganho do M2: a pessoa deixa de digitar e passa a conferir.
-    expect(receipt.issued_at).toBe('2026-06-19');
-    expect(receipt.amount_cents).toBe(3760);
-    expect(Number(receipt.confidence)).toBeGreaterThan(0);
-  });
-
-  it('nao confirma nada sozinho, mesmo tendo lido tudo', async () => {
-    const report = await insertReport();
-
-    await upload(report.id, [
-      { buffer: await makeReceiptPdf(), filename: 'cupom.pdf' },
-    ]);
-
-    const [receipt] = await listReceipts(report.id);
-
-    // Extrair nao e conferir. Confirmar continua sendo ato humano — inclusive
-    // quando a extracao preencheu tudo, categoria adivinhada incluida.
-    expect(receipt.status).toBe('needs_review');
   });
 
   it('o subtotal da listagem ja inclui o que esta em revisao, marcado como palpite', async () => {

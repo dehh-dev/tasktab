@@ -18,71 +18,71 @@ async function listReceipts(reportId) {
   return response.body.data;
 }
 
-describe('OCR de pagina escaneada', () => {
-  it('le o cupom sem camada de texto', async () => {
+/**
+ * A cascata inteira num upload so: um cupom digital e um escaneado.
+ *
+ * Eram sete testes, espalhados por dois arquivos, cada um subindo o proprio
+ * PDF — e o Tesseract rodando cinco vezes, a parte mais cara da suite. Cada
+ * afirmacao abaixo e uma daquelas; o que mudou e que pagam um OCR so.
+ */
+describe('cascata de extracao', () => {
+  it('le o digital pelo texto e o escaneado pelo OCR, e nao confirma nenhum dos dois', async () => {
     const report = await insertReport();
 
     await upload(report.id, [
       {
+        buffer: await makeReceiptPdf({ total: '48,60', date: '20/06/2026' }),
+        filename: 'digital.pdf',
+      },
+      {
+        // Escaneado costuma trazer um resto de camada de texto, como o numero
+        // da pagina. Nao e texto util, e nao pode segurar a pagina fora do OCR.
         buffer: await makeScannedReceiptPdf({
           total: '37,60',
           date: '19/06/2026',
+          residualText: '2',
         }),
         filename: 'escaneado.pdf',
       },
     ]);
 
-    const [receipt] = await listReceipts(report.id);
-
-    expect(receipt.extraction_source).toBe('ocr');
-    expect(receipt.raw_text).toMatch(/FRANGUINHO/i);
-    expect(receipt.amount_cents).toBe(3760);
-    expect(receipt.issued_at).toBe('2026-06-19');
-  });
-
-  it('nunca confirma sozinho o que veio de OCR', async () => {
-    const report = await insertReport();
-
-    await upload(report.id, [
-      { buffer: await makeScannedReceiptPdf(), filename: 'escaneado.pdf' },
-    ]);
-
-    const [receipt] = await listReceipts(report.id);
-
-    // O caminho menos confiavel da cascata e o que menos pode decidir sozinho.
-    expect(receipt.status).toBe('needs_review');
-  });
-
-  it('registra confianca menor que a de um PDF digital', async () => {
-    const report = await insertReport();
-
-    await upload(report.id, [
-      { buffer: await makeScannedReceiptPdf(), filename: 'escaneado.pdf' },
-      { buffer: await makeReceiptPdf(), filename: 'digital.pdf' },
-    ]);
-
     const receipts = await listReceipts(report.id);
-    const escaneado = receipts.find((r) => r.extraction_source === 'ocr');
     const digital = receipts.find((r) => r.extraction_source === 'text');
+    const scanned = receipts.find((r) => r.extraction_source === 'ocr');
+
+    // Cada pagina no degrau certo: o OCR e o mais caro, e so desce ate ele
+    // quem nao tem camada de texto util.
+    expect(receipts.map((r) => r.extraction_source).sort()).toEqual([
+      'ocr',
+      'text',
+    ]);
+
+    // Os dois lidos sozinhos — o ganho e a pessoa deixar de digitar e passar a
+    // conferir.
+    expect(digital).toMatchObject({
+      issued_at: '2026-06-20',
+      amount_cents: 4860,
+    });
+    expect(scanned).toMatchObject({
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
+    });
+    expect(scanned.raw_text).toMatch(/FRANGUINHO/i);
+
+    // E nenhum confirmado. Extrair nao e conferir — inclusive quando a
+    // extracao preencheu tudo, categoria adivinhada incluida —, e o que veio
+    // de OCR menos ainda.
+    expect(receipts.map((r) => r.status)).toEqual([
+      'needs_review',
+      'needs_review',
+    ]);
 
     // A confianca guia o destaque na revisao: o que veio de imagem merece
     // mais atencao que o que veio da camada de texto.
-    expect(Number(escaneado.confidence)).toBeLessThanOrEqual(
+    expect(Number(digital.confidence)).toBeGreaterThan(0);
+    expect(Number(scanned.confidence)).toBeLessThanOrEqual(
       Number(digital.confidence),
     );
-  });
-
-  it('nao roda OCR quando ja ha camada de texto', async () => {
-    const report = await insertReport();
-
-    await upload(report.id, [
-      { buffer: await makeReceiptPdf(), filename: 'digital.pdf' },
-    ]);
-
-    const [receipt] = await listReceipts(report.id);
-
-    // OCR e o degrau mais caro: so desce ate ele quem precisa.
-    expect(receipt.extraction_source).toBe('text');
   });
 });
 
