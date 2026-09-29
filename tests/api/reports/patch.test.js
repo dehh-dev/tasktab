@@ -70,17 +70,6 @@ describe('PATCH /api/reports/:id', () => {
     expect(response.body.data.period_start).toBe('2026-07-01');
   });
 
-  it('atualiza o updated_at pelo trigger', async () => {
-    const created = await insertReport();
-
-    const response = await request('PATCH', `/api/reports/${created.id}`, {
-      title: 'Marcado',
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.updated_at).not.toEqual(created.updated_at);
-  });
-
   it('rejeita corpo sem campos atualizaveis', async () => {
     const created = await insertReport();
 

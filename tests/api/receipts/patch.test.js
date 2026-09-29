@@ -134,17 +134,6 @@ describe('PATCH /api/receipts/:id', () => {
     );
   });
 
-  it('atualiza o updated_at pelo trigger', async () => {
-    const report = await insertReport();
-    const receipt = await insertReceipt(report.id);
-
-    const response = await request('PATCH', `/api/receipts/${receipt.id}`, {
-      category: 'outros',
-    });
-
-    expect(response.body.data.updated_at).not.toEqual(receipt.updated_at);
-  });
-
   it('retorna 404 para id inexistente', async () => {
     const response = await request('PATCH', '/api/receipts/999999', {
       category: 'outros',

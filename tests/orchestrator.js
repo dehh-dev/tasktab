@@ -375,14 +375,41 @@ async function insertMerchant(overrides = {}) {
  * para provar o que e garantia do banco: repare que `updated_at` nao aparece
  * no SQL abaixo.
  */
-async function updateTaskTitleDirectly(id, title) {
+/**
+ * Escrita crua numa coluna, direto no banco — sem API, sem model e sem tocar
+ * em `updated_at`. E o que prova que essa garantia e do banco (trigger), e nao
+ * de quem escreve.
+ *
+ * A comparacao sai do proprio Postgres, em microssegundos: o `Date` do
+ * JavaScript so vai ate milissegundo, e duas escritas seguidas cabem no mesmo.
+ * Tabela e coluna vem da lista fixa do teste; o valor vai por placeholder.
+ */
+async function updateColumnDirectly(table, id, column, value) {
+  if (!/^[a-z_]+$/.test(table) || !/^[a-z_]+$/.test(column)) {
+    throw new Error(`identificador invalido: ${table}.${column}`);
+  }
+
   const { rows } = await db.query(
-    `UPDATE tasks SET title = $1 WHERE id = $2
-     RETURNING id, title, updated_at`,
-    [title, id],
+    `WITH before AS (SELECT updated_at FROM ${table} WHERE id = $2)
+     UPDATE ${table} SET ${column} = $1 WHERE id = $2
+     RETURNING (SELECT updated_at FROM before)::text AS before,
+               updated_at::text AS after,
+               updated_at > (SELECT updated_at FROM before) AS moved`,
+    [value, id],
   );
 
   return rows[0];
+}
+
+/** Sessoes de uma pessoa, direto do banco. */
+async function findSessions(userId) {
+  const { rows } = await db.query(
+    `SELECT id, user_id, expires_at, created_at, updated_at
+     FROM sessions WHERE user_id = $1 ORDER BY id`,
+    [userId],
+  );
+
+  return rows;
 }
 
 /**
@@ -519,7 +546,8 @@ module.exports = {
   insertReport,
   insertReceipt,
   insertMerchant,
-  updateTaskTitleDirectly,
+  updateColumnDirectly,
+  findSessions,
   findReceipts,
   uploadedFileExists,
   waitForProcessing,
