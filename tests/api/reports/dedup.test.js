@@ -6,6 +6,7 @@ const {
   insertReceipt,
   requestUpload,
   waitForProcessing,
+  findReceipts,
 } = require('../../orchestrator');
 const { makeQrReceiptPdf } = require('../../fixtures/pdf');
 
@@ -17,6 +18,30 @@ async function listReceipts(reportId) {
   await waitForProcessing(reportId);
   const response = await request('GET', `/api/reports/${reportId}/receipts`);
   return response.body;
+}
+
+/**
+ * O primeiro retrato do banco em que nada mais esta em processamento, lido
+ * sem intervalo e conferido na mesma consulta. E o que a tela ve quando para
+ * de consultar: uma pagina que parecesse pronta antes de a duplicata ser
+ * decidida apareceria aqui. O `waitForProcessing`, que dorme 50 ms entre as
+ * leituras, so pegava essa janela de vez em quando.
+ */
+async function firstSettledSnapshot(reportId, { timeoutMs = 15000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const rows = await findReceipts(reportId);
+    const settled = rows.every(
+      (row) => row.status !== 'pending' && row.status !== 'processing',
+    );
+
+    if (settled) {
+      return rows;
+    }
+  }
+
+  throw new Error(`A extracao do relatorio ${reportId} nao terminou.`);
 }
 
 describe('duplicata exata', () => {
@@ -41,12 +66,20 @@ describe('duplicata exata', () => {
       },
     ]);
 
-    const { data } = await listReceipts(report.id);
-    const duplicata = data.find((receipt) => receipt.status === 'duplicate');
+    const rows = await firstSettledSnapshot(report.id);
+    const duplicata = rows.find((receipt) => receipt.status === 'duplicate');
+    const original = rows.find((receipt) => receipt.status !== 'duplicate');
 
-    expect(data).toHaveLength(2);
-    expect(duplicata).toBeDefined();
-    expect(duplicata.duplicate_of_id).toBeDefined();
+    // A duplicata ja existe no primeiro instante em que a pagina parece
+    // pronta. Antes de a decisao vir junto com o status, esta linha falhava
+    // sempre que lida sem intervalo.
+    expect(rows.map((receipt) => receipt.status).sort()).toEqual([
+      'duplicate',
+      'needs_review',
+    ]);
+    // Apontar para o original, e nao so ter o campo preenchido: `null` passaria
+    // num `toBeDefined`.
+    expect(duplicata.duplicate_of_id).toBe(original.id);
   });
 
   it('a duplicata continua listada, mas fora do somatorio', async () => {
@@ -154,13 +187,13 @@ describe('duplicata provavel', () => {
     // tipos diferentes, sem chave nos dois.
     // `needs_review` e o estado de quem ja passou pela extracao: inserir como
     // `pending` deixaria o teste esperando uma fila que nunca vai rodar.
-    await insertReceipt(report.id, {
+    const first = await insertReceipt(report.id, {
       page_number: 1,
       issued_at: '2026-06-20',
       amount_cents: 598,
       status: 'needs_review',
     });
-    await insertReceipt(report.id, {
+    const second = await insertReceipt(report.id, {
       page_number: 2,
       issued_at: '2026-06-20',
       amount_cents: 598,
@@ -178,7 +211,10 @@ describe('duplicata provavel', () => {
 
     expect(suspeitas).toHaveLength(1);
     expect(suspeitas[0].severity).toBe('aviso');
-    expect(suspeitas[0].related_id).toBeDefined();
+    // O alerta liga os dois comprovantes, e nao so traz o campo preenchido.
+    expect([suspeitas[0].receipt_id, suspeitas[0].related_id].sort()).toEqual(
+      [first.id, second.id].sort(),
+    );
 
     // Nada foi marcado nem removido: quem decide e a pessoa.
     const lista = await listReceipts(report.id);

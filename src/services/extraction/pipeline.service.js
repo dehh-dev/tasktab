@@ -144,11 +144,30 @@ async function processPage(receipt, page, { buffer, log }) {
     fields.city?.value ?? null,
   );
 
+  // So o que e provadamente o mesmo documento colapsa sozinho; suspeita vira
+  // alerta na revisao, nunca exclusao silenciosa. A checagem vem antes da
+  // gravacao, e nao depois dela: gravar `needs_review` primeiro deixava a
+  // pagina parecendo pronta por alguns milissegundos, e quem lesse nesse
+  // intervalo — a tela, que para de consultar quando nada esta em
+  // processamento — via como pendente o que ia virar duplicata. Confirmada
+  // ali, ela entraria na soma: o erro que a ferramenta existe para evitar.
+  const original = key
+    ? await dedup.findExactDuplicate({
+        id: receipt.id,
+        report_id: receipt.report_id,
+        access_key: key.value,
+      })
+    : null;
+
   await Receipt.applyExtraction(receipt.id, {
     raw_text: text,
     // Nada e confirmado sozinho, e o que veio de OCR menos ainda. O ganho da
-    // extracao e o humano deixar de digitar e passar a conferir.
-    status: 'needs_review',
+    // extracao e o humano deixar de digitar e passar a conferir. A duplicata
+    // continua listada e vai no PDF consolidado — ela existe, so nao soma.
+    status: original ? 'duplicate' : 'needs_review',
+    // Nulo tambem quando reprocessada deixa de ser duplicata, para nao apontar
+    // para um original que ja nao vale.
+    duplicate_of_id: original?.id ?? null,
     // O QR vale mais que o texto, que vale mais que o OCR.
     extraction_source: key?.source === 'qr' ? 'qr' : (source ?? 'text'),
     issued_at: fields.issued_at?.value ?? null,
@@ -166,15 +185,9 @@ async function processPage(receipt, page, { buffer, log }) {
     ),
   });
 
-  // So o que e provadamente o mesmo documento colapsa sozinho. Suspeita vira
-  // alerta na revisao, nunca exclusao silenciosa.
-  const original = await dedup.collapseExact(
-    await Receipt.findById(receipt.id),
-  );
-
   if (original) {
     log?.info(
-      { receipt_id: receipt.id, duplicate_of_id: original },
+      { receipt_id: receipt.id, duplicate_of_id: original.id },
       'comprovante marcado como duplicata pela chave de acesso',
     );
   }

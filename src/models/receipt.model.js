@@ -171,6 +171,7 @@ const EXTRACTION_COLUMNS = [
   'access_key',
   'confidence',
   'merchant_id',
+  'duplicate_of_id',
 ];
 
 async function applyExtraction(id, data) {

@@ -511,7 +511,8 @@ async function requestBinary(method, pathname, { token, headers } = {}) {
 /** Le os receipts de um relatorio direto do banco, na ordem de pagina. */
 async function findReceipts(reportId) {
   const { rows } = await db.query(
-    `SELECT id, report_id, file_path, file_hash, page_number, status, raw_text
+    `SELECT id, report_id, file_path, file_hash, page_number, status, raw_text,
+            duplicate_of_id
      FROM receipts WHERE report_id = $1
      ORDER BY file_hash, page_number`,
     [reportId],
