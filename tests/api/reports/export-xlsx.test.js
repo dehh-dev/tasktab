@@ -367,13 +367,4 @@ describe('GET /api/reports/:id/export.xlsx', () => {
       summary.getCell(`B${findRow(summary, 'Aguardando revisao')}`).value,
     ).toBe(1);
   });
-
-  it('retorna 404 para relatorio inexistente', async () => {
-    const response = await requestBinary(
-      'GET',
-      '/api/reports/999999/export.xlsx',
-    );
-
-    expect(response.status).toBe(404);
-  });
 });

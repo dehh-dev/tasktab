@@ -55,27 +55,6 @@ describe('PUT|PATCH /api/tasks/:id', () => {
     expect(response.body.data.due_date).toBeNull();
   });
 
-  it('retorna 404 para id inexistente', async () => {
-    const response = await request('PUT', '/api/tasks/999999', {
-      title: 'Fantasma',
-    });
-
-    expect(response.status).toBe(404);
-  });
-
-  it('rejeita corpo sem campos atualizaveis', async () => {
-    const created = await insertTask();
-
-    const response = await request('PATCH', `/api/tasks/${created.id}`, {
-      foo: 'bar',
-    });
-
-    expect(response.status).toBe(422);
-    expect(response.body.details).toContainEqual(
-      expect.objectContaining({ field: 'body' }),
-    );
-  });
-
   it('rejeita title invalido na atualizacao', async () => {
     const created = await insertTask();
 

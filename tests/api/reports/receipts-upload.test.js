@@ -5,6 +5,7 @@ const {
   insertReport,
   findReceipts,
   waitForProcessing,
+  leftoverUploads,
 } = require('../../orchestrator');
 const { makePdf, makeCorruptPdf, makeNonPdf } = require('../../fixtures/pdf');
 
@@ -149,13 +150,20 @@ describe('POST /api/reports/:id/receipts', () => {
     expect(status).toEqual(['failed', 'needs_review', 'needs_review']);
   });
 
-  it('retorna 404 para relatorio inexistente', async () => {
+  it('recusa relatorio inexistente e apaga do disco o que o multer ja gravou', async () => {
+    // O 404 de toda rota com id mora em `contract.test.js`. Este fica porque
+    // e o unico que manda arquivo de verdade: o multer grava antes de o
+    // controller saber que o relatorio nao existe, e o que sobrasse seria um
+    // PDF com CNPJ de terceiros que ninguem mais alcanca pela API.
+    const before = leftoverUploads();
+
     const response = await requestUpload('/api/reports/999999/receipts', [
       { buffer: await makePdf({ pages: 1 }), filename: 'cupom.pdf' },
     ]);
 
     expect(response.status).toBe(404);
     expect(response.body.name).toBe('NotFoundError');
+    expect(leftoverUploads()).toEqual(before);
   });
 
   it('retorna 422 quando nenhum arquivo e enviado', async () => {

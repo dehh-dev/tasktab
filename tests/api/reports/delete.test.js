@@ -12,10 +12,4 @@ describe('DELETE /api/reports/:id', () => {
     const lookup = await request('GET', `/api/reports/${created.id}`);
     expect(lookup.status).toBe(404);
   });
-
-  it('retorna 404 ao deletar id inexistente', async () => {
-    const response = await request('DELETE', '/api/reports/999999');
-
-    expect(response.status).toBe(404);
-  });
 });

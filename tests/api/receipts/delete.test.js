@@ -48,12 +48,6 @@ describe('DELETE /api/receipts/:id', () => {
     expect(body.meta.total_cents).toBe(1000);
   });
 
-  it('retorna 404 ao deletar id inexistente', async () => {
-    const response = await request('DELETE', '/api/receipts/999999');
-
-    expect(response.status).toBe(404);
-  });
-
   it('apagar o relatorio leva os comprovantes junto', async () => {
     const report = await insertReport();
     const receipt = await insertReceipt(report.id);

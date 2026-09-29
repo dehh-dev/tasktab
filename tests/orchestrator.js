@@ -528,6 +528,17 @@ function uploadedFileExists(fileHash) {
   return fs.existsSync(path.join(env.upload.dir, `${fileHash}.pdf`));
 }
 
+/**
+ * Temporarios do multer que ficaram no disco. O upload grava antes de saber se
+ * o relatorio existe (ou e da pessoa); o que sobrar aqui e um PDF com CNPJ de
+ * terceiros que ninguem mais alcanca pela API.
+ */
+function leftoverUploads() {
+  return fs
+    .readdirSync(env.upload.dir)
+    .filter((name) => name.startsWith('tmp-'));
+}
+
 module.exports = {
   apiUrl,
   DEFAULT_USER,
@@ -551,6 +562,7 @@ module.exports = {
   findSessions,
   findReceipts,
   uploadedFileExists,
+  leftoverUploads,
   waitForProcessing,
   waitForQueue,
   request,

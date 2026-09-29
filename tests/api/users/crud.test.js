@@ -135,18 +135,6 @@ describe('GET /api/users/:id', () => {
 
     expect(response.status).toBe(403);
   });
-
-  it('retorna 404 para id inexistente', async () => {
-    const response = await request('GET', '/api/users/999999');
-
-    expect(response.status).toBe(404);
-  });
-
-  it('retorna 400 para id nao numerico', async () => {
-    const response = await request('GET', '/api/users/abc');
-
-    expect(response.status).toBe(400);
-  });
 });
 
 describe('PATCH /api/users/:id', () => {

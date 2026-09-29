@@ -158,13 +158,4 @@ describe('GET /api/reports/:id/export/anexo-i.xlsx', () => {
 
     expect(response.status).toBe(422);
   });
-
-  it('retorna 404 para relatorio inexistente', async () => {
-    const response = await requestBinary(
-      'GET',
-      '/api/reports/999999/export/anexo-i.xlsx',
-    );
-
-    expect(response.status).toBe(404);
-  });
 });

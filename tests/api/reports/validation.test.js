@@ -41,12 +41,6 @@ describe('GET /api/reports/:id/validation', () => {
     expect(body.meta).toEqual({ total: 0, erros: 0, avisos: 0 });
   });
 
-  it('retorna 404 para relatorio inexistente', async () => {
-    const response = await request('GET', '/api/reports/999999/validation');
-
-    expect(response.status).toBe(404);
-  });
-
   it('separa erro de aviso na contagem', async () => {
     const report = await insertReport();
     await insertReceipt(report.id, { status: 'needs_review' });

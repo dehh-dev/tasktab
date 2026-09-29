@@ -139,10 +139,4 @@ describe('processamento assincrono', () => {
     const [reprocessado] = await listReceipts(report.id);
     expect(reprocessado.amount_cents).toBe(4860);
   });
-
-  it('retorna 404 ao reprocessar id inexistente', async () => {
-    const response = await request('POST', '/api/receipts/999999/reprocess');
-
-    expect(response.status).toBe(404);
-  });
 });

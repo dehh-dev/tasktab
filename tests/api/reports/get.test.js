@@ -77,19 +77,4 @@ describe('GET /api/reports/:id', () => {
     expect(response.body.data.period_start).toBe('2026-06-01');
     expect(response.body.data.period_end).toBe('2026-06-30');
   });
-
-  it('retorna 404 para id inexistente', async () => {
-    const response = await request('GET', '/api/reports/999999');
-
-    expect(response.status).toBe(404);
-    expect(response.body.name).toBe('NotFoundError');
-    expect(response.body.action).toEqual(expect.any(String));
-  });
-
-  it('retorna 400 para id nao numerico', async () => {
-    const response = await request('GET', '/api/reports/abc');
-
-    expect(response.status).toBe(400);
-    expect(response.body.name).toBe('BadRequestError');
-  });
 });

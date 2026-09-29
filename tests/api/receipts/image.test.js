@@ -57,10 +57,4 @@ describe('GET /api/receipts/:id/image', () => {
 
     expect(response.status).toBe(304);
   });
-
-  it('retorna 404 para id inexistente', async () => {
-    const response = await requestBinary('GET', '/api/receipts/999999/image');
-
-    expect(response.status).toBe(404);
-  });
 });
