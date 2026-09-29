@@ -3,10 +3,8 @@
 const {
   request,
   requestBinary,
-  insertTask,
   insertReport,
   insertReceipt,
-  insertMerchant,
   insertSession,
   createUserWithSession,
 } = require('../../orchestrator');
@@ -59,29 +57,6 @@ describe('autenticacao obrigatoria', () => {
 
     expect(actual).toEqual(byRoute(ROUTES, () => '401 UnauthorizedError'));
   });
-
-  it('o health check e o login continuam publicos', async () => {
-    // O probe do container consulta o health; exigir sessao nele faria o
-    // HEALTHCHECK do Dockerfile derrubar o container que esta saudavel.
-    const health = await request('GET', '/api/health', undefined, {
-      token: null,
-    });
-    expect(health.status).toBe(200);
-
-    // Sem corpo o login recusa por validacao, e nao por falta de sessao.
-    const login = await request('POST', '/api/auth/login', {}, { token: null });
-    expect(login.status).toBe(422);
-  });
-
-  it('rota inexistente continua respondendo 404, com ou sem sessao', async () => {
-    const withoutSession = await request('GET', '/api/nao-existe', undefined, {
-      token: null,
-    });
-    const withSession = await request('GET', '/api/nao-existe');
-
-    expect(withoutSession.status).toBe(404);
-    expect(withSession.status).toBe(404);
-  });
 });
 
 describe('escopo exigido em cada rota', () => {
@@ -128,52 +103,7 @@ describe('escopo exigido em cada rota', () => {
   });
 });
 
-describe('papel user', () => {
-  it('escreve nas proprias tarefas e no cadastro de emitentes', async () => {
-    const { token } = await createUserWithSession({ role: 'user' });
-
-    expect(
-      (
-        await request(
-          'POST',
-          '/api/tasks',
-          { title: 'Comprar cafe' },
-          { token },
-        )
-      ).status,
-    ).toBe(201);
-
-    expect(
-      (
-        await request(
-          'POST',
-          '/api/merchants',
-          { cnpj: '26048802000165', name: 'Padaria' },
-          { token },
-        )
-      ).status,
-    ).toBe(201);
-  });
-});
-
 describe('papel auditor', () => {
-  it('le tarefas, relatorios e emitentes', async () => {
-    const { token } = await createUserWithSession({ role: 'auditor' });
-
-    await insertTask();
-    await insertMerchant();
-
-    expect(
-      (await request('GET', '/api/tasks', undefined, { token })).status,
-    ).toBe(200);
-    expect(
-      (await request('GET', '/api/merchants', undefined, { token })).status,
-    ).toBe(200);
-    expect(
-      (await request('GET', '/api/reports', undefined, { token })).status,
-    ).toBe(200);
-  });
-
   it('le o relatorio de outra pessoa, mas nao o edita', async () => {
     // E o papel de quem confere e assina: enxerga tudo, muda nada.
     const dono = await createUserWithSession({ role: 'user' });

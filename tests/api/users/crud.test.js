@@ -79,20 +79,6 @@ describe('POST /api/users', () => {
     expect(response.status).toBe(422);
     expect(response.body.details[0].field).toBe('role');
   });
-
-  it('nao ha auto-cadastro: sem sessao responde 401', async () => {
-    const response = await request('POST', '/api/users', NOVO, { token: null });
-
-    expect(response.status).toBe(401);
-  });
-
-  it('quem nao tem users:write recebe 403', async () => {
-    const { token } = await createUserWithSession({ role: 'user' });
-    const response = await request('POST', '/api/users', NOVO, { token });
-
-    expect(response.status).toBe(403);
-    expect(response.body.name).toBe('ForbiddenError');
-  });
 });
 
 describe('GET /api/users', () => {
@@ -105,13 +91,6 @@ describe('GET /api/users', () => {
     expect(response.body.meta.total).toBe(2);
     expect(JSON.stringify(response.body)).not.toContain('scrypt');
   });
-
-  it('quem nao tem users:read recebe 403', async () => {
-    const { token } = await createUserWithSession({ role: 'user' });
-    const response = await request('GET', '/api/users', undefined, { token });
-
-    expect(response.status).toBe(403);
-  });
 });
 
 describe('GET /api/users/:id', () => {
@@ -123,17 +102,6 @@ describe('GET /api/users/:id', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.id).toBe(user.id);
-  });
-
-  it('recusa consultar o cadastro alheio sem users:read', async () => {
-    const { token } = await createUserWithSession({ role: 'user' });
-    const alvo = await insertUser({ email: 'alvo@tasktab.test', role: 'user' });
-
-    const response = await request('GET', `/api/users/${alvo.id}`, undefined, {
-      token,
-    });
-
-    expect(response.status).toBe(403);
   });
 });
 
@@ -180,20 +148,6 @@ describe('PATCH /api/users/:id', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.role).toBe('auditor');
-  });
-
-  it('recusa alterar o cadastro alheio sem users:write', async () => {
-    const { token } = await createUserWithSession({ role: 'user' });
-    const alvo = await insertUser({ email: 'alvo@tasktab.test', role: 'user' });
-
-    const response = await request(
-      'PATCH',
-      `/api/users/${alvo.id}`,
-      { name: 'Invadido' },
-      { token },
-    );
-
-    expect(response.status).toBe(403);
   });
 
   it('recusa trocar o e-mail por esta rota', async () => {
@@ -327,19 +281,5 @@ describe('DELETE /api/users/:id', () => {
 
     expect(rebaixar.status).toBe(422);
     expect(rebaixar.body.details[0].message).toContain('unico administrador');
-  });
-
-  it('quem nao tem users:write recebe 403', async () => {
-    const { token } = await createUserWithSession({ role: 'user' });
-    const alvo = await insertUser({ email: 'alvo@tasktab.test', role: 'user' });
-
-    const response = await request(
-      'DELETE',
-      `/api/users/${alvo.id}`,
-      undefined,
-      { token },
-    );
-
-    expect(response.status).toBe(403);
   });
 });

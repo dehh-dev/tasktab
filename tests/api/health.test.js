@@ -3,8 +3,13 @@
 const { request } = require('../orchestrator');
 
 describe('GET /api/health', () => {
-  it('responde 200 quando o banco esta acessivel', async () => {
-    const response = await request('GET', '/api/health');
+  it('responde 200 sem sessao quando o banco esta acessivel', async () => {
+    // Publico de proposito: o probe do container consulta esta rota, e exigir
+    // sessao nela faria o HEALTHCHECK do Dockerfile derrubar o container que
+    // esta saudavel.
+    const response = await request('GET', '/api/health', undefined, {
+      token: null,
+    });
 
     expect(response.status).toBe(200);
     expect(response.body.data.status).toBe('ok');
