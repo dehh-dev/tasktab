@@ -22,7 +22,9 @@ async function entrar(page) {
   await form.getByLabel('Senha').fill(E2E_USER.password);
   await form.getByRole('button', { name: 'Entrar' }).click();
 
+  // Entrou de verdade: a aplicacao aparece, com o nome de quem esta nela.
   await expect(page.getByRole('tab', { name: 'Tarefas' })).toBeVisible();
+  await expect(page.getByText(E2E_USER.name)).toBeVisible();
 }
 
 test.describe('sessao', () => {
@@ -54,12 +56,6 @@ test.describe('sessao', () => {
     await expect(form.getByLabel('E-mail')).toHaveValue(E2E_USER.email);
   });
 
-  test('entra e chega na aplicacao', async ({ page }) => {
-    await entrar(page);
-
-    await expect(page.getByText(E2E_USER.name)).toBeVisible();
-  });
-
   test('quando a sessao cai no meio do uso, volta ao login e diz por que', async ({
     page,
   }) => {
@@ -83,9 +79,10 @@ test.describe('sessao', () => {
 });
 
 test.describe('sair', () => {
-  test('o botao Sair devolve a tela de login', async ({ page }) => {
+  test('Sair devolve o login, e recarregar nao devolve a sessao', async ({
+    page,
+  }) => {
     await entrar(page);
-
     await page.getByRole('button', { name: 'Sair' }).click();
 
     await expect(
@@ -93,17 +90,9 @@ test.describe('sair', () => {
     ).toBeVisible();
     // Quem saiu por vontade propria nao recebe aviso de sessao perdida.
     await expect(page.getByRole('alert')).toHaveCount(0);
-  });
 
-  test('depois de sair, recarregar nao devolve a sessao', async ({ page }) => {
     // A sessao morre no banco, e nao so no estado da tela: e o que uma sessao
     // revogavel entrega e um token que so expira nao entregaria.
-    await entrar(page);
-    await page.getByRole('button', { name: 'Sair' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Entrar no tasktab' }),
-    ).toBeVisible();
-
     await page.reload();
 
     await expect(
