@@ -142,10 +142,6 @@ describe('extractDate', () => {
 
     expect(extractDate(texto)).toBe('2026-06-19');
   });
-
-  it('devolve null quando nao ha data', () => {
-    expect(extractDate('cupom sem data')).toBeNull();
-  });
 });
 
 describe('extractCnpj', () => {

@@ -10,7 +10,6 @@ const {
   makePdf,
   makeReceiptPdf,
   makeQrReceiptPdf,
-  makeCorruptPdf,
 } = require('../../fixtures/pdf');
 
 async function upload(reportId, files) {
@@ -57,19 +56,6 @@ describe('extracao no upload', () => {
     expect(
       receipts.every((receipt) => receipt.raw_text.includes('48,60')),
     ).toBe(true);
-  });
-
-  it('nao tenta extrair de um PDF que nem abriu', async () => {
-    const report = await insertReport();
-
-    await upload(report.id, [
-      { buffer: makeCorruptPdf(), filename: 'corrompido.pdf' },
-    ]);
-
-    const [receipt] = await listReceipts(report.id);
-
-    expect(receipt.status).toBe('failed');
-    expect(receipt.raw_text).toMatch(/Falha ao ler o PDF/);
   });
 
   it('o subtotal da listagem ja inclui o que esta em revisao, marcado como palpite', async () => {

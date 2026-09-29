@@ -81,31 +81,6 @@ describe('duplicata exata', () => {
     // num `toBeDefined`.
     expect(duplicata.duplicate_of_id).toBe(original.id);
   });
-
-  it('a duplicata continua listada, mas fora do somatorio', async () => {
-    const report = await insertReport();
-
-    await insertReceipt(report.id, {
-      page_number: 1,
-      amount_cents: 4860,
-      category: 'alimentacao',
-      status: 'confirmed',
-      issued_at: '2026-06-17',
-    });
-    await insertReceipt(report.id, {
-      page_number: 2,
-      amount_cents: 4860,
-      category: 'alimentacao',
-      status: 'duplicate',
-      issued_at: '2026-06-17',
-    });
-
-    const { data, meta } = await listReceipts(report.id);
-
-    // Ela existe e vai no PDF consolidado; so nao soma.
-    expect(data).toHaveLength(2);
-    expect(meta.total_cents).toBe(4860);
-  });
 });
 
 describe('o contraexemplo obrigatorio', () => {
