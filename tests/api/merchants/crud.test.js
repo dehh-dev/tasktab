@@ -168,12 +168,4 @@ describe('PATCH /api/merchants/:id', () => {
       expect.objectContaining({ field: 'body' }),
     );
   });
-
-  it('retorna 404 para id inexistente', async () => {
-    const response = await request('PATCH', '/api/merchants/999999', {
-      name: 'Fantasma',
-    });
-
-    expect(response.status).toBe(404);
-  });
 });

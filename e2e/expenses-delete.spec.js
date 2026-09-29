@@ -1,36 +1,22 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport } = require('./helpers');
+const { clearReports, createReport, addReceipts } = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 
 test.beforeEach(async ({ request }) => {
   await clearReports(request);
 });
 
-async function openReportWithReceipts(page, report, buffers) {
+async function openReportWithReceipts(page, request, report, buffers) {
+  // O upload e preparo: vai pela API, que so devolve depois de a extracao
+  // terminar — a lista ja abre no estado final, sem mudar sozinha na tela.
+  await addReceipts(request, report.id, buffers);
+
   await page.goto('/');
   await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
   await page.getByRole('button', { name: report.title }).click();
-
-  await page.setInputFiles(
-    '.dropzone input[type=file]',
-    buffers.map((buffer, index) => ({
-      name: `cupom-${index}.pdf`,
-      mimeType: 'application/pdf',
-      buffer,
-    })),
-  );
-
-  // O upload responde 202 e a extracao roda em fila: esperar as linhas sairem
-  // de "processando" evita agir sobre uma lista que ainda vai mudar sozinha.
-  await page.waitForFunction(
-    (expected) =>
-      (document.body.textContent.match(/Aguardando revisao/g) || []).length >=
-      expected,
-    buffers.length,
-    { timeout: 15000 },
-  );
+  await expect(page.locator('.list-item')).toHaveCount(buffers.length);
 }
 
 /** A linha da lista que contem um texto — "Deletar" existe em todas elas. */
@@ -54,7 +40,7 @@ test('deleta um comprovante pela lista e o total acompanha', async ({
     extra: ['segundo'],
   });
 
-  await openReportWithReceipts(page, report, [pdfA, pdfB]);
+  await openReportWithReceipts(page, request, report, [pdfA, pdfB]);
   await expect(page.locator('.list-item')).toHaveCount(2);
 
   await row(page, '20,00').getByRole('button', { name: 'Deletar' }).click();
@@ -79,7 +65,7 @@ test('cancelar mantem o comprovante', async ({ page, request }) => {
   const report = await createReport(request, { title: 'Cancelar descarte' });
   const pdf = await makeReceiptPdf({ total: '37,60', date: '19/06/2026' });
 
-  await openReportWithReceipts(page, report, [pdf]);
+  await openReportWithReceipts(page, request, report, [pdf]);
 
   await page
     .locator('.list-item')
@@ -110,7 +96,7 @@ test('deleta da tela de revisao e segue para o proximo pendente', async ({
     extra: ['segundo'],
   });
 
-  await openReportWithReceipts(page, report, [pdfA, pdfB]);
+  await openReportWithReceipts(page, request, report, [pdfA, pdfB]);
 
   await page.locator('.list-item .link-button').first().click();
   await page.waitForSelector('.review__fields');
@@ -138,7 +124,7 @@ test('deletar o ultimo pendente fecha a revisao', async ({ page, request }) => {
   const report = await createReport(request, { title: 'Ultimo pendente' });
   const pdf = await makeReceiptPdf({ total: '37,60', date: '19/06/2026' });
 
-  await openReportWithReceipts(page, report, [pdf]);
+  await openReportWithReceipts(page, request, report, [pdf]);
 
   await page.locator('.list-item .link-button').first().click();
   await page.waitForSelector('.review__fields');
@@ -164,7 +150,7 @@ test('Escape no dialogo cancela sem fechar a revisao junto', async ({
   const report = await createReport(request, { title: 'Escape na revisao' });
   const pdf = await makeReceiptPdf({ total: '37,60', date: '19/06/2026' });
 
-  await openReportWithReceipts(page, report, [pdf]);
+  await openReportWithReceipts(page, request, report, [pdf]);
 
   await page.locator('.list-item .link-button').first().click();
   await page.waitForSelector('.review__fields');

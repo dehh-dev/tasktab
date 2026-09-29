@@ -20,6 +20,7 @@ Node **24.18.0** (`.nvmrc`) — rode `nvm use` antes de qualquer coisa.
 | Rodar so a API / so a interface          | `npm run dev:api` / `npm run dev:web`     |
 | Rodar testes                             | `npm test`                                |
 | Iterar nos testes (servicos ja no ar)    | `npm run test:watch`                      |
+| So os testes puros, sem servico nenhum   | `npm run test:pure`                       |
 | Lint / corrigir                          | `npm run lint` / `npm run lint:fix`       |
 | Formatar / conferir                      | `npm run format` / `npm run format:check` |
 | Criar migration                          | `npm run migrations:create -- nome`       |
@@ -287,35 +288,56 @@ nao se importa `src/app` dentro de teste.
 Os arquivos espelham as rotas: `tests/api/tasks/get.test.js`,
 `post.test.js`, `put.test.js`, `delete.test.js`, mais `tests/api/health.test.js`
 e `tests/api/not-found.test.js`. Os scripts de linha de comando tem os seus em
-`tests/scripts/`, rodados de verdade por `runScript`.
+`tests/scripts/`, rodados de verdade por `runScript`, e as garantias do banco
+(triggers) ficam em `tests/db/`.
+
+O que vale para **toda** rota nao se repete arquivo a arquivo: mora em duas
+matrizes que percorrem a mesma lista, **`tests/api/routes.js`**.
+
+| Matriz                          | O que confere em toda rota da lista                                                    |
+| ------------------------------- | -------------------------------------------------------------------------------------- |
+| `tests/api/auth/scopes.test.js` | 401 sem sessao; 403 exatamente para os papeis sem o escopo                             |
+| `tests/api/contract.test.js`    | 400 com id invalido, 404 com id inexistente, 422 com corpo so de colunas de identidade |
+
+Cada checagem compara um mapa `{ rota: resultado }`, e a falha mostra de uma vez
+todas as rotas que sairam do esperado. **Rota nova entra em `routes.js`**, ou
+nenhuma das duas a confere — e e justamente a rota esquecida que elas existem
+para pegar. Nao volte a escrever "404 para id inexistente" em cada arquivo.
 
 Tudo que e infraestrutura de teste vive em **`tests/orchestrator.js`**:
 
-| Funcao                              | Para que                                                |
-| ----------------------------------- | ------------------------------------------------------- |
-| `waitForAllServices()`              | espera o `/api/health` responder 200                    |
-| `runPendingMigrations()`            | aplica as migrations no banco de teste                  |
-| `runScript(file, args)`             | roda um script de `scripts/` contra o banco de teste    |
-| `clearDatabase()`                   | trunca todas as tabelas reiniciando a identidade        |
-| `insertTask(overrides)`             | arranjo direto no banco, sem passar pela API            |
-| `insertUser` / `insertSession`      | usuario e sessao direto no banco                        |
-| `createUserWithSession`             | usuario de outro papel, devolve `{ user, token }`       |
-| `seedDefaultUser()`                 | recria o admin padrao e a sessao dele                   |
-| `updateTaskTitleDirectly`           | escrita crua, para provar garantia do banco             |
-| `request(m, path, body, { token })` | HTTP; `body` string vai cru, `token: null` = sem sessao |
+| Funcao                              | Para que                                                   |
+| ----------------------------------- | ---------------------------------------------------------- |
+| `waitForAllServices()`              | espera o `/api/health` responder 200                       |
+| `runPendingMigrations()`            | aplica as migrations no banco de teste                     |
+| `runScript(file, args)`             | roda um script de `scripts/` contra o banco de teste       |
+| `clearDatabase()`                   | trunca todas as tabelas reiniciando a identidade           |
+| `insertTask(overrides)`             | arranjo direto no banco, sem passar pela API               |
+| `insertUser` / `insertSession`      | usuario e sessao direto no banco                           |
+| `createUserWithSession`             | usuario de outro papel, devolve `{ user, token }`          |
+| `seedDefaultUser()`                 | recria o admin padrao e a sessao dele                      |
+| `updateColumnDirectly(t, id, c, v)` | escrita crua; diz se o `updated_at` andou, medido no banco |
+| `leftoverUploads()`                 | temporarios do multer que sobraram no disco                |
+| `request(m, path, body, { token })` | HTTP; `body` string vai cru, `token: null` = sem sessao    |
 
 **Um arquivo de teste novo nao precisa de preambulo nenhum** — so `require` do
 orchestrator e os `describe`. O ciclo esta dividido em dois lugares:
 
-| Onde                    | Quando roda          | O que faz                                                |
-| ----------------------- | -------------------- | -------------------------------------------------------- |
-| `tests/global-setup.js` | uma vez por execucao | espera a API, aplica migrations                          |
-| `tests/setup.js`        | por arquivo de teste | trunca as tabelas, recria o usuario padrao, fecha o pool |
+| Onde                    | Quando roda             | O que faz                                                 |
+| ----------------------- | ----------------------- | --------------------------------------------------------- |
+| `tests/global-setup.js` | uma vez por execucao    | espera a API, aplica migrations                           |
+| `tests/setup.js`        | antes de **cada** teste | espera a fila, trunca as tabelas, recria o usuario padrao |
 
 O que e caro fica no `global-setup`: `runPendingMigrations()` custa um processo
 `npx`, e chama-lo por arquivo multiplicaria o custo a cada arquivo novo.
 Deduplicar com marca em `process.env` **nao** funciona — o Jest entrega a cada
 arquivo a sua propria copia de `process.env`.
+
+O Jest tem dois projetos (`jest.config.js`): `integracao`, com esse ciclo, e
+`puros`, as funcoes puras de `tests/services/`, sem ciclo nenhum. Com ele, cada
+caso puro pagava ~40 ms de banco e exigia Docker e API no ar para testar um
+parser. `npm run test:pure` roda so os puros, em menos de um segundo. Pasta
+nova de teste cai na integracao por padrao, que e o lado seguro.
 
 - **Toda rota exige sessao, e `request()` ja chega autenticada** como o admin
   padrao — nenhum arquivo de teste precisa de preambulo. O hash da senha e
@@ -325,12 +347,15 @@ arquivo a sua propria copia de `process.env`.
   outro papel, `createUserWithSession({ role })`.
 - O usuario padrao e **admin** para que o arranjo antigo continue valendo:
   `insertReport()` cria relatorio sem dono, e so `reports:read:any` o enxerga.
-- `tests/api/auth/scopes.test.js` e a **matriz de autorizacao**, endpoint a
-  endpoint. Vale mais que a soma dos testes de cada rota: uma rota nova sem
-  `requireScope` passa em todos os testes dela mesma, e so ali, ao chegar com
-  um papel que nao deveria alcanca-la, e que a falta aparece. **Toda rota nova
-  entra nessa lista.** Cada entrada diz quais papeis passam do portao da rota,
-  e a falha compara o mapa inteiro, mostrando qual papel escapou.
+- A matriz de autorizacao vale mais que a soma dos testes de cada rota: uma
+  rota nova sem `requireScope` passa em todos os testes dela mesma, e so ali,
+  ao chegar com um papel que nao deveria alcanca-la, e que a falta aparece.
+- **Teste tem de conseguir falhar.** Quando a regra importa, quebre o codigo
+  de proposito e veja o teste cair antes de confiar nele. Foi assim que tres
+  testes de `updated_at` apareceram vazios: passavam sem trigger nenhum.
+- Compare instantes **no Postgres**, nao no JavaScript. O `Date` so vai ate
+  milissegundo, e a string ISO de uma resposta nunca e igual ao `Date` que o
+  `pg` devolve — `not.toEqual` entre os dois passa sempre.
 - Rodam com `--runInBand`: compartilham a mesma tabela e nao podem paralelizar.
 - Use `insertTask()` para preparar estado — arranjo fora da rota evita que um
   teste de leitura quebre por causa de um bug na escrita.
@@ -344,6 +369,10 @@ arquivo a sua propria copia de `process.env`.
 
 - O arranjo passa pela **API publica** (`e2e/helpers.js`), nunca pelo banco: um
   pool do `pg` no worker do Playwright prende o processo no fim da suite.
+- Comprovante como preparo vai por `addReceipts`, que so devolve com a
+  extracao pronta. Subir pela tela fica para as specs cujo assunto e o upload:
+  nas outras, esperar o poll de 1,5 s da `ReportDetail` custava quase dois
+  segundos por spec, e o E2E caiu de 60 s para 35 s quando isso mudou.
 - Locators acessiveis (`getByRole`, `getByLabel`) — de quebra, cobrem a11y.
   Escope ao formulario (`page.locator('form.form')`): "Status" tambem casa com
   o `aria-label` do grupo de filtros, e "Cancelar" existe no form e no dialogo.
@@ -550,8 +579,13 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   seguinte. Aconteceu.
 - Os testes puros de extracao vivem em `tests/services/`. E excecao estreita a
   regra de so integracao, e vale so para funcao pura: uma tabela de 48 casos de
-  parsing nao cabe em 48 PDFs. Leitura de PDF continua coberta por integracao —
-  o `unpdf` usa import dinamico, que a VM do Jest recusa sem flag.
+  parsing nao cabe em 48 PDFs. Rodam num projeto do Jest sem banco
+  (`npm run test:pure`). Leitura de PDF continua coberta por integracao — o
+  `unpdf` usa import dinamico, que a VM do Jest recusa sem flag.
+- A cascata inteira (texto, OCR, nada confirmado sozinho, confianca do OCR
+  menor) e conferida num upload so, com um cupom digital e um escaneado. O
+  Tesseract e a parte mais cara da suite: nao suba outro escaneado para provar
+  um pedaco que esse teste ja prova.
 
 ## Conferencia e duplicatas
 
@@ -559,6 +593,12 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   decide e a pessoa que assina.
 - So **mesma chave de acesso** colapsa como duplicata automatica. Mesma data
   com mesmo valor e **suspeita**, e vira alerta.
+- A duplicata exata e decidida **antes** de a pagina sair de `processing`:
+  status e `duplicate_of_id` numa escrita so. Gravar `needs_review` primeiro e
+  marcar depois deixava a pagina parecendo pronta por alguns milissegundos; a
+  tela para de consultar quando nada esta em processamento, e uma confirmacao
+  naquele instante somaria a duplicata. O teste de duplicata exata le o banco
+  sem intervalo justamente para pegar essa janela.
 - Regra agressiva demais recria o erro que a ferramenta existe para evitar: ha
   teste do contraexemplo (dois almocos iguais em dias diferentes **nao** sao
   duplicata). **Nao afrouxe esse teste.**
@@ -636,9 +676,10 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 
 O que precisa valer para **toda** escrita mora no banco, nao no model:
 
-- `updated_at` e mantido pelo trigger `tasks_set_updated_at`. Nao volte a
-  setar a coluna no `task.model.js` — o ponto e cobrir tambem seed, psql e
-  migration.
+- `updated_at` e mantido pelo trigger `set_updated_at` nas seis tabelas que o
+  tem (tasks, reports, receipts, merchants, users, sessions), com teste em
+  `tests/db/updated-at.test.js`. Nao volte a setar a coluna num model — o ponto
+  e cobrir tambem seed, psql e migration.
 - `tasks_title_not_blank` complementa a validacao da aplicacao.
 
 ## Datas
@@ -691,7 +732,8 @@ React 19 + Vite, sem router e sem biblioteca de estado — tela unica, estado no
 
 ## Nunca
 
-- Nao rode `jest` direto — use `npm test` ou `npm run test:watch`.
+- Nao rode `jest` direto — use `npm test`, `npm run test:watch` ou, so para os
+  testes puros, `npm run test:pure`.
 - Nao aponte `migrations:up` para nada alem de `env.development`.
 - Nao concatene valor em SQL. Placeholder sempre.
 - Nao faca commit sem `npm test` e `npm run lint` passando.

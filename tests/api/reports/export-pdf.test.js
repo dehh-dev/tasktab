@@ -235,13 +235,4 @@ describe('GET /api/reports/:id/export.pdf', () => {
     const doc = await PDFDocument.load(response.buffer);
     expect(doc.getPageCount()).toBe(1);
   });
-
-  it('retorna 404 para relatorio inexistente', async () => {
-    const response = await requestBinary(
-      'GET',
-      '/api/reports/999999/export.pdf',
-    );
-
-    expect(response.status).toBe(404);
-  });
 });

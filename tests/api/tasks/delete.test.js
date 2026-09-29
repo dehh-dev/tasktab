@@ -12,10 +12,4 @@ describe('DELETE /api/tasks/:id', () => {
     const lookup = await request('GET', `/api/tasks/${created.id}`);
     expect(lookup.status).toBe(404);
   });
-
-  it('retorna 404 ao deletar id inexistente', async () => {
-    const response = await request('DELETE', '/api/tasks/999999');
-
-    expect(response.status).toBe(404);
-  });
 });

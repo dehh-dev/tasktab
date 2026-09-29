@@ -653,6 +653,7 @@ interface.
 ```bash
 npm test              # API: sobe os servicos, roda a suite e para os containers
 npm run test:watch    # API: sem subir/parar servicos, para iterar
+npm run test:pure     # so as funcoes puras de extracao, sem servico nenhum
 npm run test:e2e      # interface: Playwright contra API + Vite
 npm run test:e2e:ui   # interface: modo interativo do Playwright
 ```
@@ -660,11 +661,15 @@ npm run test:e2e:ui   # interface: modo interativo do Playwright
 Roda contra `tasktab_test` com `NODE_ENV=test`. Nao e preciso preparar nada
 antes: o `pretest` sobe os servicos e espera o banco, o proprio `test` sobe a
 API em `:3001` em paralelo ao Jest, e o `tests/orchestrator.js` espera o
-`/api/health`, aplica as migrations e trunca a tabela a cada teste. Ao final o
-`posttest` para os containers.
+`/api/health`, aplica as migrations e trunca as tabelas a cada teste. Ao final
+o `posttest` para os containers.
 
 Os testes falam **HTTP de verdade** com a API, como qualquer outro cliente —
 nao importam `src/app` nem usam supertest.
+
+O que vale para toda rota — sessao, escopo por papel, 400 e 404 por id, corpo
+que tenta escrever coluna de identidade — e conferido por duas matrizes sobre
+a mesma lista, `tests/api/routes.js`. Rota nova entra nela.
 
 ### E2E da interface
 

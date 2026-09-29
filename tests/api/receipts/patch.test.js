@@ -119,37 +119,4 @@ describe('PATCH /api/receipts/:id', () => {
 
     expect(response.status).toBe(422);
   });
-
-  it('rejeita corpo sem campos atualizaveis', async () => {
-    const report = await insertReport();
-    const receipt = await insertReceipt(report.id);
-
-    const response = await request('PATCH', `/api/receipts/${receipt.id}`, {
-      file_hash: 'tentando trocar a identidade da pagina',
-    });
-
-    expect(response.status).toBe(422);
-    expect(response.body.details).toContainEqual(
-      expect.objectContaining({ field: 'body' }),
-    );
-  });
-
-  it('atualiza o updated_at pelo trigger', async () => {
-    const report = await insertReport();
-    const receipt = await insertReceipt(report.id);
-
-    const response = await request('PATCH', `/api/receipts/${receipt.id}`, {
-      category: 'outros',
-    });
-
-    expect(response.body.data.updated_at).not.toEqual(receipt.updated_at);
-  });
-
-  it('retorna 404 para id inexistente', async () => {
-    const response = await request('PATCH', '/api/receipts/999999', {
-      category: 'outros',
-    });
-
-    expect(response.status).toBe(404);
-  });
 });

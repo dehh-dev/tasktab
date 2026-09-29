@@ -375,14 +375,41 @@ async function insertMerchant(overrides = {}) {
  * para provar o que e garantia do banco: repare que `updated_at` nao aparece
  * no SQL abaixo.
  */
-async function updateTaskTitleDirectly(id, title) {
+/**
+ * Escrita crua numa coluna, direto no banco — sem API, sem model e sem tocar
+ * em `updated_at`. E o que prova que essa garantia e do banco (trigger), e nao
+ * de quem escreve.
+ *
+ * A comparacao sai do proprio Postgres, em microssegundos: o `Date` do
+ * JavaScript so vai ate milissegundo, e duas escritas seguidas cabem no mesmo.
+ * Tabela e coluna vem da lista fixa do teste; o valor vai por placeholder.
+ */
+async function updateColumnDirectly(table, id, column, value) {
+  if (!/^[a-z_]+$/.test(table) || !/^[a-z_]+$/.test(column)) {
+    throw new Error(`identificador invalido: ${table}.${column}`);
+  }
+
   const { rows } = await db.query(
-    `UPDATE tasks SET title = $1 WHERE id = $2
-     RETURNING id, title, updated_at`,
-    [title, id],
+    `WITH before AS (SELECT updated_at FROM ${table} WHERE id = $2)
+     UPDATE ${table} SET ${column} = $1 WHERE id = $2
+     RETURNING (SELECT updated_at FROM before)::text AS before,
+               updated_at::text AS after,
+               updated_at > (SELECT updated_at FROM before) AS moved`,
+    [value, id],
   );
 
   return rows[0];
+}
+
+/** Sessoes de uma pessoa, direto do banco. */
+async function findSessions(userId) {
+  const { rows } = await db.query(
+    `SELECT id, user_id, expires_at, created_at, updated_at
+     FROM sessions WHERE user_id = $1 ORDER BY id`,
+    [userId],
+  );
+
+  return rows;
 }
 
 /**
@@ -484,7 +511,8 @@ async function requestBinary(method, pathname, { token, headers } = {}) {
 /** Le os receipts de um relatorio direto do banco, na ordem de pagina. */
 async function findReceipts(reportId) {
   const { rows } = await db.query(
-    `SELECT id, report_id, file_path, file_hash, page_number, status, raw_text
+    `SELECT id, report_id, file_path, file_hash, page_number, status, raw_text,
+            duplicate_of_id
      FROM receipts WHERE report_id = $1
      ORDER BY file_hash, page_number`,
     [reportId],
@@ -498,6 +526,17 @@ async function findReceipts(reportId) {
  */
 function uploadedFileExists(fileHash) {
   return fs.existsSync(path.join(env.upload.dir, `${fileHash}.pdf`));
+}
+
+/**
+ * Temporarios do multer que ficaram no disco. O upload grava antes de saber se
+ * o relatorio existe (ou e da pessoa); o que sobrar aqui e um PDF com CNPJ de
+ * terceiros que ninguem mais alcanca pela API.
+ */
+function leftoverUploads() {
+  return fs
+    .readdirSync(env.upload.dir)
+    .filter((name) => name.startsWith('tmp-'));
 }
 
 module.exports = {
@@ -519,9 +558,11 @@ module.exports = {
   insertReport,
   insertReceipt,
   insertMerchant,
-  updateTaskTitleDirectly,
+  updateColumnDirectly,
+  findSessions,
   findReceipts,
   uploadedFileExists,
+  leftoverUploads,
   waitForProcessing,
   waitForQueue,
   request,

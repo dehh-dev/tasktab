@@ -78,26 +78,4 @@ async function findProbableDuplicates(receipt) {
   return rows;
 }
 
-/**
- * Marca o comprovante como duplicata quando ha certeza documental.
- *
- * Devolve o id do original, ou `null` se nada foi marcado. A linha marcada
- * continua listada e vai no PDF consolidado — ela existe, so nao soma.
- */
-async function collapseExact(receipt) {
-  const original = await findExactDuplicate(receipt);
-
-  if (!original) {
-    return null;
-  }
-
-  await db.query(
-    `UPDATE receipts SET status = 'duplicate', duplicate_of_id = $1
-     WHERE id = $2`,
-    [original.id, receipt.id],
-  );
-
-  return original.id;
-}
-
-module.exports = { findExactDuplicate, findProbableDuplicates, collapseExact };
+module.exports = { findExactDuplicate, findProbableDuplicates };

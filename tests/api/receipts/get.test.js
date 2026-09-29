@@ -147,12 +147,6 @@ describe('GET /api/reports/:id/receipts', () => {
       expect.objectContaining({ field: 'category' }),
     );
   });
-
-  it('retorna 404 para relatorio inexistente', async () => {
-    const response = await request('GET', '/api/reports/999999/receipts');
-
-    expect(response.status).toBe(404);
-  });
 });
 
 describe('GET /api/receipts/:id', () => {
@@ -168,12 +162,5 @@ describe('GET /api/receipts/:id', () => {
       report_id: report.id,
       amount_cents: 5980,
     });
-  });
-
-  it('retorna 404 para id inexistente', async () => {
-    const response = await request('GET', '/api/receipts/999999');
-
-    expect(response.status).toBe(404);
-    expect(response.body.name).toBe('NotFoundError');
   });
 });

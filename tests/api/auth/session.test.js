@@ -18,15 +18,6 @@ describe('GET /api/auth/me', () => {
     });
   });
 
-  it('responde 401 sem cookie', async () => {
-    const response = await request('GET', '/api/auth/me', undefined, {
-      token: null,
-    });
-
-    expect(response.status).toBe(401);
-    expect(response.body.name).toBe('UnauthorizedError');
-  });
-
   it('responde 401 com token inventado', async () => {
     const response = await request('GET', '/api/auth/me', undefined, {
       token: 'token-que-nunca-existiu',
@@ -78,13 +69,5 @@ describe('POST /api/auth/logout', () => {
     // sem esperar o token vencer.
     const depois = await request('GET', '/api/auth/me', undefined, { token });
     expect(depois.status).toBe(401);
-  });
-
-  it('responde 401 quando nao ha sessao para encerrar', async () => {
-    const response = await request('POST', '/api/auth/logout', undefined, {
-      token: null,
-    });
-
-    expect(response.status).toBe(401);
   });
 });

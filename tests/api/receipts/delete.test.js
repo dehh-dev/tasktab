@@ -12,18 +12,7 @@ const {
 const { makePdf } = require('../../fixtures/pdf');
 
 describe('DELETE /api/receipts/:id', () => {
-  it('remove o comprovante e retorna 204', async () => {
-    const report = await insertReport();
-    const receipt = await insertReceipt(report.id);
-
-    const deleted = await request('DELETE', `/api/receipts/${receipt.id}`);
-    expect(deleted.status).toBe(204);
-
-    const lookup = await request('GET', `/api/receipts/${receipt.id}`);
-    expect(lookup.status).toBe(404);
-  });
-
-  it('tira o comprovante confirmado do somatorio do relatorio', async () => {
+  it('remove o comprovante, que sai da lista e do total', async () => {
     const report = await insertReport();
     await insertReceipt(report.id, {
       status: 'confirmed',
@@ -31,7 +20,7 @@ describe('DELETE /api/receipts/:id', () => {
       category: 'alimentacao',
       issued_at: '2026-06-10',
     });
-    const descartado = await insertReceipt(report.id, {
+    const discarded = await insertReceipt(report.id, {
       page_number: 2,
       status: 'confirmed',
       amount_cents: 2500,
@@ -39,19 +28,16 @@ describe('DELETE /api/receipts/:id', () => {
       issued_at: '2026-06-11',
     });
 
-    await request('DELETE', `/api/receipts/${descartado.id}`);
+    const deleted = await request('DELETE', `/api/receipts/${discarded.id}`);
+    expect(deleted.status).toBe(204);
 
-    const { body } = await request('GET', `/api/reports/${report.id}/receipts`);
+    const lookup = await request('GET', `/api/receipts/${discarded.id}`);
+    expect(lookup.status).toBe(404);
 
     // A linha some do total, e nao so da listagem: o resumo da tela le daqui.
+    const { body } = await request('GET', `/api/reports/${report.id}/receipts`);
     expect(body.meta.total).toBe(1);
     expect(body.meta.total_cents).toBe(1000);
-  });
-
-  it('retorna 404 ao deletar id inexistente', async () => {
-    const response = await request('DELETE', '/api/receipts/999999');
-
-    expect(response.status).toBe(404);
   });
 
   it('apagar o relatorio leva os comprovantes junto', async () => {

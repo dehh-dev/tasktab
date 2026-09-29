@@ -100,14 +100,6 @@ describe('POST /api/tasks', () => {
     expect(response.status).toBe(422);
   });
 
-  it('retorna 400 para JSON malformado', async () => {
-    const response = await request('POST', '/api/tasks', '{"title": ');
-
-    expect(response.status).toBe(400);
-    expect(response.body.name).toBe('BadRequestError');
-    expect(response.body.message).toBe('JSON invalido.');
-  });
-
   it('converte erro inesperado em 500 sem vazar detalhe interno', async () => {
     // Um byte NUL passa na validacao — e uma string nao-vazia dentro do limite
     // — mas o Postgres recusa. E a forma de exercitar o caminho do erro

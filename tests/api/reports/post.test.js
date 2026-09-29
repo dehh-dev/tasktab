@@ -121,11 +121,4 @@ describe('POST /api/reports', () => {
 
     expect(response.status).toBe(422);
   });
-
-  it('retorna 400 para JSON malformado', async () => {
-    const response = await request('POST', '/api/reports', '{"title": ');
-
-    expect(response.status).toBe(400);
-    expect(response.body.message).toBe('JSON invalido.');
-  });
 });

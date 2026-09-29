@@ -103,8 +103,12 @@ const SCAN_FONTS = ['DejaVu Sans', 'Liberation Sans', 'Noto Sans', 'Arial'];
  * sem a fonte produziria uma pagina quase em branco e os testes de OCR
  * passariam a nao afirmar nada — falha silenciosa, que e o que este projeto
  * evita.
+ *
+ * `residualText` desenha um resto de camada de texto no rodape, como o numero
+ * de pagina que muitos escaneados trazem: texto que existe mas nao e util, e
+ * nao pode impedir a pagina de descer para o OCR.
  */
-async function makeScannedReceiptPdf(options = {}) {
+async function makeScannedReceiptPdf({ residualText, ...options } = {}) {
   const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
   const sharp = require('sharp');
 
@@ -153,6 +157,11 @@ async function makeScannedReceiptPdf(options = {}) {
     width: 300,
     height: 400,
   });
+
+  if (residualText) {
+    const font = await document.embedFont(StandardFonts.Helvetica);
+    page.drawText(residualText, { x: 280, y: 8, size: 6, font });
+  }
 
   return Buffer.from(await document.save());
 }

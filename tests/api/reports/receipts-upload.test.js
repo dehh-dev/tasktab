@@ -5,6 +5,7 @@ const {
   insertReport,
   findReceipts,
   waitForProcessing,
+  leftoverUploads,
 } = require('../../orchestrator');
 const { makePdf, makeCorruptPdf, makeNonPdf } = require('../../fixtures/pdf');
 
@@ -116,46 +117,42 @@ describe('POST /api/reports/:id/receipts', () => {
     expect(await findReceipts(report.id)).toHaveLength(0);
   });
 
-  it('PDF ilegivel vira uma linha em failed, com o motivo', async () => {
+  it('PDF ilegivel vira linha em failed, com o motivo, sem barrar os bons', async () => {
     const report = await insertReport();
 
     const response = await requestUpload(`/api/reports/${report.id}/receipts`, [
       { buffer: makeCorruptPdf(), filename: 'corrompido.pdf' },
+      { buffer: await makePdf({ pages: 2 }), filename: 'bom.pdf' },
     ]);
 
     expect(response.status).toBe(202);
-
-    const receipts = await findReceipts(report.id);
-
-    expect(receipts).toHaveLength(1);
-    expect(receipts[0].status).toBe('failed');
-    expect(receipts[0].raw_text).toMatch(/Falha ao ler o PDF/);
-  });
-
-  it('um arquivo ruim nao impede os bons de entrarem', async () => {
-    const report = await insertReport();
-
-    await requestUpload(`/api/reports/${report.id}/receipts`, [
-      { buffer: makeCorruptPdf(), filename: 'corrompido.pdf' },
-      { buffer: await makePdf({ pages: 2 }), filename: 'bom.pdf' },
-    ]);
 
     await waitForProcessing(report.id);
 
     const receipts = await findReceipts(report.id);
     const status = receipts.map((receipt) => receipt.status).sort();
+    const failed = receipts.find((receipt) => receipt.status === 'failed');
 
     expect(receipts).toHaveLength(3);
     expect(status).toEqual(['failed', 'needs_review', 'needs_review']);
+    // O motivo fica na linha: a pessoa sabe o que refazer sem abrir o log.
+    expect(failed.raw_text).toMatch(/Falha ao ler o PDF/);
   });
 
-  it('retorna 404 para relatorio inexistente', async () => {
+  it('recusa relatorio inexistente e apaga do disco o que o multer ja gravou', async () => {
+    // O 404 de toda rota com id mora em `contract.test.js`. Este fica porque
+    // e o unico que manda arquivo de verdade: o multer grava antes de o
+    // controller saber que o relatorio nao existe, e o que sobrasse seria um
+    // PDF com CNPJ de terceiros que ninguem mais alcanca pela API.
+    const before = leftoverUploads();
+
     const response = await requestUpload('/api/reports/999999/receipts', [
       { buffer: await makePdf({ pages: 1 }), filename: 'cupom.pdf' },
     ]);
 
     expect(response.status).toBe(404);
     expect(response.body.name).toBe('NotFoundError');
+    expect(leftoverUploads()).toEqual(before);
   });
 
   it('retorna 422 quando nenhum arquivo e enviado', async () => {

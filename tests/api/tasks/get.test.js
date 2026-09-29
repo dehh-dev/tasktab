@@ -79,25 +79,4 @@ describe('GET /api/tasks/:id', () => {
       due_date: '2026-12-31',
     });
   });
-
-  it('retorna 404 para id inexistente', async () => {
-    const response = await request('GET', '/api/tasks/999999');
-
-    expect(response.status).toBe(404);
-    expect(response.body).toEqual({
-      name: 'NotFoundError',
-      message: 'Task 999999 nao encontrada.',
-      action: 'Verifique o id informado ou liste as tarefas disponiveis.',
-      status_code: 404,
-    });
-  });
-
-  it('retorna 400 para id nao numerico', async () => {
-    const response = await request('GET', '/api/tasks/abc');
-
-    expect(response.status).toBe(400);
-    expect(response.body.name).toBe('BadRequestError');
-    expect(response.body.status_code).toBe(400);
-    expect(response.body.action).toEqual(expect.any(String));
-  });
 });
