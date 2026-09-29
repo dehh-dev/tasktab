@@ -1,7 +1,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport } = require('./helpers');
+const { clearReports, createReport, addReceipts } = require('./helpers');
 const { makeReceiptPdf, makeQrReceiptPdf } = require('../tests/fixtures/pdf');
 
 test.beforeEach(async ({ request }) => {
@@ -14,25 +14,12 @@ async function openExpensesTab(page) {
 }
 
 async function uploadAndOpenReview(page, request, report, buffers) {
+  // Aqui o upload e preparo, e nao o assunto: vai pela API, que ja espera a
+  // extracao terminar. O upload pela tela tem as specs dele.
+  await addReceipts(request, report.id, buffers);
+
   await openExpensesTab(page);
   await page.getByRole('button', { name: report.title }).click();
-
-  await page.setInputFiles(
-    '.dropzone input[type=file]',
-    buffers.map((buffer, index) => ({
-      name: `cupom-${index}.pdf`,
-      mimeType: 'application/pdf',
-      buffer,
-    })),
-  );
-
-  await page.waitForFunction(
-    (expected) =>
-      (document.body.textContent.match(/Aguardando revisao/g) || []).length >=
-      expected,
-    buffers.length,
-    { timeout: 15000 },
-  );
 
   await page.locator('.list-item .link-button').first().click();
   await page.waitForSelector('.review__fields');
@@ -41,12 +28,17 @@ async function uploadAndOpenReview(page, request, report, buffers) {
   );
 }
 
-test('abre a revisao com os campos pre-preenchidos pela extracao', async ({
+test('abre a revisao preenchida pela extracao, com a origem e sem a chave', async ({
   page,
   request,
 }) => {
   const report = await createReport(request, { title: 'Revisao basica' });
-  const pdf = await makeReceiptPdf({ total: '37,60', date: '19/06/2026' });
+  const chave = '52260626048802000165650010001631601303284889';
+  const pdf = await makeQrReceiptPdf({
+    accessKey: chave,
+    total: '37,60',
+    date: '19/06/2026',
+  });
 
   await uploadAndOpenReview(page, request, report, [pdf]);
 
@@ -55,6 +47,13 @@ test('abre a revisao com os campos pre-preenchidos pela extracao', async ({
   // A imagem e servida por endpoint proprio, mesma origem — nunca blob:.
   const src = await page.locator('.review__image').getAttribute('src');
   expect(src).toMatch(/^\/api\/receipts\/\d+\/image$/);
+
+  // A origem continua a vista — QR e a mais confiavel que a extracao produz,
+  // e e isso que diz o quanto confiar no que esta preenchido. A chave, nao:
+  // sao 44 digitos que ninguem confere a olho, e ocupavam a primeira linha
+  // da tela acima da data.
+  await expect(page.getByText(/QR Code/)).toBeVisible();
+  await expect(page.getByText(chave)).toHaveCount(0);
 });
 
 test('confirmar avanca para o proximo pendente sem recarregar', async ({
@@ -218,28 +217,6 @@ test('sugestao de duplicata: marcar avanca, dispensar so esconde', async ({
 
   await page.getByRole('button', { name: 'Voltar a lista' }).click();
   await expect(page.locator('.badge--duplicate')).toHaveText('Duplicata');
-});
-
-test('a revisao mostra a origem QR e esconde a chave de acesso', async ({
-  page,
-  request,
-}) => {
-  const report = await createReport(request, { title: 'Com chave QR' });
-  const chave = '52260626048802000165650010001631601303284889';
-  const pdf = await makeQrReceiptPdf({
-    accessKey: chave,
-    total: '37,60',
-    date: '19/06/2026',
-  });
-
-  await uploadAndOpenReview(page, request, report, [pdf]);
-
-  // A chave nao e mais exibida: sao 44 digitos que ninguem confere a olho, e
-  // ocupavam a primeira linha da tela acima da data.
-  await expect(page.getByText(chave)).toHaveCount(0);
-  // A origem, sim, continua a vista — QR e a mais confiavel que a extracao
-  // produz, e e isso que diz o quanto confiar no que esta preenchido.
-  await expect(page.getByText(/QR Code/)).toBeVisible();
 });
 
 test('a categoria adivinhada chega marcada, e a marca some ao escolher', async ({

@@ -68,15 +68,56 @@ async function createReport(request, overrides = {}) {
   return readData(response, 'criar relatorio');
 }
 
-/** Envia um PDF ao relatorio no campo `files`, o mesmo que a tela usa. */
-async function uploadReceipt(request, reportId, buffer) {
-  const response = await request.post(`/api/reports/${reportId}/receipts`, {
-    multipart: {
-      files: { name: 'cupom.pdf', mimeType: 'application/pdf', buffer },
-    },
+/**
+ * Poe os PDFs no relatorio pela API e espera a extracao terminar, antes de a
+ * pagina abrir.
+ *
+ * Subir pela tela so vale nas specs cujo assunto e o proprio upload. Nas
+ * outras ele e preparo, e ir pela tela obrigava a esperar o poll de 1,5 s da
+ * `ReportDetail`: quase dois segundos por spec, em mais da metade da suite.
+ * Vai numa requisicao so, no campo `files`, como a tela manda.
+ */
+async function addReceipts(request, reportId, buffers) {
+  const form = new FormData();
+
+  buffers.forEach((buffer, index) => {
+    form.append(
+      'files',
+      new Blob([buffer], { type: 'application/pdf' }),
+      `cupom-${index}.pdf`,
+    );
   });
 
-  return readData(response, 'enviar comprovante');
+  const response = await request.post(`/api/reports/${reportId}/receipts`, {
+    multipart: form,
+  });
+
+  await readData(response, 'enviar comprovantes');
+  return waitForReceipts(request, reportId);
+}
+
+/** Espera nenhum comprovante do relatorio estar mais na fila de extracao. */
+async function waitForReceipts(request, reportId, { timeoutMs = 15000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const response = await request.get(`/api/reports/${reportId}/receipts`);
+    const receipts = await readData(response, 'listar comprovantes');
+    const settled = receipts.every(
+      (receipt) =>
+        receipt.status !== 'pending' && receipt.status !== 'processing',
+    );
+
+    if (settled) {
+      return receipts;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error(
+    `arranjo falhou: a extracao do relatorio ${reportId} nao terminou`,
+  );
 }
 
 /**
@@ -108,7 +149,7 @@ module.exports = {
   createTask,
   clearReports,
   createReport,
-  uploadReceipt,
+  addReceipts,
   createUser,
   deleteUser,
 };

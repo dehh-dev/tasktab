@@ -1,7 +1,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport } = require('./helpers');
+const { clearReports, createReport, addReceipts } = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 
 const SCROLL = '.review__image-scroll';
@@ -18,18 +18,12 @@ async function openReviewWithImage(page, request, title, pdfOptions = {}) {
     ...pdfOptions,
   });
 
+  // O upload e preparo: vai pela API, que so devolve com a extracao pronta.
+  await addReceipts(request, report.id, [pdf]);
+
   await page.goto('/');
   await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
   await page.getByRole('button', { name: report.title }).click();
-  await page.setInputFiles('.dropzone input[type=file]', [
-    { name: 'cupom.pdf', mimeType: 'application/pdf', buffer: pdf },
-  ]);
-
-  await page.waitForFunction(
-    () => document.body.textContent.includes('Aguardando revisao'),
-    null,
-    { timeout: 15000 },
-  );
 
   await page.locator('.list-item .link-button').first().click();
   await page.waitForSelector('.review__fields');

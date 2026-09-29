@@ -1,29 +1,21 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport } = require('./helpers');
+const { clearReports, createReport, addReceipts } = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 
 test.beforeEach(async ({ request }) => {
   await clearReports(request);
 });
 
-async function openReportWithReceipt(page, report, buffer) {
+async function openReportWithReceipt(page, request, report, buffer) {
+  // O upload e preparo: vai pela API, que so devolve com a extracao pronta.
+  await addReceipts(request, report.id, [buffer]);
+
   await page.goto('/');
   await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
   await page.getByRole('button', { name: report.title }).click();
-
-  await page.setInputFiles('.dropzone input[type=file]', {
-    name: 'cupom.pdf',
-    mimeType: 'application/pdf',
-    buffer,
-  });
-
-  await page.waitForFunction(
-    () => document.body.textContent.includes('Aguardando revisao'),
-    undefined,
-    { timeout: 15000 },
-  );
+  await expect(page.locator('.list-item')).toHaveCount(1);
 }
 
 test('exportar so libera depois que ha comprovante confirmado', async ({
@@ -33,7 +25,7 @@ test('exportar so libera depois que ha comprovante confirmado', async ({
   const report = await createReport(request, { title: 'Exportacao' });
   const pdf = await makeReceiptPdf({ total: '37,60', date: '19/06/2026' });
 
-  await openReportWithReceipt(page, report, pdf);
+  await openReportWithReceipt(page, request, report, pdf);
 
   // Sem nenhum confirmado a planilha sairia zerada: o botao fica desligado e
   // a tela diz o que falta, em vez de entregar um arquivo vazio.

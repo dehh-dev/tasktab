@@ -4,7 +4,7 @@ const { test, expect } = require('@playwright/test');
 const {
   clearReports,
   createReport,
-  uploadReceipt,
+  addReceipts,
   createUser,
   deleteUser,
 } = require('./helpers');
@@ -71,20 +71,17 @@ test('o auditor le o relatorio e o comprovante, sem nada que os altere', async (
   const report = await createReport(request, {
     title: 'Conferencia do auditor',
   });
-  await uploadReceipt(
-    request,
-    report.id,
+  await addReceipts(request, report.id, [
     await makeReceiptPdf({ total: '37,60', date: '19/06/2026' }),
-  );
+  ]);
 
   await enterAs(page, auditor);
   await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
   await page.getByRole('button', { name: report.title }).click();
 
-  // A extracao roda em segundo plano; a tela consulta ate ela terminar.
   await expect(
     page.locator('.list-item').getByText('Aguardando revisao'),
-  ).toBeVisible({ timeout: 15000 });
+  ).toBeVisible();
 
   await expect(page.locator('.dropzone')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Deletar' })).toHaveCount(0);
