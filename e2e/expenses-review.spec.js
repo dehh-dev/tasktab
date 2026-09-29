@@ -220,7 +220,7 @@ test('sugestao de duplicata: marcar avanca, dispensar so esconde', async ({
   await expect(page.locator('.badge--duplicate')).toHaveText('Duplicata');
 });
 
-test('chave de acesso invalida no formulario de exemplo', async ({
+test('a revisao mostra a origem QR e esconde a chave de acesso', async ({
   page,
   request,
 }) => {

@@ -119,7 +119,7 @@ describe('extracao no upload', () => {
     expect(receipt.status).toBe('needs_review');
   });
 
-  it('nao soma no total o que ainda nao foi confirmado', async () => {
+  it('o subtotal da listagem ja inclui o que esta em revisao, marcado como palpite', async () => {
     const report = await insertReport();
 
     await upload(report.id, [
