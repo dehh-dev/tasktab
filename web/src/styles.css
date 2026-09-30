@@ -1,50 +1,171 @@
 /*
- * Paleta baseada no tema GitHub Dark Colorblind (Protanopia & Deuteranopia).
- * A troca central em relacao ao dark padrao: verde da lugar a azul e vermelho
- * a laranja, porque verde/vermelho e justamente o par que esses tipos de
- * daltonismo confundem.
+ * Sistema visual: base neutra em tons de zinco, com tema claro e escuro — o do
+ * sistema por padrao —, cartoes de borda fina e um acento so, usado com
+ * parcimonia (foco, link, selecao). A referencia de interface e o lifeboard.
  *
- * Os status seguem a mesma logica e nao dependem so de cor: cada um tambem
- * carrega texto proprio, entao a informacao sobrevive em tons de cinza.
+ * Os tons semanticos continuam os do GitHub Colorblind (Protanopia &
+ * Deuteranopia): perigo e laranja, nao vermelho, e os status evitam o eixo
+ * verde/vermelho, que e justamente o par que esses tipos de daltonismo
+ * confundem. Cor nunca e o unico canal: todo badge carrega o texto do status.
  */
 :root {
-  --canvas-default: #0d1117;
-  --canvas-overlay: #161b22;
-  --canvas-inset: #010409;
-  --canvas-subtle: #161b22;
+  color-scheme: light;
 
-  --border-default: #30363d;
-  --border-muted: #21262d;
+  --bg-app: #fafafa;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f4f4f5;
+  --bg-inset: #f4f4f5;
 
-  --fg-default: #e6edf3;
-  --fg-muted: #8b949e;
-  --fg-subtle: #6e7681;
-  --fg-on-emphasis: #ffffff;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
 
-  --accent-fg: #4184e4;
-  --accent-emphasis: #1f6feb;
-  --accent-muted: rgba(65, 132, 228, 0.4);
+  --fg: #18181b;
+  --fg-muted: #52525b;
+  --fg-subtle: #71717a;
+
+  --primary: #18181b;
+  --primary-hover: #3f3f46;
+  --on-primary: #fafafa;
+
+  --accent: #0969da;
+  --accent-strong: #0550ae;
+  --accent-subtle: #ddf4ff;
+  --accent-muted: #b6e3ff;
+
+  /* "perigo" no tema colorblind e laranja, nao vermelho */
+  --danger: #bc4c00;
+  --danger-strong: #953800;
+  --danger-emphasis: #bc4c00;
+  --danger-subtle: #fff1e5;
+  --danger-muted: #ffc9a0;
+
+  --attention: #9a6700;
+  --attention-strong: #7d4e00;
+  --attention-subtle: #fff8c5;
+  --attention-muted: #eed888;
+
+  --done: #8250df;
+  --done-strong: #6639ba;
+  --done-subtle: #fbefff;
+  --done-muted: #e1c7ff;
+
+  --neutral-strong: #52525b;
+  --neutral-subtle: #f4f4f5;
+  --neutral-muted: #d4d4d8;
+
+  --backdrop: rgba(9, 9, 11, 0.45);
+  --shadow-sm: 0 1px 2px rgba(9, 9, 11, 0.06);
+  --shadow-lg: 0 16px 40px rgba(9, 9, 11, 0.16);
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/*
+ * O escuro aparece duas vezes, e de proposito. A media query cobre quem segue
+ * o sistema sem esperar o JavaScript — sem ela, quem usa tema escuro veria um
+ * clarao branco a cada carga. O atributo cobre a escolha feita na tela, que
+ * vale mesmo contra o sistema.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --bg-app: #18181b;
+    --bg-surface: #09090b;
+    --bg-subtle: #27272a;
+    --bg-inset: #18181b;
+
+    --border: #27272a;
+    --border-strong: #3f3f46;
+
+    --fg: #f4f4f5;
+    --fg-muted: #a1a1aa;
+    --fg-subtle: #8b8b94;
+
+    --primary: #f4f4f5;
+    --primary-hover: #d4d4d8;
+    --on-primary: #18181b;
+
+    --accent: #4184e4;
+    --accent-strong: #6ca4f8;
+    --accent-subtle: rgba(65, 132, 228, 0.15);
+    --accent-muted: rgba(65, 132, 228, 0.4);
+
+    --danger: #ec8e2c;
+    --danger-strong: #ec8e2c;
+    --danger-emphasis: #bd561d;
+    --danger-subtle: rgba(236, 142, 44, 0.15);
+    --danger-muted: rgba(236, 142, 44, 0.4);
+
+    --attention: #d29922;
+    --attention-strong: #d29922;
+    --attention-subtle: rgba(210, 153, 34, 0.15);
+    --attention-muted: rgba(210, 153, 34, 0.4);
+
+    --done: #a371f7;
+    --done-strong: #a371f7;
+    --done-subtle: rgba(163, 113, 247, 0.15);
+    --done-muted: rgba(163, 113, 247, 0.4);
+
+    --neutral-strong: #a1a1aa;
+    --neutral-subtle: rgba(161, 161, 170, 0.12);
+    --neutral-muted: rgba(161, 161, 170, 0.35);
+
+    --backdrop: rgba(0, 0, 0, 0.6);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg-app: #18181b;
+  --bg-surface: #09090b;
+  --bg-subtle: #27272a;
+  --bg-inset: #18181b;
+
+  --border: #27272a;
+  --border-strong: #3f3f46;
+
+  --fg: #f4f4f5;
+  --fg-muted: #a1a1aa;
+  --fg-subtle: #8b8b94;
+
+  --primary: #f4f4f5;
+  --primary-hover: #d4d4d8;
+  --on-primary: #18181b;
+
+  --accent: #4184e4;
+  --accent-strong: #6ca4f8;
   --accent-subtle: rgba(65, 132, 228, 0.15);
+  --accent-muted: rgba(65, 132, 228, 0.4);
 
-  /* "danger" no tema colorblind e laranja, nao vermelho */
-  --danger-fg: #ec8e2c;
+  --danger: #ec8e2c;
+  --danger-strong: #ec8e2c;
   --danger-emphasis: #bd561d;
-  --danger-muted: rgba(236, 142, 44, 0.4);
   --danger-subtle: rgba(236, 142, 44, 0.15);
+  --danger-muted: rgba(236, 142, 44, 0.4);
 
-  --attention-fg: #d29922;
+  --attention: #d29922;
+  --attention-strong: #d29922;
   --attention-subtle: rgba(210, 153, 34, 0.15);
   --attention-muted: rgba(210, 153, 34, 0.4);
 
-  --done-fg: #a371f7;
+  --done: #a371f7;
+  --done-strong: #a371f7;
   --done-subtle: rgba(163, 113, 247, 0.15);
   --done-muted: rgba(163, 113, 247, 0.4);
 
-  --neutral-subtle: rgba(110, 118, 129, 0.1);
-  --neutral-muted: rgba(110, 118, 129, 0.4);
+  --neutral-strong: #a1a1aa;
+  --neutral-subtle: rgba(161, 161, 170, 0.12);
+  --neutral-muted: rgba(161, 161, 170, 0.35);
 
-  --shadow-overlay: 0 8px 24px rgba(1, 4, 9, 0.6);
-  --radius: 6px;
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
 *,
@@ -53,15 +174,38 @@
   box-sizing: border-box;
 }
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
   margin: 0;
-  background-color: var(--canvas-default);
-  color: var(--fg-default);
+  background-color: var(--bg-app);
+  color: var(--fg);
   font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica,
-    Arial, sans-serif;
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Noto Sans',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* Animacao aqui e so transicao curta de cor. Quem pediu menos movimento ao
+   sistema nao recebe nem isso. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
 }
 
 /* ---------- layout ---------- */
@@ -78,7 +222,7 @@ body {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border);
   padding-bottom: 16px;
   margin-bottom: 24px;
 }
@@ -101,6 +245,18 @@ body {
 .app__role {
   font-weight: 400;
   font-size: 12px;
+  color: var(--fg-subtle);
+}
+
+.app__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app__subtitle {
+  margin: 4px 0 0;
   color: var(--fg-muted);
 }
 
@@ -121,23 +277,13 @@ body {
   margin: 0 0 16px;
   font-size: 20px;
   font-weight: 600;
-}
-
-.app__title {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.app__subtitle {
-  margin: 4px 0 0;
-  color: var(--fg-muted);
+  letter-spacing: -0.01em;
 }
 
 /* ---------- abas ---------- */
 
 .tabs {
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border);
   display: flex;
   gap: 20px;
   margin-bottom: 24px;
@@ -156,17 +302,12 @@ body {
 }
 
 .tabs__tab:hover {
-  color: var(--fg-default);
+  color: var(--fg);
 }
 
 .tabs__tab[aria-selected='true'] {
-  border-bottom-color: var(--accent-emphasis);
-  color: var(--fg-default);
-}
-
-.tabs__tab:focus-visible {
-  outline: 2px solid var(--accent-fg);
-  outline-offset: 2px;
+  border-bottom-color: var(--fg);
+  color: var(--fg);
 }
 
 .toolbar {
@@ -185,128 +326,156 @@ body {
   gap: 10px;
 }
 
-/* ---------- filtro ---------- */
+/* ---------- foco ---------- */
+
+/* Anel de 2px no acento, afastado do elemento: e o unico lugar onde o acento
+   aparece em todo controle, e tem de ser visivel nos dois temas. */
+.btn:focus-visible,
+.tabs__tab:focus-visible,
+.filter__option:focus-visible,
+.link-button:focus-visible,
+.field__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- filtro segmentado ---------- */
 
 .filter {
-  display: flex;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius);
-  overflow: hidden;
+  background: var(--bg-subtle);
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
 }
 
 .filter__option {
-  background: var(--canvas-subtle);
+  background: transparent;
   border: 0;
-  border-right: 1px solid var(--border-default);
+  border-radius: 5px;
   color: var(--fg-muted);
   cursor: pointer;
   font: inherit;
-  padding: 6px 14px;
-}
-
-.filter__option:last-child {
-  border-right: 0;
+  font-weight: 500;
+  padding: 4px 12px;
+  transition:
+    background-color 150ms var(--ease),
+    color 150ms var(--ease);
 }
 
 .filter__option:hover {
-  background: var(--border-muted);
-  color: var(--fg-default);
+  color: var(--fg);
 }
 
 .filter__option[aria-pressed='true'] {
-  background: var(--accent-emphasis);
-  color: var(--fg-on-emphasis);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--fg);
   font-weight: 600;
 }
 
 .filter__count {
   color: var(--fg-subtle);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- botoes ---------- */
 
 .btn {
-  background: var(--canvas-subtle);
-  border: 1px solid var(--border-default);
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  color: var(--fg-default);
+  box-shadow: var(--shadow-sm);
+  color: var(--fg);
   cursor: pointer;
+  display: inline-flex;
   font: inherit;
   font-weight: 500;
-  padding: 6px 14px;
+  gap: 6px;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
   transition:
-    background-color 0.1s,
-    border-color 0.1s;
+    background-color 150ms var(--ease),
+    border-color 150ms var(--ease),
+    color 150ms var(--ease);
+  white-space: nowrap;
 }
 
-/* Link que age como botao (o download da planilha): <a> nao tem o
-   line-height de um <button> e viria sublinhado. */
+/* Link que age como botao (o download da planilha): sem isto ele viria
+   sublinhado e com a cor de link. */
 a.btn {
-  display: inline-flex;
-  align-items: center;
   text-decoration: none;
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--border-muted);
-  border-color: var(--fg-subtle);
+  background: var(--bg-subtle);
 }
 
 .btn:disabled {
-  color: var(--fg-subtle);
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
+/* O principal e neutro, e nao azul: o acento fica para foco e selecao, e o
+   botao que importa se destaca pelo contraste. */
 .btn--primary {
-  background: var(--accent-emphasis);
-  border-color: var(--accent-emphasis);
-  color: var(--fg-on-emphasis);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: var(--accent-fg);
-  border-color: var(--accent-fg);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .btn--danger {
   border-color: var(--danger-muted);
-  color: var(--danger-fg);
+  color: var(--danger);
 }
 
 .btn--danger:hover:not(:disabled) {
   background: var(--danger-emphasis);
   border-color: var(--danger-emphasis);
-  color: var(--fg-on-emphasis);
+  color: #ffffff;
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--fg-muted);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  color: var(--fg);
 }
 
 .btn--sm {
   font-size: 12px;
-  padding: 3px 10px;
+  min-height: 28px;
+  padding: 0 10px;
 }
 
-.btn:focus-visible,
-.filter__option:focus-visible,
-.field__input:focus-visible {
-  outline: 2px solid var(--accent-fg);
-  outline-offset: 1px;
-}
-
-/* ---------- formulario ---------- */
+/* ---------- cartoes: formulario, lista, painel ---------- */
 
 .form {
-  background: var(--canvas-overlay);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   margin-bottom: 24px;
-  padding: 16px;
+  padding: 20px;
 }
 
 .form__title {
   margin: 0 0 16px;
   font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .form__grid {
@@ -333,30 +502,32 @@ a.btn {
 }
 
 .field__label {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .field__required {
-  color: var(--danger-fg);
+  color: var(--danger);
   margin-left: 2px;
 }
 
 .field__input {
-  background: var(--canvas-inset);
-  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  color: var(--fg-default);
+  color: var(--fg);
   font: inherit;
+  min-height: 36px;
   padding: 6px 10px;
+  transition: border-color 150ms var(--ease);
   width: 100%;
 }
 
 .field__input:focus {
-  border-color: var(--accent-fg);
+  border-color: var(--accent);
 }
 
 .field__input[aria-invalid='true'] {
-  border-color: var(--danger-fg);
+  border-color: var(--danger);
 }
 
 /* Campo travado para quem so confere. O texto mantem o contraste normal — ele
@@ -377,15 +548,25 @@ textarea.field__input {
 }
 
 .field__error {
-  color: var(--danger-fg);
+  color: var(--danger);
   font-size: 12px;
+}
+
+/* Campo preenchido por palpite da extracao, ainda nao confirmado por ninguem.
+   Borda tracejada, e nao cor sozinha: o texto de apoio abaixo do campo diz o
+   mesmo por escrito. */
+.field__input--guess {
+  border-style: dashed;
+  border-color: var(--accent);
 }
 
 /* ---------- lista ---------- */
 
 .list {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   list-style: none;
   margin: 0;
   overflow: hidden;
@@ -394,13 +575,14 @@ textarea.field__input {
 
 .task,
 .list-item {
-  border-bottom: 1px solid var(--border-default);
+  align-items: center;
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  align-items: flex-start;
   justify-content: space-between;
   padding: 12px 16px;
+  transition: background-color 150ms var(--ease);
 }
 
 .task:last-child,
@@ -410,7 +592,7 @@ textarea.field__input {
 
 .task:hover,
 .list-item:hover {
-  background: var(--canvas-subtle);
+  background: var(--bg-app);
 }
 
 .task__main,
@@ -430,7 +612,8 @@ textarea.field__input {
 .link-button {
   background: none;
   border: 0;
-  color: var(--fg-default);
+  border-radius: 2px;
+  color: var(--fg);
   cursor: pointer;
   font: inherit;
   font-weight: 600;
@@ -440,13 +623,14 @@ textarea.field__input {
 }
 
 .link-button:hover {
-  color: var(--accent-fg);
+  color: var(--accent);
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .task__description {
   color: var(--fg-muted);
-  margin-top: 2px;
+  margin: 2px 0 0;
   overflow-wrap: anywhere;
 }
 
@@ -457,6 +641,7 @@ textarea.field__input {
   display: flex;
   flex-wrap: wrap;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
   gap: 8px;
   margin-top: 6px;
 }
@@ -464,7 +649,7 @@ textarea.field__input {
 .task__actions,
 .list-item__actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* ---------- badge de status ---------- */
@@ -474,21 +659,25 @@ textarea.field__input {
   border-radius: 999px;
   display: inline-block;
   font-size: 12px;
-  font-weight: 600;
-  padding: 1px 9px;
+  font-weight: 500;
+  line-height: 18px;
+  padding: 0 8px;
   white-space: nowrap;
 }
 
-.badge--pending {
+.badge--pending,
+.badge--needs_review {
   background: var(--attention-subtle);
   border-color: var(--attention-muted);
-  color: var(--attention-fg);
+  color: var(--attention-strong);
 }
 
-.badge--in_progress {
+.badge--in_progress,
+.badge--processing,
+.badge--open {
   background: var(--accent-subtle);
   border-color: var(--accent-muted);
-  color: var(--accent-fg);
+  color: var(--accent-strong);
 }
 
 .badge--done,
@@ -496,55 +685,43 @@ textarea.field__input {
 .badge--closed {
   background: var(--done-subtle);
   border-color: var(--done-muted);
-  color: var(--done-fg);
-}
-
-.badge--processing,
-.badge--open {
-  background: var(--accent-subtle);
-  border-color: var(--accent-muted);
-  color: var(--accent-fg);
-}
-
-.badge--needs_review {
-  background: var(--attention-subtle);
-  border-color: var(--attention-muted);
-  color: var(--attention-fg);
+  color: var(--done-strong);
 }
 
 .badge--failed {
   background: var(--danger-subtle);
   border-color: var(--danger-muted);
-  color: var(--danger-fg);
+  color: var(--danger-strong);
 }
 
 .badge--duplicate {
   background: var(--neutral-subtle);
   border-color: var(--neutral-muted);
-  color: var(--fg-muted);
+  color: var(--neutral-strong);
 }
 
 /* ---------- estados ---------- */
 
 .state {
-  border: 1px dashed var(--border-default);
-  border-radius: var(--radius);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
   color: var(--fg-muted);
-  padding: 32px 16px;
+  margin: 0;
+  padding: 40px 16px;
   text-align: center;
 }
 
 .alert {
-  border: 1px solid var(--danger-muted);
   background: var(--danger-subtle);
-  border-radius: var(--radius);
-  color: var(--fg-default);
+  border: 1px solid var(--danger-muted);
+  border-radius: var(--radius-lg);
+  color: var(--fg);
   margin-bottom: 16px;
   padding: 12px 16px;
 }
 
 .alert__title {
-  color: var(--danger-fg);
+  color: var(--danger-strong);
   font-weight: 600;
 }
 
@@ -556,7 +733,7 @@ textarea.field__input {
 }
 
 .alert[data-severity='aviso'] .alert__title {
-  color: var(--attention-fg);
+  color: var(--attention-strong);
 }
 
 .alert__actions {
@@ -591,9 +768,10 @@ textarea.field__input {
 }
 
 .review__image-pane {
-  background: var(--canvas-inset);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   padding: 12px;
 }
 
@@ -605,6 +783,8 @@ textarea.field__input {
 }
 
 .review__image-scroll {
+  background: var(--bg-inset);
+  border-radius: var(--radius);
   display: flex;
   justify-content: center;
   max-height: 70vh;
@@ -678,30 +858,32 @@ textarea.field__input {
 }
 
 .dialog::backdrop {
-  background: rgba(1, 4, 9, 0.8);
+  backdrop-filter: blur(2px);
+  background: var(--backdrop);
 }
 
 .dialog__box {
-  background: var(--canvas-overlay);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-overlay);
-  padding: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 20px;
 }
 
 .dialog__title {
   font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   margin: 0 0 8px;
 }
 
 .dialog__body {
   color: var(--fg-muted);
-  margin: 0 0 16px;
+  margin: 0 0 20px;
 }
 
 .dialog__target {
-  color: var(--fg-default);
+  color: var(--fg);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -720,24 +902,27 @@ textarea.field__input {
 
 .dropzone {
   align-items: center;
-  background: var(--canvas-inset);
-  border: 1px dashed var(--border-default);
-  border-radius: var(--radius);
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
   cursor: pointer;
   display: flex;
   justify-content: center;
   padding: 32px 16px;
   text-align: center;
+  transition:
+    background-color 150ms var(--ease),
+    border-color 150ms var(--ease);
 }
 
 .dropzone:hover,
 .dropzone--active {
-  border-color: var(--accent-fg);
   background: var(--accent-subtle);
+  border-color: var(--accent);
 }
 
 .dropzone:has(input:focus-visible) {
-  outline: 2px solid var(--accent-fg);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -747,20 +932,24 @@ textarea.field__input {
 
 /* ---------- resumo de valores ---------- */
 
+/* Um cartao por valor, como os numeros de resumo do lifeboard: o total vem
+   primeiro e maior, e cada tipo de despesa ao lado. */
 .summary {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px 24px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   margin-bottom: 16px;
-  padding: 12px 16px;
 }
 
 .summary__item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 12px 14px;
 }
 
 .summary__label {
@@ -769,8 +958,14 @@ textarea.field__input {
 }
 
 .summary__value {
-  font-size: 16px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.summary__item:first-child .summary__value {
+  font-size: 22px;
 }
 
 .sr-only {
@@ -781,12 +976,4 @@ textarea.field__input {
   position: absolute;
   white-space: nowrap;
   width: 1px;
-}
-
-/* Campo preenchido por palpite da extracao, ainda nao confirmado por ninguem.
-   Borda tracejada, e nao cor sozinha: a paleta do projeto nunca usa cor como
-   unico canal, e o texto de apoio abaixo do campo diz o mesmo por escrito. */
-.field__input--guess {
-  border-style: dashed;
-  border-color: var(--accent-muted, #9e6a03);
 }
