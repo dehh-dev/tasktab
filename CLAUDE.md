@@ -228,6 +228,9 @@ comparando as duas respostas campo a campo.
   derruba as outras sessoes. Um JWT so expira — revoga-lo antes exigiria uma
   lista de bloqueio consultada a cada requisicao, que e o custo que o JWT
   prometia evitar.
+- A sessao **renova** quando passa da metade da validade: o `authenticate`
+  estende `expires_at` e reenvia o cookie. So depois da metade, para nao virar
+  uma escrita por requisicao; o "passou da metade" e medido no Postgres.
 - **`sameSite=lax` e o que dispensa token de CSRF.** Sob Lax o cookie so
   acompanha navegacao de topo por GET, e toda escrita daqui e POST, PATCH ou
   DELETE. Trocar para `none` reintroduz o CSRF e passaria a exigir token.

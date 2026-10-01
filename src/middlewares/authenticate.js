@@ -18,6 +18,11 @@ async function authenticate(req, res, next) {
     if (resolved) {
       req.user = resolved.user;
       req.session = resolved.session;
+
+      if (resolved.renewDue) {
+        await sessions.renew(res, token, resolved.session);
+      }
+
       // O id de quem fez a requisicao passa a acompanhar cada linha de log.
       // E-mail e token ficam de fora de proposito: o id basta para investigar
       // e nao transforma o log num cadastro de pessoas.

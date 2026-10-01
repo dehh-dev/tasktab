@@ -7,6 +7,7 @@ const { scopesForRole } = require('./scopes');
 
 const TOKEN_BYTES = 32;
 const HOUR_MS = 60 * 60 * 1000;
+const TTL_SECONDS = env.session.ttlHours * 60 * 60;
 
 /**
  * O token e 256 bits de aleatoriedade criptografica — nao carrega significado
@@ -44,7 +45,10 @@ async function resolve(token) {
     return null;
   }
 
-  const row = await Session.findActiveByTokenHash(hashToken(token));
+  const row = await Session.findActiveByTokenHash(
+    hashToken(token),
+    TTL_SECONDS,
+  );
 
   if (!row) {
     return null;
@@ -52,6 +56,7 @@ async function resolve(token) {
 
   return {
     session: { id: row.id, expires_at: row.expires_at },
+    renewDue: row.renew_due,
     user: {
       id: row.user_id,
       name: row.name,
@@ -63,6 +68,19 @@ async function resolve(token) {
       scopes: scopesForRole(row.role),
     },
   };
+}
+
+/**
+ * Estende a sessao de quem esta usando o sistema.
+ *
+ * Sem isto a sessao vencia uma semana depois do login mesmo para quem entra
+ * todo dia — no meio da revisao de um lote, sem aviso. So renova depois da
+ * metade da validade: renovar a cada requisicao seria uma escrita no banco
+ * por clique, para ganhar minutos.
+ */
+async function renew(res, token, session) {
+  await Session.renew(session.id, TTL_SECONDS);
+  setCookie(res, token);
 }
 
 function end(token) {
@@ -144,6 +162,7 @@ function clearCookie(res) {
 module.exports = {
   start,
   resolve,
+  renew,
   end,
   readToken,
   setCookie,

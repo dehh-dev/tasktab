@@ -185,11 +185,17 @@ async function insertUser(overrides = {}) {
 }
 
 /** Abre uma sessao direto no banco e devolve o token cru. */
-async function insertSession(userId, token = sessions.generateToken()) {
+async function insertSession(
+  userId,
+  token = sessions.generateToken(),
+  { hours = env.session.ttlHours } = {},
+) {
+  // Validade cheia por padrao: abaixo da metade, a primeira requisicao ja
+  // renovaria a sessao e cada resposta levaria um `Set-Cookie` a mais.
   await db.query(
     `INSERT INTO sessions (user_id, token_hash, expires_at)
-     VALUES ($1, $2, now() + interval '1 day')`,
-    [userId, sessions.hashToken(token)],
+     VALUES ($1, $2, now() + make_interval(hours => $3))`,
+    [userId, sessions.hashToken(token), hours],
   );
 
   return token;
@@ -410,6 +416,16 @@ async function findPasswordHash(userId) {
   return rows[0].password_hash;
 }
 
+/** Horas ate a sessao vencer, medidas no Postgres. */
+async function sessionHoursLeft(token) {
+  const { rows } = await db.query(
+    `SELECT EXTRACT(EPOCH FROM expires_at - now()) / 3600 AS hours
+     FROM sessions WHERE token_hash = $1`,
+    [sessions.hashToken(token)],
+  );
+  return Number(rows[0].hours);
+}
+
 /** Sessoes de uma pessoa, direto do banco. */
 async function findSessions(userId) {
   const { rows } = await db.query(
@@ -574,6 +590,7 @@ module.exports = {
   insertMerchant,
   updateColumnDirectly,
   findSessions,
+  sessionHoursLeft,
   findPasswordHash,
   findReceipts,
   uploadedFileExists,

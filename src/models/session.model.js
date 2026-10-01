@@ -17,15 +17,19 @@ const db = require('../config/database');
  * requisicao autenticada precisa, e uma juncao custa menos que duas idas.
  * O filtro por `expires_at` e parte da consulta — sessao vencida simplesmente
  * nao existe, e nao ha como esquecer de conferir.
+ *
+ * `renew_due` diz se ja passou da metade da validade, medido no Postgres: o
+ * mesmo relogio que o filtro usa, sem comparar com o `Date` do Node.
  */
-async function findActiveByTokenHash(tokenHash) {
+async function findActiveByTokenHash(tokenHash, ttlSeconds) {
   const { rows } = await db.query(
     `SELECT s.id, s.user_id, s.expires_at,
+            s.expires_at < now() + make_interval(secs => $2::float8 / 2) AS renew_due,
             u.name, u.email, u.role
      FROM sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = $1 AND s.expires_at > now()`,
-    [tokenHash],
+    [tokenHash, ttlSeconds],
   );
   return rows[0] || null;
 }
@@ -38,6 +42,16 @@ async function create({ userId, tokenHash, expiresAt }) {
     [userId, tokenHash, expiresAt],
   );
   return rows[0];
+}
+
+async function renew(id, ttlSeconds) {
+  const { rows } = await db.query(
+    `UPDATE sessions SET expires_at = now() + make_interval(secs => $2::float8)
+     WHERE id = $1
+     RETURNING expires_at`,
+    [id, ttlSeconds],
+  );
+  return rows[0] || null;
 }
 
 async function removeByTokenHash(tokenHash) {
@@ -90,6 +104,7 @@ async function countByUser(userId) {
 module.exports = {
   findActiveByTokenHash,
   create,
+  renew,
   removeByTokenHash,
   removeByUser,
   removeExpired,
