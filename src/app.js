@@ -8,6 +8,7 @@ const env = require('./config/env');
 const routes = require('./routes');
 const controller = require('../infra/controller');
 const { httpLogger } = require('../infra/logger');
+const noStore = require('./middlewares/no-store');
 const { readLimiter, writeLimiter } = require('./middlewares/rate-limit');
 
 const app = express();
@@ -24,7 +25,7 @@ app.use(helmet());
 
 app.use(express.json({ limit: '100kb' }));
 
-app.use('/api', readLimiter, writeLimiter, routes);
+app.use('/api', noStore, readLimiter, writeLimiter, routes);
 
 // Em desenvolvimento o Vite serve a interface e encaminha /api para ca. Em
 // producao nao ha Vite: o Express entrega o build estatico na mesma origem,
