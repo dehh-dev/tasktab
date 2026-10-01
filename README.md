@@ -684,7 +684,7 @@ a mesma lista, `tests/api/routes.js`. Rota nova entra nela.
 
 ### E2E da interface
 
-O `npm run test:e2e` sobe a API em `:3001` (banco de teste) e o Vite em `:5173`,
+O `npm run test:e2e` sobe a API em `:3001` (banco de teste) e um Vite proprio em `:5174`,
 e roda o Playwright contra o navegador. O proxy do Vite aponta para a API de
 teste via `API_URL`, entao o E2E **nunca toca no banco de desenvolvimento**.
 

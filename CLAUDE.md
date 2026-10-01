@@ -392,8 +392,10 @@ nova de teste cai na integracao por padrao, que e o lado seguro.
 - Locators acessiveis (`getByRole`, `getByLabel`) — de quebra, cobrem a11y.
   Escope ao formulario (`page.locator('form.form')`): "Status" tambem casa com
   o `aria-label` do grupo de filtros, e "Cancelar" existe no form e no dialogo.
-- O E2E aponta para a API de teste via `API_URL`. **Nunca** deixe a suite tocar
-  o banco de desenvolvimento.
+- O E2E aponta para a API de teste via `API_URL`, num Vite proprio na **5174**
+  (`WEB_PORT`). Na 5173 o `reuseExistingServer` pegava o Vite de um
+  `npm run dev` aberto, que faz proxy para a API de dev. **Nunca** deixe a
+  suite tocar o banco de desenvolvimento.
 - Vale a mesma regra de nao mockar. A unica excecao esta anotada em
   `form-validation.spec.js` e explicada la.
 - O `ConfirmDialog` usa a tag `<dialog>` nativa com `showModal()`. **Nao volte
