@@ -68,6 +68,28 @@ describe('POST /api/merchants', () => {
     expect(response.status).toBe(422);
   });
 
+  it('aceita CNPJ alfanumerico e grava em maiuscula, sem mascara', async () => {
+    const response = await request('POST', '/api/merchants', {
+      cnpj: '12.abc.345/01de-35',
+      name: 'Padaria Alfa',
+    });
+    const found = await request('GET', '/api/merchants/by-cnpj/12ABC34501DE35');
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.cnpj).toBe('12ABC34501DE35');
+    expect(found.body.data.id).toBe(response.body.data.id);
+  });
+
+  it('recusa CNPJ alfanumerico com DV errado', async () => {
+    const response = await request('POST', '/api/merchants', {
+      cnpj: '12ABC34501DE36',
+      name: 'Padaria Alfa',
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details[0].field).toBe('cnpj');
+  });
+
   it('recusa CNPJ com menos de 14 digitos', async () => {
     const response = await request('POST', '/api/merchants', {
       cnpj: '2604880200016',

@@ -21,7 +21,7 @@ function validateCnpj(value, errors) {
   const cnpj = cnpjRules.normalize(value);
 
   if (cnpj === null) {
-    errors.push({ field: 'cnpj', message: 'cnpj deve ter 14 digitos' });
+    errors.push({ field: 'cnpj', message: 'cnpj deve ter 14 caracteres: 12 letras ou digitos e 2 digitos' });
     return undefined;
   }
 
@@ -183,7 +183,7 @@ function validateCnpjParam(raw) {
   if (errors.length > 0) {
     throw new BadRequestError({
       message: 'cnpj invalido.',
-      action: 'Informe um CNPJ de 14 digitos com verificador valido.',
+      action: 'Informe um CNPJ de 14 caracteres com verificador valido.',
     });
   }
 

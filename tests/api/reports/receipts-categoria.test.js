@@ -198,3 +198,32 @@ describe('categorizacao por emitente', () => {
     expect(receipt.category_guessed).toBe(false);
   });
 });
+
+describe('CNPJ alfanumerico', () => {
+  it('a chave alfanumerica do QR cadastra o emitente pelo CNPJ dela', async () => {
+    // Exemplo da Receita. Antes de julho de 2026 o QR com letra na chave era
+    // descartado inteiro: sem chave, sem emitente e sem duplicata automatica.
+    const chave = '35260912ABC34501DE35550010000001231123456784';
+    const report = await insertReport();
+
+    await upload(report.id, [
+      {
+        buffer: await makeQrReceiptPdf({
+          accessKey: chave,
+          cnpj: '12.ABC.345/01DE-35',
+        }),
+        filename: 'a.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+    const merchant = await request(
+      'GET',
+      '/api/merchants/by-cnpj/12ABC34501DE35',
+    );
+
+    expect(receipt.access_key).toBe(chave);
+    expect(merchant.status).toBe(200);
+    expect(receipt.merchant_id).toBe(merchant.body.data.id);
+  });
+});

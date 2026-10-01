@@ -1,5 +1,7 @@
 'use strict';
 
+const cnpjRules = require('../../validators/cnpj');
+
 /**
  * Normalizadores de valor e data.
  *
@@ -383,19 +385,21 @@ function titleCase(word) {
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 }
 
-/** CNPJ com 14 digitos, sem mascara. */
+/** Primeiro CNPJ plausivel do texto, sem mascara. */
 function extractCnpj(text) {
   if (typeof text !== 'string') {
     return null;
   }
 
-  const match = text.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
+  const anywhere = new RegExp(cnpjRules.IN_TEXT.source, 'g');
 
-  if (!match) {
-    return null;
+  for (const [candidate] of text.matchAll(anywhere)) {
+    if (cnpjRules.plausible(candidate)) {
+      return cnpjRules.normalize(candidate);
+    }
   }
 
-  return match[0].replace(/\D/g, '');
+  return null;
 }
 
 // Linha de item de cupom: codigo, descricao, quantidade, unidade e o valor no

@@ -99,7 +99,9 @@ async function readAccessKey(buffer, pageNumber) {
   const texts = await decode(imageData);
 
   for (const text of texts) {
-    for (const candidate of String(text).match(/\d{44}/g) || []) {
+    const anywhere = new RegExp(accessKey.IN_TEXT.source, 'g');
+
+    for (const [candidate] of String(text).matchAll(anywhere)) {
       if (accessKey.isValid(candidate)) {
         return candidate;
       }

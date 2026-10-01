@@ -589,6 +589,13 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   Postgres exige recriar o tipo; ha migration com `up` e `down` testados.
 - O CNPJ confiavel e o das posicoes 7 a 20 da **chave de acesso**, nao o do
   texto: o cupom traz tambem o da credenciadora do cartao.
+- **CNPJ alfanumerico** (julho de 2026): os 12 primeiros caracteres do CNPJ,
+  e as posicoes 7 a 18 da chave, aceitam `A-Z`. Nos dois DVs cada caractere
+  vale `ASCII - 48`, que deixa os digitos como eram; os exemplos oficiais da
+  Receita estao nos testes puros. **Nao volte a limpar com `\D`**: era assim
+  que a letra sumia e a chave inteira era descartada sem aviso. Achado no
+  texto, candidato com letra so vale se fechar o DV (`plausible`) —
+  "SUPERMERCADO12" tem o formato de um CNPJ.
 - Chave que nao fecha o DV mod-11 e **descartada**. Nao ha meio termo entre
   confiar e nao confiar num identificador com verificador.
 - `nao_classificado` vira `NULL` no comprovante: e ausencia de decisao, nao
