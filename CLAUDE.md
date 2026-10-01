@@ -100,16 +100,18 @@ Toda resposta de erro nasce de uma classe em `infra/errors.js` que estende
 { "name": "...", "message": "...", "action": "...", "status_code": 000 }
 ```
 
-| Classe                 | Status | Quando                                         |
-| ---------------------- | ------ | ---------------------------------------------- |
-| `BadRequestError`      | 400    | id invalido, JSON malformado, corpo nao-objeto |
-| `NotFoundError`        | 404    | recurso ou rota inexistente                    |
-| `UnauthorizedError`    | 401    | sem sessao valida                              |
-| `ForbiddenError`       | 403    | ha sessao, mas ela nao alcanca a operacao      |
-| `ValidationError`      | 422    | falha de validacao; carrega `details`          |
-| `TooManyRequestsError` | 429    | teto de requisicoes estourado                  |
-| `ServiceError`         | 503    | dependencia fora do ar (banco)                 |
-| `InternalServerError`  | 500    | qualquer erro inesperado                       |
+| Classe                  | Status | Quando                                           |
+| ----------------------- | ------ | ------------------------------------------------ |
+| `BadRequestError`       | 400    | id invalido, JSON malformado, corpo nao-objeto   |
+| `NotFoundError`         | 404    | recurso ou rota inexistente                      |
+| `UnauthorizedError`     | 401    | sem sessao valida                                |
+| `ForbiddenError`        | 403    | ha sessao, mas ela nao alcanca a operacao        |
+| `MethodNotAllowedError` | 405    | metodo errado em caminho que existe (`Allow`)    |
+| `ConflictError`         | 409    | estado nao permite: escrita em relatorio fechado |
+| `ValidationError`       | 422    | falha de validacao; carrega `details`            |
+| `TooManyRequestsError`  | 429    | teto de requisicoes estourado                    |
+| `ServiceError`          | 503    | dependencia fora do ar (banco)                   |
+| `InternalServerError`   | 500    | qualquer erro inesperado                         |
 
 - **Erro esperado** → crie ou reutilize uma classe especifica com seu proprio
   `statusCode`, `message` e `action`. O `action` diz ao usuario **o que fazer a
@@ -508,6 +510,11 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - Confirmar exige `issued_at`, `amount_cents` e `category`, conferidos sobre o
   registro ja gravado. Duplicata continua listada e **fora do somatorio**.
 - As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
+- **Relatorio `closed` e somente leitura**, ate para o dono: upload, edicao,
+  exclusao e reprocessamento respondem `409 ConflictError`, e o unico PATCH
+  aceito e `{ "status": "open" }`. A trava mora no `loadReport`/`loadReceipt`,
+  **depois** da posse — relatorio alheio fechado continua 404. Leitura e
+  exportacao seguem liberadas: fechado e justamente o que se exporta.
 
 ### Retencao dos arquivos
 

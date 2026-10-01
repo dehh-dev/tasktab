@@ -32,6 +32,23 @@ function receiptLabel(receipt) {
   return details.length > 0 ? `${name} — ${details.join(' · ')}` : name;
 }
 
+/** Link de download que vira botao desabilitado quando nao ha o que exportar. */
+function ExportLink({ href, download, enabled, children }) {
+  if (!enabled) {
+    return (
+      <button type="button" className="btn" disabled>
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <a className="btn" href={href} download={download}>
+      {children}
+    </a>
+  );
+}
+
 export default function ReportDetail({ reportId, onBack, canWrite = true }) {
   const [report, setReport] = useState(null);
   const [receipts, setReceipts] = useState([]);
@@ -45,6 +62,7 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
 
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
 
   /**
    * Devolve os comprovantes recem-buscados, e nao so os grava no estado.
@@ -142,6 +160,38 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
     }
   }
 
+  /**
+   * Reenfileira a pagina. O status volta para `pending`, e o poll ja existente
+   * retoma sozinho ate a extracao terminar.
+   */
+  async function handleReprocess(receipt) {
+    try {
+      await api.reprocessReceipt(receipt.id);
+      await load();
+    } catch (caught) {
+      setError({ message: caught.message, action: caught.action });
+    }
+  }
+
+  /**
+   * Fechar trava a escrita no servidor (409 em tudo que altera comprovante), e
+   * a tela acompanha: some o upload, a exclusao e o reprocessamento, e a
+   * revisao abre somente leitura. Reabrir e o caminho de volta.
+   */
+  async function handleStatusChange(status) {
+    setChangingStatus(true);
+
+    try {
+      await api.setReportStatus(reportId, status);
+      await load();
+      setError(null);
+    } catch (caught) {
+      setError({ message: caught.message, action: caught.action });
+    } finally {
+      setChangingStatus(false);
+    }
+  }
+
   /** Prev/anterior dentro da fila, sem mutar nada — usa o estado atual. */
   function handleNavigate(direction) {
     const queue = needsReviewQueue(receipts);
@@ -162,6 +212,10 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
   if (loading) {
     return <p className="state">Carregando relatorio...</p>;
   }
+
+  const closed = report?.status === 'closed';
+  // Quem pode escrever, num relatorio que ainda aceita escrita.
+  const editable = canWrite && !closed;
 
   // Montado uma vez e incluido nos dois retornos: o ramo da revisao sai antes
   // do return final, entao um dialogo declarado so la embaixo nunca chegaria a
@@ -204,7 +258,12 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
           onBack={() => setReviewingId(null)}
           onAction={handleAction}
           onDelete={setPendingDelete}
-          canWrite={canWrite}
+          canWrite={editable}
+          readOnlyReason={
+            canWrite && closed
+              ? 'Relatorio fechado: reabra-o para alterar os comprovantes.'
+              : undefined
+          }
         />
         {deleteDialog}
       </>
@@ -232,19 +291,41 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
             </span>
           )}
 
-          {confirmedCount > 0 ? (
+          {
             // Download por <a href>, nao por fetch: entregar o arquivo baixado
-            // exigiria um `blob:`, que a CSP do projeto nao libera.
-            <a
+            // exigiria um `blob:`, que a CSP do projeto nao libera. Excel e
+            // Anexo I so levam o confirmado; o PDF leva todo comprovante.
+          }
+          <ExportLink
+            href={api.reportXlsxUrl(reportId)}
+            download={`relatorio-${reportId}.xlsx`}
+            enabled={confirmedCount > 0}
+          >
+            Exportar Excel
+          </ExportLink>
+          <ExportLink
+            href={api.reportAnexoIUrl(reportId)}
+            download={`anexo-i-${reportId}.xlsx`}
+            enabled={confirmedCount > 0}
+          >
+            Anexo I
+          </ExportLink>
+          <ExportLink
+            href={api.reportPdfUrl(reportId)}
+            download={`relatorio-${reportId}.pdf`}
+            enabled={receipts.length > 0}
+          >
+            PDF consolidado
+          </ExportLink>
+
+          {canWrite && (
+            <button
+              type="button"
               className="btn"
-              href={api.reportXlsxUrl(reportId)}
-              download={`relatorio-${reportId}.xlsx`}
+              onClick={() => handleStatusChange(closed ? 'open' : 'closed')}
+              disabled={changingStatus}
             >
-              Exportar Excel
-            </a>
-          ) : (
-            <button type="button" className="btn" disabled>
-              Exportar Excel
+              {closed ? 'Reabrir relatorio' : 'Fechar relatorio'}
             </button>
           )}
         </div>
@@ -275,15 +356,24 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
         </div>
       )}
 
+      {canWrite && closed && (
+        <p className="field__hint" role="status">
+          Relatorio fechado: os comprovantes estao travados. Reabra para
+          alterar.
+        </p>
+      )}
+
       {
-        // Quem so confere (auditor) le o relatorio inteiro e nao anexa nada.
-        canWrite && <ReceiptUpload reportId={reportId} onUploaded={load} />
+        // Quem so confere (auditor) le o relatorio inteiro e nao anexa nada;
+        // relatorio fechado tambem nao recebe comprovante novo.
+        editable && <ReceiptUpload reportId={reportId} onUploaded={load} />
       }
       <ReceiptSummary meta={meta} />
       <ReceiptList
         receipts={receipts}
         onOpen={setReviewingId}
-        onDelete={canWrite ? setPendingDelete : undefined}
+        onDelete={editable ? setPendingDelete : undefined}
+        onReprocess={editable ? handleReprocess : undefined}
         busy={deleting}
       />
 

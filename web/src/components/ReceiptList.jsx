@@ -5,7 +5,13 @@ import {
   receiptStatusLabel,
 } from '../constants';
 
-function ReceiptRow({ receipt, onOpen, onDelete, busy }) {
+// Onde reprocessar faz sentido: a pagina que falhou, e a que ficou presa na
+// fila — a fila vive na memoria do processo, e um reinicio no meio do lote
+// deixa linhas em `pending`/`processing` para sempre. Sem este botao a unica
+// saida era `curl`.
+const REPROCESSABLE = new Set(['failed', 'pending', 'processing']);
+
+function ReceiptRow({ receipt, onOpen, onDelete, onReprocess, busy }) {
   const issuedAt = formatDate(receipt.issued_at);
 
   return (
@@ -35,6 +41,16 @@ function ReceiptRow({ receipt, onOpen, onDelete, busy }) {
         // sem acoes — o mesmo contrato da TaskList.
         onDelete && (
           <div className="list-item__actions">
+            {onReprocess && REPROCESSABLE.has(receipt.status) && (
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={() => onReprocess(receipt)}
+                disabled={busy}
+              >
+                Reprocessar
+              </button>
+            )}
             <button
               type="button"
               className="btn btn--sm btn--danger"
@@ -50,7 +66,13 @@ function ReceiptRow({ receipt, onOpen, onDelete, busy }) {
   );
 }
 
-export default function ReceiptList({ receipts, onOpen, onDelete, busy }) {
+export default function ReceiptList({
+  receipts,
+  onOpen,
+  onDelete,
+  onReprocess,
+  busy,
+}) {
   if (receipts.length === 0) {
     // Mandar enviar um PDF a quem so le o relatorio seria oferecer o que a
     // API vai recusar.
@@ -71,6 +93,7 @@ export default function ReceiptList({ receipts, onOpen, onDelete, busy }) {
           receipt={receipt}
           onOpen={onOpen}
           onDelete={onDelete}
+          onReprocess={onReprocess}
           busy={busy}
         />
       ))}

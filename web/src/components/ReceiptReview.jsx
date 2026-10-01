@@ -58,6 +58,7 @@ export default function ReceiptReview({
   onAction,
   onDelete,
   canWrite = true,
+  readOnlyReason,
 }) {
   const [values, setValues] = useState({
     issued_at: receipt.issued_at ?? '',
@@ -69,6 +70,15 @@ export default function ReceiptReview({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [zoom, setZoom] = useState(1);
+
+  // Emitente ainda sem categoria: a escolha desta revisao vira o cadastro dele
+  // por padrao, que e o caso de uso (7 dos 28 cupons do caso-base eram do
+  // mesmo CNPJ). Emitente ja classificado comeca desmarcado, para nao trocar
+  // um cadastro sem querer ao corrigir um cupom fora do padrao.
+  const [applyToMerchant, setApplyToMerchant] = useState(
+    !receipt.merchant_default_category ||
+      receipt.merchant_default_category === 'nao_classificado',
+  );
 
   // O destaque some assim que a pessoa escolhe outra categoria: a partir dai a
   // decisao e dela, e continuar avisando "isto e um palpite" seria mentira.
@@ -88,6 +98,14 @@ export default function ReceiptReview({
   const [pannable, setPannable] = useState(false);
 
   const errors = { ...serverErrors, ...localErrors };
+
+  // So oferece quando ha emitente e a escolha difere do que ele ja tem: com a
+  // mesma categoria no cadastro nao ha o que atualizar.
+  const offerMerchantUpdate =
+    canWrite &&
+    Boolean(receipt.merchant_id) &&
+    Boolean(values.category) &&
+    values.category !== receipt.merchant_default_category;
   const visibleAlerts = alerts.filter(
     (alert) => !dismissed.has(alertKey(alert)),
   );
@@ -155,6 +173,13 @@ export default function ReceiptReview({
     setError(null);
 
     try {
+      // O emitente vai primeiro: se o cadastro falhar, nada foi confirmado e a
+      // pessoa tenta de novo. Na ordem inversa, o cupom ficaria confirmado e
+      // o cadastro, nao — e a tela ja teria avancado para o proximo.
+      if (offerMerchantUpdate && applyToMerchant) {
+        await api.setMerchantCategory(receipt.merchant_id, values.category);
+      }
+
       await api.updateReceipt(receipt.id, {
         issued_at: values.issued_at,
         amount_cents: amountCents,
@@ -568,6 +593,20 @@ export default function ReceiptReview({
                 </span>
               )}
             </div>
+
+            {offerMerchantUpdate && (
+              <label className="field field--checkbox">
+                <input
+                  type="checkbox"
+                  checked={applyToMerchant}
+                  onChange={(event) => setApplyToMerchant(event.target.checked)}
+                />
+                <span>
+                  Usar esta categoria nos proximos cupons de{' '}
+                  {receipt.merchant_name || 'este emitente'}
+                </span>
+              </label>
+            )}
           </fieldset>
 
           <div className="form__actions">
@@ -586,8 +625,9 @@ export default function ReceiptReview({
               </>
             ) : (
               <span className="field__hint">
-                Somente leitura: seu acesso confere os comprovantes, mas nao os
-                altera. Atalhos: Esc volta · Alt+← / Alt+→ navega
+                {readOnlyReason ??
+                  'Somente leitura: seu acesso confere os comprovantes, mas nao os altera.'}{' '}
+                Atalhos: Esc volta · Alt+← / Alt+→ navega
               </span>
             )}
           </div>

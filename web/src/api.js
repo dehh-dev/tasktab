@@ -2,6 +2,7 @@ const AUTH_URL = '/api/auth';
 const TASKS_URL = '/api/tasks';
 const REPORTS_URL = '/api/reports';
 const RECEIPTS_URL = '/api/receipts';
+const MERCHANTS_URL = '/api/merchants';
 const USERS_URL = '/api/users';
 
 /**
@@ -182,6 +183,14 @@ export function getReport(id) {
   return request(`${REPORTS_URL}/${id}`);
 }
 
+/** Fechar (`closed`) trava a escrita; reabrir (`open`) e o unico PATCH aceito ali. */
+export function setReportStatus(id, status) {
+  return request(`${REPORTS_URL}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
 export function getValidation(reportId) {
   return request(`${REPORTS_URL}/${reportId}/validation`);
 }
@@ -226,6 +235,14 @@ export function reprocessReceipt(id) {
   return request(`${RECEIPTS_URL}/${id}/reprocess`, { method: 'POST' });
 }
 
+/** Categoria padrao do emitente: vale para os proximos cupons daquele CNPJ. */
+export function setMerchantCategory(id, category) {
+  return request(`${MERCHANTS_URL}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ default_category: category }),
+  });
+}
+
 /** URL da imagem renderizada do comprovante — usada direto num <img src>. */
 export function receiptImageUrl(id) {
   return `${RECEIPTS_URL}/${id}/image`;
@@ -238,4 +255,14 @@ export function receiptImageUrl(id) {
  */
 export function reportXlsxUrl(id) {
   return `${REPORTS_URL}/${id}/export.xlsx`;
+}
+
+/** Anexo I oficial preenchido. Mesmo motivo do `reportXlsxUrl` para nao usar fetch. */
+export function reportAnexoIUrl(id) {
+  return `${REPORTS_URL}/${id}/export/anexo-i.xlsx`;
+}
+
+/** PDF consolidado com os comprovantes carimbados. */
+export function reportPdfUrl(id) {
+  return `${REPORTS_URL}/${id}/export.pdf`;
 }

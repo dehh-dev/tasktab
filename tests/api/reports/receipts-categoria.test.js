@@ -62,6 +62,13 @@ describe('categorizacao por emitente', () => {
     const merchant = await request('GET', `/api/merchants/by-cnpj/${CNPJ}`);
     expect(merchant.status).toBe(200);
     expect(merchant.body.data.default_category).toBe('nao_classificado');
+
+    // A listagem traz o emitente: e de onde a tela tira o nome e a categoria
+    // do cadastro que a revisao oferece atualizar.
+    expect(receipt).toMatchObject({
+      merchant_name: merchant.body.data.name,
+      merchant_default_category: 'nao_classificado',
+    });
   });
 
   it('o segundo cupom do mesmo CNPJ ja entra classificado', async () => {

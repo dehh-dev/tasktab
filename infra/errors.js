@@ -121,6 +121,23 @@ class ForbiddenError extends BaseError {
 }
 
 /**
+ * 409 — a requisicao e valida, mas o estado atual do recurso nao a permite.
+ *
+ * Diferente do 403: nao falta permissao a ninguem. O relatorio fechado recusa
+ * escrita ate de quem e dono, e o `action` diz como sair dali (reabrir).
+ */
+class ConflictError extends BaseError {
+  constructor({ message, action, cause } = {}) {
+    super({
+      message: message || 'O recurso esta num estado que nao permite isto.',
+      action: action || 'Recarregue o recurso e confira o estado dele.',
+      statusCode: 409,
+      cause,
+    });
+  }
+}
+
+/**
  * 405 — o caminho existe, mas nao com este metodo.
  *
  * Distinto do 404: a pessoa acertou o endereco e errou o verbo, e o header
@@ -163,6 +180,7 @@ module.exports = {
   NotFoundError,
   UnauthorizedError,
   ForbiddenError,
+  ConflictError,
   MethodNotAllowedError,
   ValidationError,
 };
