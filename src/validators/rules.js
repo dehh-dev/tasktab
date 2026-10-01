@@ -1,5 +1,7 @@
 'use strict';
 
+const { BadRequestError } = require('../../infra/errors');
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isBlank(value) {
@@ -33,4 +35,64 @@ function isoDateNotAfter(start, end) {
   return start <= end;
 }
 
-module.exports = { isBlank, isValidIsoDate, isoDateNotAfter };
+/**
+ * O `:id` da rota como inteiro positivo, ou 400 com a mensagem do recurso.
+ *
+ * Eram cinco copias identicas, uma por validator, que so diferiam no texto do
+ * erro. O texto continua de cada um; a regra mora aqui.
+ */
+function parseId(rawId, invalid) {
+  if (!/^\d+$/.test(String(rawId))) {
+    throw new BadRequestError(invalid);
+  }
+
+  const id = Number(rawId);
+
+  if (!Number.isSafeInteger(id) || id < 1) {
+    throw new BadRequestError(invalid);
+  }
+
+  return id;
+}
+
+/**
+ * `limit` e `offset` da query string, com os erros empurrados em `errors`.
+ * Valores invalidos ficam no padrao (50 e 0) para o resto da validacao seguir.
+ */
+function parsePagination(query, errors) {
+  const result = { limit: 50, offset: 0 };
+
+  if (query.limit !== undefined) {
+    const limit = Number(query.limit);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      errors.push({
+        field: 'limit',
+        message: 'limit deve ser um inteiro entre 1 e 100',
+      });
+    } else {
+      result.limit = limit;
+    }
+  }
+
+  if (query.offset !== undefined) {
+    const offset = Number(query.offset);
+    if (!Number.isInteger(offset) || offset < 0) {
+      errors.push({
+        field: 'offset',
+        message: 'offset deve ser um inteiro maior ou igual a 0',
+      });
+    } else {
+      result.offset = offset;
+    }
+  }
+
+  return result;
+}
+
+module.exports = {
+  isBlank,
+  isValidIsoDate,
+  isoDateNotAfter,
+  parseId,
+  parsePagination,
+};

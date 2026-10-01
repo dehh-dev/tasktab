@@ -302,7 +302,7 @@ testes falam **HTTP real** contra `http://localhost:3001`. Nao ha supertest e
 nao se importa `src/app` dentro de teste.
 
 Os arquivos espelham as rotas: `tests/api/tasks/get.test.js`,
-`post.test.js`, `put.test.js`, `delete.test.js`, mais `tests/api/health.test.js`
+`post.test.js`, `patch.test.js`, `delete.test.js`, mais `tests/api/health.test.js`
 e `tests/api/not-found.test.js`. Os scripts de linha de comando tem os seus em
 `tests/scripts/`, rodados de verdade por `runScript`, e as garantias do banco
 (triggers) ficam em `tests/db/`.

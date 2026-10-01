@@ -1,7 +1,7 @@
 'use strict';
 
 const { BadRequestError, ValidationError } = require('../../infra/errors');
-const { isValidIsoDate } = require('./rules');
+const { isValidIsoDate, parseId } = require('./rules');
 
 const BODY_NOT_OBJECT = {
   message: 'Corpo da requisicao deve ser um objeto JSON.',
@@ -167,17 +167,7 @@ function validateUpdate(body, current = {}) {
 }
 
 function validateId(rawId) {
-  if (!/^\d+$/.test(String(rawId))) {
-    throw new BadRequestError(INVALID_ID);
-  }
-
-  const id = Number(rawId);
-
-  if (!Number.isSafeInteger(id) || id < 1) {
-    throw new BadRequestError(INVALID_ID);
-  }
-
-  return id;
+  return parseId(rawId, INVALID_ID);
 }
 
 function validateListQuery(query = {}) {

@@ -25,6 +25,11 @@ router.post(
   requireScope('merchants:write'),
   asyncHandler(controller.create),
 );
+router.get(
+  '/:id',
+  requireScope('merchants:read'),
+  asyncHandler(controller.show),
+);
 router.patch(
   '/:id',
   requireScope('merchants:write'),

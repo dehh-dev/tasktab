@@ -14,11 +14,6 @@ const router = Router();
 router.get('/', requireScope('tasks:read'), asyncHandler(controller.index));
 router.post('/', requireScope('tasks:write'), asyncHandler(controller.create));
 router.get('/:id', requireScope('tasks:read'), asyncHandler(controller.show));
-router.put(
-  '/:id',
-  requireScope('tasks:write'),
-  asyncHandler(controller.update),
-);
 router.patch(
   '/:id',
   requireScope('tasks:write'),

@@ -171,13 +171,13 @@ Base: `/api/users` (`users:read` / `users:write`; o proprio cadastro dispensa)
 
 Base: `/api/tasks`
 
-| Metodo        | Rota   | Descricao                   | Sucesso |
-| ------------- | ------ | --------------------------- | ------- |
-| `GET`         | `/`    | Lista (paginada, filtravel) | 200     |
-| `GET`         | `/:id` | Detalhe                     | 200     |
-| `POST`        | `/`    | Cria                        | 201     |
-| `PUT`/`PATCH` | `/:id` | Atualiza (parcial)          | 200     |
-| `DELETE`      | `/:id` | Remove                      | 204     |
+| Metodo   | Rota   | Descricao                   | Sucesso |
+| -------- | ------ | --------------------------- | ------- |
+| `GET`    | `/`    | Lista (paginada, filtravel) | 200     |
+| `GET`    | `/:id` | Detalhe                     | 200     |
+| `POST`   | `/`    | Cria                        | 201     |
+| `PATCH`  | `/:id` | Atualiza (parcial)          | 200     |
+| `DELETE` | `/:id` | Remove                      | 204     |
 
 Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
 `offset` (padrao 0).
@@ -211,6 +211,7 @@ Base: `/api/merchants` — o cadastro que da categoria ao comprovante.
 | ------- | ------------------------------ | ------------------------------- |
 | `GET`   | `/api/merchants`               | Lista os emitentes cadastrados  |
 | `POST`  | `/api/merchants`               | Cadastra um emitente            |
+| `GET`   | `/api/merchants/:id`           | Detalhe                         |
 | `PATCH` | `/api/merchants/:id`           | Atualiza (e a categoria padrao) |
 | `GET`   | `/api/merchants/by-cnpj/:cnpj` | Busca pelo CNPJ lido da chave   |
 
