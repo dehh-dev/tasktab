@@ -294,10 +294,10 @@ e `tests/api/not-found.test.js`. Os scripts de linha de comando tem os seus em
 O que vale para **toda** rota nao se repete arquivo a arquivo: mora em duas
 matrizes que percorrem a mesma lista, **`tests/api/routes.js`**.
 
-| Matriz                          | O que confere em toda rota da lista                                                    |
-| ------------------------------- | -------------------------------------------------------------------------------------- |
-| `tests/api/auth/scopes.test.js` | 401 sem sessao; 403 exatamente para os papeis sem o escopo                             |
-| `tests/api/contract.test.js`    | 400 com id invalido, 404 com id inexistente, 422 com corpo so de colunas de identidade |
+| Matriz                          | O que confere em toda rota da lista                                                                               |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `tests/api/auth/scopes.test.js` | 401 sem sessao; 403 exatamente para os papeis sem o escopo                                                        |
+| `tests/api/contract.test.js`    | 400 com id invalido, 404 com id inexistente, 422 com corpo so de colunas de identidade, nenhuma resposta em cache |
 
 Cada checagem compara um mapa `{ rota: resultado }`, e a falha mostra de uma vez
 todas as rotas que sairam do esperado. **Rota nova entra em `routes.js`**, ou
@@ -439,6 +439,15 @@ funcionam com `--ignore-scripts` — todas trazem binario musl pre-compilado.
   Decisao ja tomada para a aba de prestacao de contas: a imagem do cupom e
   servida por endpoint proprio, que cabe em `'self'` — **nao** liberar `blob:`
   so para exibir preview gerado no cliente.
+- **Nenhuma resposta de `/api` fica no cache do navegador**
+  (`src/middlewares/no-store.js`, o primeiro da cadeia de `/api`). O cache
+  guarda pela URL e nao sabe de sessao: sair apagava a sessao no banco, mas a
+  imagem do cupom, servida com `max-age` de um dia, continuava aparecendo sem
+  perguntar ao servidor — ate para outra conta no mesmo navegador. A imagem e
+  a unica excecao: `private, no-cache`, guardada so para revalidar; cada uso
+  passa pela sessao e pela posse, e o ETag devolve 304 sem renderizar. **Nao
+  volte a por `max-age` em resposta da API.** O 304 leva os mesmos headers do
+  200: sem eles herda o `no-store` e o navegador descarta a copia.
 - O limitador e desligado em teste de proposito — a suite trombaria em
   qualquer teto realista. Mudou algo nele? Confira manualmente com
   `RATE_LIMIT_WRITE_MAX=5 npm start`.

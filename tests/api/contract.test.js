@@ -7,6 +7,8 @@ const {
   insertReceipt,
   insertMerchant,
   currentUser,
+  DEFAULT_USER,
+  DEFAULT_PASSWORD,
 } = require('../orchestrator');
 const { ROUTES, label, pathWith, byRoute } = require('./routes');
 
@@ -144,6 +146,58 @@ describe('contrato do corpo JSON', () => {
     expect(response.body).toMatchObject({
       name: 'BadRequestError',
       message: 'JSON invalido.',
+    });
+  });
+});
+
+describe('contrato de cache', () => {
+  const NO_STORE = 'no-store, no-cache, max-age=0, must-revalidate';
+  const LOGOUT = 'POST /api/auth/logout';
+
+  it('nenhuma rota deixa a resposta no cache do navegador', async () => {
+    // A imagem do comprovante tem politica propria quando entrega a imagem
+    // (`receipts/image.test.js`); com id inexistente cai no 404 como as
+    // outras. O logout vai por ultimo: ele derruba a sessao das seguintes.
+    const routes = [
+      ...ROUTES.filter((route) => label(route) !== LOGOUT),
+      ...ROUTES.filter((route) => label(route) === LOGOUT),
+    ];
+
+    const responses = await hitAll(
+      routes,
+      (route) => pathWith(route, 999999),
+      (route) => route.body,
+    );
+
+    expect(
+      summarize(responses, (response) => response.headers.get('cache-control')),
+    ).toEqual(byRoute(routes, () => NO_STORE));
+  });
+
+  it('vale tambem para as rotas publicas e para a rota inexistente', async () => {
+    const anonymous = { token: null };
+    const responses = {
+      health: await request('GET', '/api/health', undefined, anonymous),
+      // A que mais importa: e a resposta que traz o cookie da sessao.
+      login: await request(
+        'POST',
+        '/api/auth/login',
+        { email: DEFAULT_USER.email, password: DEFAULT_PASSWORD },
+        anonymous,
+      ),
+      notFound: await request('GET', '/api/nao-existe', undefined, anonymous),
+    };
+
+    expect(
+      summarize(
+        responses,
+        (response) =>
+          `${response.status} ${response.headers.get('cache-control')}`,
+      ),
+    ).toEqual({
+      health: `200 ${NO_STORE}`,
+      login: `200 ${NO_STORE}`,
+      notFound: `404 ${NO_STORE}`,
     });
   });
 });

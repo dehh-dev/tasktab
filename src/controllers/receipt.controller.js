@@ -232,22 +232,30 @@ async function reprocess(req, res) {
 /**
  * GET /api/receipts/:id/image
  *
- * Renderiza a pagina original como PNG, para a tela de revisao mostrar o
+ * Renderiza a pagina original como WebP, para a tela de revisao mostrar o
  * cupom. Serve por endpoint proprio (mesma origem) de proposito: a CSP e
  * `img-src 'self'`, e liberar `blob:` so para isto seria afrouxar a politica
  * por conveniencia — decisao ja registrada desde a Issue 0.
  *
- * O ETag e o par (hash do arquivo, pagina): o conteudo nunca muda depois de
- * gravado, entao o navegador para de pedir de novo a cada volta a tela.
+ * O navegador guarda a imagem, mas pergunta antes de cada uso (`no-cache`): a
+ * pergunta passa pela sessao e pela posse, e como o ETag e o par (hash do
+ * arquivo, pagina), que nunca muda depois de gravado, a resposta e um 304 sem
+ * renderizar nada. Com `max-age` a copia era servida sem pergunta nenhuma por
+ * um dia — depois do logout, e ate para outra conta no mesmo navegador.
  */
 async function image(req, res) {
   const id = receiptValidator.validateId(req.params.id);
   const receipt = await loadReceipt(req.user, id);
 
-  const etag = `"${receipt.file_hash}-${receipt.page_number}"`;
+  // Vai tambem no 304: sem isto ele herdaria o `no-store` da API, e o
+  // navegador descartaria a copia — cada exibicao voltaria a renderizar.
+  const cache = {
+    'Cache-Control': 'private, no-cache',
+    ETag: `"${receipt.file_hash}-${receipt.page_number}"`,
+  };
 
-  if (req.headers['if-none-match'] === etag) {
-    return res.status(304).end();
+  if (req.headers['if-none-match'] === cache.ETag) {
+    return res.status(304).set(cache).end();
   }
 
   const filePath = path.join(env.upload.dir, receipt.file_path);
@@ -274,8 +282,7 @@ async function image(req, res) {
   res
     .status(200)
     .set('Content-Type', image.contentType)
-    .set('Cache-Control', 'private, max-age=86400')
-    .set('ETag', etag)
+    .set(cache)
     .send(image.data);
 }
 

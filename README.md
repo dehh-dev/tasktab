@@ -459,6 +459,13 @@ O `helmet` aplica os headers de seguranca com a politica padrao — front e back
 ficam sempre na mesma origem, entao a CSP `'self'` atende o build do Vite sem
 excecoes.
 
+Nenhuma resposta de `/api` fica no cache do navegador (`Cache-Control:
+no-store`): o cache guarda pela URL e nao sabe de sessao, entao o que ficasse
+nele sobreviveria ao logout. A imagem do comprovante e a unica excecao,
+`private, no-cache`: o navegador guarda, mas pergunta antes de cada uso, e a
+pergunta passa pela sessao e pela posse. Com o ETag certo a resposta e um `304`,
+sem renderizar a imagem de novo.
+
 O limitador tem tetos sobrepostos: um geral, generoso porque a interface
 recarrega a lista a cada mutacao; um mais apertado so para escrita; um proprio
 para as rotas em lote da prestacao de contas; e o mais apertado de todos no
