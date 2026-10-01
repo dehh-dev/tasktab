@@ -116,6 +116,11 @@ Toda resposta de erro nasce de uma classe em `infra/errors.js` que estende
   seguir** — a interface o exibe abaixo da mensagem, entao nunca deixe vazio.
 - **Erro inesperado** → deixe estourar. O `onErrorHandler` converte em
   `InternalServerError` (500) para nao vazar detalhe interno.
+- **`catch` so pega o caso que sabe nomear** e relanca o resto: `ENOENT` na
+  leitura do PDF, `InvalidPDFException` ao gerar a imagem. Um `catch` largo
+  transformava permissao de disco, hash corrompido no banco e template ausente
+  em "reenvie o arquivo" ou "senha incorreta" — erro do usuario que nenhuma
+  acao dele conserta, e sem nada no log. Ha teste de cada um.
 - Erro **nosso** com status 5xx (`ServiceError`) e repassado como esta e
   logado; a mensagem publica dele ja nasce segura.
 - **Nunca** monte um objeto de erro na mao dentro do controller.

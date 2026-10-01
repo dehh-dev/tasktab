@@ -91,13 +91,10 @@ async function verify(password, stored) {
 
   const expectedBuffer = Buffer.from(expected, 'base64');
 
-  let derived;
-
-  try {
-    derived = await derive(password, Buffer.from(salt, 'base64'), cost);
-  } catch {
-    return false;
-  }
+  // Sem catch: o hash vem do banco, e se a KDF recusa os parametros dele o
+  // defeito e do registro, nao da senha. Responder "senha incorreta" mandaria
+  // a pessoa tentar de novo ate o limitador bloquear, sem nada no log.
+  const derived = await derive(password, Buffer.from(salt, 'base64'), cost);
 
   if (derived.length !== expectedBuffer.length) {
     return false;

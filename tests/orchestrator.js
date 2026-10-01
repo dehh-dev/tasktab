@@ -525,7 +525,12 @@ async function findReceipts(reportId) {
  * unica forma de provar a retencao: a API nao expoe o diretorio de upload.
  */
 function uploadedFileExists(fileHash) {
-  return fs.existsSync(path.join(env.upload.dir, `${fileHash}.pdf`));
+  return fs.existsSync(uploadedFilePath(`${fileHash}.pdf`));
+}
+
+/** Caminho no disco de um `file_path` de comprovante, para estragar o arquivo. */
+function uploadedFilePath(filePath) {
+  return path.join(env.upload.dir, filePath);
 }
 
 /**
@@ -562,6 +567,7 @@ module.exports = {
   findSessions,
   findReceipts,
   uploadedFileExists,
+  uploadedFilePath,
   leftoverUploads,
   waitForProcessing,
   waitForQueue,

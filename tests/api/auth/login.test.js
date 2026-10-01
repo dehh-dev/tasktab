@@ -5,6 +5,8 @@ const {
   insertUser,
   DEFAULT_USER,
   DEFAULT_PASSWORD,
+  currentUser,
+  updateColumnDirectly,
 } = require('../../orchestrator');
 
 describe('POST /api/auth/login', () => {
@@ -168,5 +170,27 @@ describe('POST /api/auth/login', () => {
     const response = await request('GET', '/api/auth/me', undefined, { token });
 
     expect(response.status).toBe(401);
+  });
+
+  it('hash que a KDF recusa e 500, nao "senha incorreta"', async () => {
+    // N precisa ser potencia de 2: o scrypt recusa 1000 com
+    // ERR_CRYPTO_INVALID_SCRYPT_PARAMS. O defeito e do registro, e responder
+    // 401 mandaria a pessoa repetir a senha certa ate o limitador bloquear.
+    await updateColumnDirectly(
+      'users',
+      currentUser().id,
+      'password_hash',
+      'scrypt$1000$8$1$c2FsdA==$aGFzaA==',
+    );
+
+    const response = await request(
+      'POST',
+      '/api/auth/login',
+      { email: DEFAULT_USER.email, password: DEFAULT_PASSWORD },
+      { token: null },
+    );
+
+    expect(response.status).toBe(500);
+    expect(response.body.name).toBe('InternalServerError');
   });
 });

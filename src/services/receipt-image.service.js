@@ -28,7 +28,7 @@ const MAX_EDGE = 4200;
 // e WebP q92 com 451 KB — quatro vezes menos que o PNG a 3x que era servido
 // antes, e ainda assim com mais resolucao. Para um scan fotografico a perda de
 // q92 nao aparece; o custo e ~0,5s de codificacao, pago uma vez por
-// comprovante graças ao ETag e ao `max-age` de um dia.
+// comprovante: as exibicoes seguintes revalidam pelo ETag e voltam com 304.
 const WEBP_QUALITY = 92;
 
 async function render(buffer, pageNumber) {

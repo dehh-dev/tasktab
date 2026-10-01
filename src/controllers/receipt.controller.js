@@ -19,6 +19,31 @@ const { ValidationError } = require('../../infra/errors');
 const validator = require('../validators/report.validator');
 const receiptValidator = require('../validators/receipt.validator');
 
+/**
+ * Le o PDF original de um comprovante.
+ *
+ * So o arquivo ausente vira erro de quem usa: e o unico caso em que reenviar
+ * resolve. Permissao, disco ou caminho que virou diretorio sao do servidor e
+ * sobem como 500, com a causa no log — antes respondiam "envie de novo" e o
+ * defeito nunca aparecia.
+ */
+async function readOriginal(receipt, action) {
+  try {
+    return await fs.readFile(path.join(env.upload.dir, receipt.file_path));
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+
+    throw new ValidationError({
+      message: 'O arquivo original nao esta mais disponivel.',
+      action,
+      details: [{ field: 'file_path', message: 'arquivo ausente' }],
+      cause: error,
+    });
+  }
+}
+
 async function discard(filePath) {
   await fs.unlink(filePath).catch(() => {});
 }
@@ -209,16 +234,10 @@ async function reprocess(req, res) {
   const id = receiptValidator.validateId(req.params.id);
   const receipt = await loadReceipt(req.user, id, { write: true });
 
-  const filePath = path.join(env.upload.dir, receipt.file_path);
-  const buffer = await fs.readFile(filePath).catch(() => null);
-
-  if (!buffer) {
-    throw new ValidationError({
-      message: 'O arquivo original nao esta mais disponivel.',
-      action: 'Envie o PDF novamente para reprocessar este comprovante.',
-      details: [{ field: 'file_path', message: 'arquivo ausente' }],
-    });
-  }
+  const buffer = await readOriginal(
+    receipt,
+    'Envie o PDF novamente para reprocessar este comprovante.',
+  );
 
   await Receipt.applyExtraction(id, { status: 'pending' });
 
@@ -258,24 +277,26 @@ async function image(req, res) {
     return res.status(304).set(cache).end();
   }
 
-  const filePath = path.join(env.upload.dir, receipt.file_path);
-  const buffer = await fs.readFile(filePath).catch(() => null);
+  const buffer = await readOriginal(
+    receipt,
+    'Envie o PDF novamente para poder revisar este comprovante.',
+  );
 
-  if (!buffer) {
-    throw new ValidationError({
-      message: 'O arquivo original nao esta mais disponivel.',
-      action: 'Envie o PDF novamente para poder revisar este comprovante.',
-      details: [{ field: 'file_path', message: 'arquivo ausente' }],
-    });
-  }
-
+  // So o PDF que o pdf.js recusa e culpa do arquivo. Qualquer outra falha
+  // (sharp, canvas, memoria) e do servidor, e responder "reenvie o arquivo"
+  // mandaria a pessoa repetir um upload que nao resolve nada.
   const image = await receiptImage
     .render(buffer, receipt.page_number)
     .catch((error) => {
+      if (error?.name !== 'InvalidPDFException') {
+        throw error;
+      }
+
       throw new ValidationError({
         message: 'Nao foi possivel gerar a imagem deste comprovante.',
-        action: 'O PDF pode estar corrompido — tente reenviar o arquivo.',
-        details: [{ field: 'file_path', message: error.message }],
+        action: 'O PDF esta corrompido — reenvie o arquivo original.',
+        details: [{ field: 'file_path', message: 'PDF ilegivel' }],
+        cause: error,
       });
     });
 

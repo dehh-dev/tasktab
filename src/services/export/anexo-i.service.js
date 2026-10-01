@@ -77,13 +77,10 @@ async function fillAnexoI(report, receipts) {
     });
   }
 
-  const templateBuffer = await fs.readFile(TEMPLATE_PATH).catch((error) => {
-    throw new ValidationError({
-      message: 'O template do Anexo I nao esta disponivel no servidor.',
-      action: 'Confira se assets/anexo-i-template.xlsx existe e tente de novo.',
-      details: [{ field: 'template', message: error.code || error.message }],
-    });
-  });
+  // Sem catch: template ausente e defeito de instalacao, nao do relatorio.
+  // Como 422 mandava quem usa corrigir um campo que nao existe, e sem a causa
+  // o log nao dizia qual arquivo faltava.
+  const templateBuffer = await fs.readFile(TEMPLATE_PATH);
 
   const zip = await JSZip.loadAsync(templateBuffer);
   let sheetXml = await zip.file(SHEET_PATH).async('string');
