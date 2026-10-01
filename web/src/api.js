@@ -2,6 +2,7 @@ const AUTH_URL = '/api/auth';
 const TASKS_URL = '/api/tasks';
 const REPORTS_URL = '/api/reports';
 const RECEIPTS_URL = '/api/receipts';
+const USERS_URL = '/api/users';
 
 /**
  * Erro de API que preserva os detalhes por campo devolvidos pelo backend
@@ -125,6 +126,20 @@ export function login(email, password) {
 
 export function logout() {
   return request(`${AUTH_URL}/logout`, { method: 'POST' });
+}
+
+/**
+ * Troca a propria senha. A API exige a atual e, depois da troca, derruba as
+ * outras sessoes da pessoa — a corrente segue valendo.
+ */
+export function changeOwnPassword(userId, currentPassword, newPassword) {
+  return request(`${USERS_URL}/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      current_password: currentPassword,
+      password: newPassword,
+    }),
+  });
 }
 
 // ---------- tarefas ----------

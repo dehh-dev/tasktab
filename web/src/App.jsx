@@ -4,6 +4,7 @@ import TabNav from './components/TabNav';
 import TasksApp from './components/TasksApp';
 import ExpensesApp from './components/ExpensesApp';
 import LoginScreen from './components/LoginScreen';
+import ChangePassword from './components/ChangePassword';
 
 const ROLE_LABELS = {
   admin: 'Administrador',
@@ -24,6 +25,9 @@ export default function App() {
   // Por que a pessoa voltou ao login, quando nao foi ela quem saiu.
   const [notice, setNotice] = useState(null);
   const [tab, setTab] = useState('tasks');
+  const [changingPassword, setChangingPassword] = useState(false);
+  // Confirmacao da troca de senha, mostrada no lugar do formulario.
+  const [passwordNotice, setPasswordNotice] = useState(null);
 
   const loadSession = useCallback(async () => {
     try {
@@ -56,7 +60,14 @@ export default function App() {
 
   function handleAuthenticated(authenticated) {
     setNotice(null);
+    setChangingPassword(false);
+    setPasswordNotice(null);
     setUser(authenticated);
+  }
+
+  function handlePasswordDone(message) {
+    setChangingPassword(false);
+    setPasswordNotice(message);
   }
 
   async function handleLogout() {
@@ -90,11 +101,32 @@ export default function App() {
             {user.name}
             <span className="app__role">{ROLE_LABELS[user.role]}</span>
           </span>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setPasswordNotice(null);
+              setChangingPassword(true);
+            }}
+            disabled={changingPassword}
+          >
+            Alterar senha
+          </button>
           <button type="button" className="btn" onClick={handleLogout}>
             Sair
           </button>
         </div>
       </header>
+
+      {changingPassword && (
+        <ChangePassword userId={user.id} onDone={handlePasswordDone} />
+      )}
+
+      {passwordNotice && (
+        <p className="state" role="status">
+          {passwordNotice}
+        </p>
+      )}
 
       <TabNav tabs={tabs} active={active} onChange={setTab} />
 
