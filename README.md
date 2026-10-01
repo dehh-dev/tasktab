@@ -137,6 +137,8 @@ ambiente (nao existe `env.production` versionado).
 | `SESSION_COOKIE_NAME`                                 | Nome do cookie (padrao `tasktab_session`) |
 | `SESSION_TTL_HOURS`                                   | Validade da sessao (padrao 168h)          |
 | `SESSION_COOKIE_SECURE`                               | Forca (ou desliga) o `Secure` do cookie   |
+| `PASSWORD_PEPPER`                                     | Pepper das senhas (obrigatorio)           |
+| `PASSWORD_SCRYPT_P`                                   | Paralelismo do scrypt (padrao 5)          |
 | `LOG_LEVEL`                                           | Nivel do `pino` (padrao `info`)           |
 
 O `.npmrc` liga `engine-strict`: sem ele o campo `engines` seria so um aviso e a
@@ -636,6 +638,7 @@ Em producao nao ha Vite: rode `npm run build` e o Express passa a servir
 docker build -t tasktab .
 docker run -p 3000:3000 \
   -e DB_HOST=... -e DB_USER=... -e DB_PASSWORD=... -e DB_NAME=... \
+  -e PASSWORD_PEPPER=... \
   tasktab
 ```
 

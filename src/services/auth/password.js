@@ -3,6 +3,8 @@
 const crypto = require('crypto');
 const { promisify } = require('util');
 
+const env = require('../../config/env');
+
 const scrypt = promisify(crypto.scrypt);
 
 /**
@@ -17,7 +19,7 @@ const scrypt = promisify(crypto.scrypt);
  * custo depois passa a valer para as senhas novas sem invalidar as antigas: a
  * verificacao le o custo de cada registro em vez de assumir o atual.
  */
-const COST = { N: 16384, r: 8, p: 1 };
+const COST = { N: 16384, r: 8, p: env.password.scryptP };
 const KEY_LENGTH = 64;
 const SALT_BYTES = 16;
 
@@ -30,8 +32,50 @@ const MAX_MEMORY = 64 * 1024 * 1024;
 // de ocupar a CPU do servidor — a KDF e cara **de proposito**.
 const MAX_PASSWORD_BYTES = 1024;
 
-async function derive(password, salt, cost) {
-  return scrypt(password.normalize('NFKC'), salt, KEY_LENGTH, {
+// `scrypt-hmac` passa a senha pelo HMAC do pepper antes da KDF; `scrypt` e o
+// formato anterior, sem pepper, que so continua sendo lido ate o proximo login
+// refazer o hash (`needsRehash`).
+const SCHEME = 'scrypt-hmac';
+const LEGACY_SCHEME = 'scrypt';
+
+/**
+ * Segredo que nao mora no banco: com ele, uma copia do banco sozinha nao basta
+ * para testar senhas fora do sistema.
+ *
+ * Lido a cada chamada, e nao no carregamento do modulo, e sem valor padrao:
+ * pepper ausente e falha de configuracao, e cair num valor fixo gravaria hashes
+ * que deixam de bater no dia em que o pepper real for configurado.
+ *
+ * **Trocar o pepper invalida todas as senhas** — cada pessoa precisa de
+ * `npm run users:create -- --replace` para entrar de novo.
+ */
+function pepper() {
+  const value = process.env.PASSWORD_PEPPER;
+
+  if (!value) {
+    throw new Error('PASSWORD_PEPPER ausente: configure o pepper das senhas');
+  }
+
+  return value;
+}
+
+/**
+ * HMAC e nao concatenacao: a saida tem tamanho fixo, entao nem o teto de
+ * `MAX_PASSWORD_BYTES` nem uma senha longa empurram o pepper para fora do que a
+ * KDF le.
+ */
+function withPepper(password) {
+  return crypto
+    .createHmac('sha256', pepper())
+    .update(password.normalize('NFKC'))
+    .digest();
+}
+
+async function derive(password, salt, cost, scheme = SCHEME) {
+  const input =
+    scheme === SCHEME ? withPepper(password) : password.normalize('NFKC');
+
+  return scrypt(input, salt, KEY_LENGTH, {
     N: cost.N,
     r: cost.r,
     p: cost.p,
@@ -46,7 +90,7 @@ async function hash(password) {
   const derived = await derive(password, salt, COST);
 
   return [
-    'scrypt',
+    SCHEME,
     COST.N,
     COST.r,
     COST.p,
@@ -78,11 +122,11 @@ async function verify(password, stored) {
 
   const parts = stored.split('$');
 
-  if (parts.length !== 6 || parts[0] !== 'scrypt') {
+  if (parts.length !== 6 || ![SCHEME, LEGACY_SCHEME].includes(parts[0])) {
     return false;
   }
 
-  const [, N, r, p, salt, expected] = parts;
+  const [scheme, N, r, p, salt, expected] = parts;
   const cost = { N: Number(N), r: Number(r), p: Number(p) };
 
   if (!Number.isInteger(cost.N) || !Number.isInteger(cost.r)) {
@@ -94,13 +138,36 @@ async function verify(password, stored) {
   // Sem catch: o hash vem do banco, e se a KDF recusa os parametros dele o
   // defeito e do registro, nao da senha. Responder "senha incorreta" mandaria
   // a pessoa tentar de novo ate o limitador bloquear, sem nada no log.
-  const derived = await derive(password, Buffer.from(salt, 'base64'), cost);
+  const derived = await derive(
+    password,
+    Buffer.from(salt, 'base64'),
+    cost,
+    scheme,
+  );
 
   if (derived.length !== expectedBuffer.length) {
     return false;
   }
 
   return crypto.timingSafeEqual(derived, expectedBuffer);
+}
+
+/**
+ * O hash gravado foi feito com outro custo que o atual.
+ *
+ * Vale tambem para o formato sem pepper. Endurecer o custo so alcancaria as senhas novas: quem ja tem conta seguiria
+ * com o custo antigo para sempre. O login e o unico momento em que a senha em
+ * claro passa pelo servidor, entao e ali que o hash e refeito.
+ */
+function needsRehash(stored) {
+  const [scheme, N, r, p] = stored.split('$');
+
+  return (
+    scheme !== SCHEME ||
+    Number(N) !== COST.N ||
+    Number(r) !== COST.r ||
+    Number(p) !== COST.p
+  );
 }
 
 /**
@@ -132,4 +199,5 @@ module.exports = {
   generate,
   COST,
   MAX_PASSWORD_BYTES,
+  needsRehash,
 };

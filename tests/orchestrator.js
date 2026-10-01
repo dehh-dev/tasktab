@@ -88,10 +88,10 @@ function runPendingMigrations() {
  * imprimiu. O script e o de verdade, num processo proprio — o mesmo caminho
  * de quem o chama pela linha de comando, sem importar nada dele no teste.
  */
-function runScript(file, args = []) {
+function runScript(file, args = [], { env: extraEnv = {} } = {}) {
   const result = spawnSync('node', [file, ...args], {
     cwd: ROOT,
-    env: { ...process.env, NODE_ENV: 'test' },
+    env: { ...process.env, ...extraEnv, NODE_ENV: 'test' },
     encoding: 'utf8',
   });
 
@@ -401,6 +401,15 @@ async function updateColumnDirectly(table, id, column, value) {
   return rows[0];
 }
 
+/** O hash gravado de uma pessoa, para conferir o rehash do login. */
+async function findPasswordHash(userId) {
+  const { rows } = await db.query(
+    'SELECT password_hash FROM users WHERE id = $1',
+    [userId],
+  );
+  return rows[0].password_hash;
+}
+
 /** Sessoes de uma pessoa, direto do banco. */
 async function findSessions(userId) {
   const { rows } = await db.query(
@@ -565,6 +574,7 @@ module.exports = {
   insertMerchant,
   updateColumnDirectly,
   findSessions,
+  findPasswordHash,
   findReceipts,
   uploadedFileExists,
   uploadedFilePath,

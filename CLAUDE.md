@@ -210,7 +210,15 @@ comparando as duas respostas campo a campo.
   Nao entra `bcrypt` nem `argon2`: os dois trazem binario nativo para o que a
   biblioteca padrao ja faz. Os parametros vao **dentro** do hash
   (`scrypt$N$r$p$salt$hash`), entao endurecer o custo depois nao invalida as
-  senhas ja cadastradas.
+  senhas ja cadastradas — e o login refaz o hash de quem entra com custo
+  diferente do atual (`needsRehash`), senao o custo novo so valeria para
+  senha nova. O `p` vem de `PASSWORD_SCRYPT_P`: **5** por padrao, o minimo da
+  OWASP para N=2^14 e r=8 (~135 ms); o `env.test` usa 1.
+- **Pepper** (`PASSWORD_PEPPER`) entra como `HMAC-SHA256(pepper, senha)` antes
+  do scrypt, nunca concatenado. E lido a cada chamada e sem valor padrao:
+  ausente, o hash falha alto. Hash sem pepper (`scrypt$...`, anterior a ele)
+  ainda entra e e refeito no login como `scrypt-hmac$...`. **Trocar o pepper
+  invalida todas as senhas** — a saida e `users:create -- --replace`.
 - A comparacao e `timingSafeEqual`, e o login roda `dummyVerify` quando o
   e-mail nao existe: sem isso a resposta instantanea entregaria quais e-mails
   estao cadastrados. Pelo mesmo motivo, e-mail inexistente e senha errada

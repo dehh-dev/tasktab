@@ -50,6 +50,12 @@ module.exports = {
       ? process.env.SESSION_COOKIE_SECURE === 'true'
       : nodeEnv === 'production',
   },
+  password: {
+    // Paralelismo do scrypt. 5 e o minimo da OWASP para N=2^14 e r=8 (~135 ms
+    // por hash). O `env.test` baixa para 1: a suite cria e confere senha
+    // dezenas de vezes, e o custo de producao nao e o que ela testa.
+    scryptP: Number(process.env.PASSWORD_SCRYPT_P || 5),
+  },
   upload: {
     // Relativo a raiz do projeto quando nao absoluto. Em container e um volume:
     // a imagem nao carrega arquivo de usuario.

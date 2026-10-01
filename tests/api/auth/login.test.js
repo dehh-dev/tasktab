@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('crypto');
+
 const {
   request,
   insertUser,
@@ -7,7 +9,9 @@ const {
   DEFAULT_PASSWORD,
   currentUser,
   updateColumnDirectly,
+  findPasswordHash,
 } = require('../../orchestrator');
+const { COST } = require('../../../src/services/auth/password');
 
 describe('POST /api/auth/login', () => {
   it('abre a sessao e devolve o usuario com os escopos', async () => {
@@ -192,5 +196,73 @@ describe('POST /api/auth/login', () => {
 
     expect(response.status).toBe(500);
     expect(response.body.name).toBe('InternalServerError');
+  });
+
+  it('refaz o hash de quem entra com o formato antigo, sem pepper e com outro custo', async () => {
+    // Hash valido da senha padrao, sem pepper e com N=1024: um registro
+    // gravado antes do pepper e de o custo subir.
+    const salt = crypto.randomBytes(16);
+    const derived = crypto.scryptSync(DEFAULT_PASSWORD, salt, 64, {
+      N: 1024,
+      r: 8,
+      p: 1,
+    });
+    const id = currentUser().id;
+    await updateColumnDirectly(
+      'users',
+      id,
+      'password_hash',
+      `scrypt$1024$8$1$${salt.toString('base64')}$${derived.toString('base64')}`,
+    );
+
+    const response = await request(
+      'POST',
+      '/api/auth/login',
+      { email: DEFAULT_USER.email, password: DEFAULT_PASSWORD },
+      { token: null },
+    );
+
+    expect(response.status).toBe(200);
+    expect(await findPasswordHash(id)).toMatch(
+      new RegExp(`^scrypt-hmac\\$${COST.N}\\$${COST.r}\\$${COST.p}\\$`),
+    );
+  });
+
+  it('o pepper entra no hash: o mesmo calculo sem ele nao abre a sessao', async () => {
+    const id = currentUser().id;
+    const salt = crypto.randomBytes(16);
+    const stored = (input) =>
+      [
+        'scrypt-hmac',
+        COST.N,
+        COST.r,
+        COST.p,
+        salt.toString('base64'),
+        crypto
+          .scryptSync(input, salt, 64, { N: COST.N, r: COST.r, p: COST.p })
+          .toString('base64'),
+      ].join('$');
+    const hmac = crypto
+      .createHmac('sha256', process.env.PASSWORD_PEPPER)
+      .update(DEFAULT_PASSWORD)
+      .digest();
+
+    const statusWith = async (hash) => {
+      await updateColumnDirectly('users', id, 'password_hash', hash);
+      const response = await request(
+        'POST',
+        '/api/auth/login',
+        { email: DEFAULT_USER.email, password: DEFAULT_PASSWORD },
+        { token: null },
+      );
+      return response.status;
+    };
+
+    // O controle positivo e o que garante que o 401 vem da falta do pepper, e
+    // nao de um hash montado errado no proprio teste.
+    expect({
+      comPepper: await statusWith(stored(hmac)),
+      semPepper: await statusWith(stored(DEFAULT_PASSWORD)),
+    }).toEqual({ comPepper: 200, semPepper: 401 });
   });
 });

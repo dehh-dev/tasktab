@@ -47,6 +47,14 @@ async function login(req, res) {
     throw invalidCredentials();
   }
 
+  if (password.needsRehash(user.password_hash)) {
+    await User.updatePassword(user.id, await password.hash(senha));
+    req.log.info(
+      { user_id: user.id },
+      'hash da senha refeito com o custo atual',
+    );
+  }
+
   // O login e raro e ja e a requisicao mais lenta do sistema (a KDF); e o
   // lugar barato para varrer as sessoes vencidas, sem um processo em segundo
   // plano so para isso.
