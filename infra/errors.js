@@ -121,6 +121,23 @@ class ForbiddenError extends BaseError {
 }
 
 /**
+ * 405 — o caminho existe, mas nao com este metodo.
+ *
+ * Distinto do 404: a pessoa acertou o endereco e errou o verbo, e o header
+ * `Allow` (posto pelo middleware que lanca este erro) diz quais servem.
+ */
+class MethodNotAllowedError extends BaseError {
+  constructor({ method, allow, cause } = {}) {
+    super({
+      message: `Metodo ${method} nao e aceito neste caminho.`,
+      action: `Use um dos metodos aceitos: ${allow.join(', ')}.`,
+      statusCode: 405,
+      cause,
+    });
+  }
+}
+
+/**
  * 422 — a requisicao esta bem formada, mas o conteudo nao passa nas regras.
  * O `details` traz `{ field, message }` por campo: e o que permite a interface
  * exibir cada erro no campo correspondente em vez de um alerta generico.
@@ -146,5 +163,6 @@ module.exports = {
   NotFoundError,
   UnauthorizedError,
   ForbiddenError,
+  MethodNotAllowedError,
   ValidationError,
 };

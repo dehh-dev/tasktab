@@ -201,3 +201,55 @@ describe('contrato de cache', () => {
     });
   });
 });
+
+describe('contrato de metodo', () => {
+  const ORDER = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+  // Os metodos de cada caminho, lidos da mesma lista das matrizes, mais as
+  // duas rotas publicas que ficam fora dela.
+  const PATHS = {};
+  for (const route of [
+    ...ROUTES,
+    { method: 'GET', path: '/api/health' },
+    { method: 'POST', path: '/api/auth/login' },
+  ]) {
+    PATHS[route.path] = [...(PATHS[route.path] || []), route.method];
+  }
+
+  const allowOf = (methods) =>
+    ORDER.filter(
+      (method) =>
+        methods.includes(method) ||
+        (method === 'HEAD' && methods.includes('GET')),
+    ).join(', ');
+
+  it('metodo errado em caminho que existe responde 405 com o Allow', async () => {
+    const actual = {};
+    const expected = {};
+
+    for (const [path, methods] of Object.entries(PATHS)) {
+      const wrong = ['PUT', 'DELETE', 'POST'].find((m) => !methods.includes(m));
+      const response = await request(
+        wrong,
+        path.replace(':id', '999999'),
+        undefined,
+        // Sem sessao: o metodo errado e o mesmo para qualquer pessoa.
+        { token: null },
+      );
+
+      actual[`${wrong} ${path}`] =
+        `${summary(response)} Allow: ${response.headers.get('allow')}`;
+      expected[`${wrong} ${path}`] =
+        `405 MethodNotAllowedError Allow: ${allowOf(methods)}`;
+    }
+
+    expect(actual).toEqual(expected);
+  });
+
+  it('caminho inexistente continua 404, qualquer que seja o metodo', async () => {
+    const response = await request('DELETE', '/api/nao-existe');
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('allow')).toBeNull();
+  });
+});

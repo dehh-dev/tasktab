@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const controller = require('../controllers/merchant.controller');
 const asyncHandler = require('../middlewares/async-handler');
+const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireScope } = require('../middlewares/authorize');
 
 const router = Router();
@@ -30,4 +31,4 @@ router.patch(
   asyncHandler(controller.update),
 );
 
-module.exports = router;
+module.exports = rejectOtherMethods(router);
