@@ -2008,9 +2008,19 @@ qualquer página, o cabeçalho do emitente (0–75% × 0–40%).
 
 **Critérios de aceite**
 
-- [ ] Atalhos escolhidos pela proporção da imagem
-- [ ] Teclado e mouse, sem perder o arrastar da #28
-- [ ] Spec E2E medindo o recorte de um atalho
+- [x] Atalhos escolhidos pela proporção da imagem
+- [x] Teclado e mouse, sem perder o arrastar da #28
+- [x] Spec E2E medindo o recorte de um atalho
+
+**Como ficou**
+
+Os atalhos são botões ao lado do zoom — teclado e mouse de graça, e o arrastar
+da #28 continua intacto. O limite do "retrato muito alto" é 1,6:1, medido no
+corpus: os cupons de Itapipoca iam de 2 a 2,5, e a página A4 do recibo padrão
+tem 1,41. A proporção é a da imagem carregada, já girada pela #43. Os atalhos
+valem também para quem só lê: zoom não escreve nada. As duas specs medem o que
+o painel mostra pelas caixas na tela, e cada uma cobre um caminho — com o
+zoom mudando e com o zoom que já era o certo.
 
 ---
 

@@ -842,6 +842,14 @@ React 19 + Vite, sem router e sem biblioteca de estado — tela unica, estado no
   haveria interpolacao, porque o dado nao existe no PDF.
 - A escala do **QR** (`qr.service.js`) continua 3x e e outra coisa: la o alvo e
   o zxing, aqui e o olho humano. Nao amarre as duas.
+- **Atalhos de recorte** na revisao (issue 46, `cropShortcuts` em
+  `ReceiptReview.jsx`): cada atalho e um retangulo em fracao da pagina, e
+  vira zoom e rolagem sobre a mesma imagem — nada e renderizado de novo. A
+  proporcao da imagem ja girada escolhe os atalhos: paisagem e recibo
+  manuscrito (Valor, Data), retrato a partir de 1,6:1 e cupom (tres fatias com
+  3% de sobreposicao), e o Cabecalho vale para qualquer pagina. Quando o zoom
+  que enquadra a regiao e o atual, a rolagem vai na hora; senao, depois que o
+  zoom novo pinta. Ha spec de cada caminho.
 - **O giro da pagina e do comprovante, nao do arquivo** (issue 43,
   `receipts.rotation`, quarto de volta com check no banco). Vale para a imagem
   da revisao, para o OCR do reprocessamento e para o PDF consolidado, somado

@@ -16,6 +16,46 @@ const ZOOM_STEP = 0.25;
 const LOW_CONFIDENCE = 0.7;
 
 /**
+ * Atalhos de recorte do procedimento de prestacao de contas (issue 46): a
+ * pagina inteira nao e legivel campo a campo, e a proporcao dela ja diz o
+ * tipo. Paisagem e recibo manuscrito em bloco; retrato muito alto e cupom
+ * termico. Cada atalho e um retangulo em fracao da pagina — zoom e rolagem
+ * sobre a mesma imagem, sem renderizar nada novo.
+ *
+ * "Muito alto" e a partir de 1,6: os cupons da prestacao de Itapipoca iam de
+ * 2 a 2,5 vezes mais altos que largos, e a pagina A4 do recibo padrao tem 1,41.
+ */
+const TALL_RATIO = 1.6;
+const HEADER = { label: 'Cabecalho', x: [0, 0.75], y: [0, 0.4] };
+const HANDWRITTEN = [
+  { label: 'Valor', x: [0.55, 1], y: [0, 0.42] },
+  { label: 'Data', x: [0, 1], y: [0.7, 1] },
+];
+// Tres fatias com 3% de sobreposicao, como o procedimento fatia o cupom.
+const SLICE = (1 + 2 * 0.03) / 3;
+const RECEIPT_SLICES = ['Topo', 'Meio', 'Fim'].map((label, index) => ({
+  label,
+  x: [0, 1],
+  y: [index * (SLICE - 0.03), Math.min(1, index * (SLICE - 0.03) + SLICE)],
+}));
+
+function cropShortcuts(size) {
+  if (!size) {
+    return [];
+  }
+
+  if (size.width > size.height) {
+    return [...HANDWRITTEN, HEADER];
+  }
+
+  if (size.height / size.width >= TALL_RATIO) {
+    return [HEADER, ...RECEIPT_SLICES];
+  }
+
+  return [HEADER];
+}
+
+/**
  * A confianca gravada e uma so por comprovante, nao por campo: o pipeline de
  * extracao (pipeline.service.js, `lowestConfidence`) resume tudo num numero
  * so, o do campo mais fraco. Por isso o destaque de "baixa confianca" e do
@@ -90,6 +130,8 @@ export default function ReceiptReview({
   const [rotation, setRotation] = useState(receipt.rotation ?? 0);
   const [rotating, setRotating] = useState(false);
   const [loadedRotation, setLoadedRotation] = useState(null);
+  // Proporcao da imagem carregada — ja girada —, que escolhe os atalhos.
+  const [imageSize, setImageSize] = useState(null);
 
   // Emitente ainda sem categoria: a escolha desta revisao vira o cadastro dele
   // por padrao, que e o caso de uso (7 dos 28 cupons do caso-base eram do
@@ -110,6 +152,9 @@ export default function ReceiptReview({
   const [dismissed, setDismissed] = useState(() => new Set());
 
   const scrollRef = useRef(null);
+  const imageRef = useRef(null);
+  // Rolagem pedida por um atalho, aplicada depois que o zoom novo pinta.
+  const pendingScroll = useRef(null);
   // Os dados do gesto em curso ficam num ref, nao em estado: eles mudam a cada
   // pixel de movimento e nada na tela depende deles diretamente — re-renderizar
   // por causa disso derrubaria o arrasto para um engasgo.
@@ -118,6 +163,7 @@ export default function ReceiptReview({
   const [pannable, setPannable] = useState(false);
 
   const errors = { ...serverErrors, ...localErrors };
+  const shortcuts = cropShortcuts(imageSize);
 
   // So oferece quando ha emitente e a escolha difere do que ele ja tem: com a
   // mesma categoria no cadastro nao ha o que atualizar.
@@ -288,6 +334,55 @@ export default function ReceiptReview({
     );
     // Girada, a imagem troca de proporcao: mede de novo quando a nova chega.
   }, [zoom, imageLoaded, loadedRotation]);
+
+  /**
+   * Leva o retangulo do atalho para o painel: o zoom que o faz caber, e a
+   * rolagem que poe o canto dele no canto do painel. O transform cresce a
+   * partir do canto superior esquerdo, entao o canto de uma regiao fica em
+   * fracao x tamanho x zoom.
+   */
+  function showRegion(region) {
+    const box = scrollRef.current;
+    const image = imageRef.current;
+
+    if (!box || !image) {
+      return;
+    }
+
+    const width = image.offsetWidth;
+    const height = image.offsetHeight;
+    const [left, right] = region.x;
+    const [top, bottom] = region.y;
+
+    const fit = Math.min(
+      box.clientWidth / ((right - left) * width),
+      box.clientHeight / ((bottom - top) * height),
+    );
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, fit));
+    const target = { left: left * width * next, top: top * height * next };
+
+    if (next === zoom) {
+      box.scrollLeft = target.left;
+      box.scrollTop = target.top;
+      return;
+    }
+
+    pendingScroll.current = target;
+    setZoom(next);
+  }
+
+  useLayoutEffect(() => {
+    const box = scrollRef.current;
+    const target = pendingScroll.current;
+
+    if (!box || !target) {
+      return;
+    }
+
+    box.scrollLeft = target.left;
+    box.scrollTop = target.top;
+    pendingScroll.current = null;
+  }, [zoom]);
 
   /** Quarto de volta: +90 no sentido horario, -90 no anti-horario. */
   async function rotate(delta) {
@@ -508,6 +603,25 @@ export default function ReceiptReview({
             )}
           </div>
 
+          {shortcuts.length > 0 && (
+            <div
+              className="review__zoom-controls"
+              role="group"
+              aria-label="Atalhos de recorte"
+            >
+              {shortcuts.map((region) => (
+                <button
+                  key={region.label}
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => showRegion(region)}
+                >
+                  {region.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Focavel de proposito: com o cupom ampliado, quem navega por
               teclado tambem precisa alcancar o que saiu da area visivel — as
               setas rolam o container nativamente. */}
@@ -541,6 +655,7 @@ export default function ReceiptReview({
                   <p className="state">Carregando imagem...</p>
                 )}
                 <img
+                  ref={imageRef}
                   className="review__image"
                   // A URL muda com o giro: o navegador guarda a imagem para
                   // revalidar, e sem isso mostraria a copia sem perguntar.
@@ -551,9 +666,13 @@ export default function ReceiptReview({
                   draggable={false}
                   hidden={!imageLoaded}
                   style={{ transform: `scale(${zoom})` }}
-                  onLoad={() => {
+                  onLoad={(event) => {
                     setImageLoaded(true);
                     setLoadedRotation(rotation);
+                    setImageSize({
+                      width: event.currentTarget.naturalWidth,
+                      height: event.currentTarget.naturalHeight,
+                    });
                   }}
                   onError={() => setImageFailed(true)}
                 />
