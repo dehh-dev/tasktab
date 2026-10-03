@@ -118,7 +118,7 @@ describe('guessCategory', () => {
     ['POSTO MONTREAL JR', 'combustivel'],
     ['UBER DO BRASIL TECNOLOGIA', 'transporte'],
     ['LAVANDERIA CENTRAL', 'lavanderia'],
-    ['ESTACIONAMENTO CENTRO LTDA', 'estacionamento'],
+    ['ESTACIONAMENTO CENTRO LTDA', 'outros'],
     ['K B A TEIXEIRA COMERCIO E SERVICOS', null],
     ['GRUPO FARTURA DE HORTIFRUTI S A', null],
     ['', null],

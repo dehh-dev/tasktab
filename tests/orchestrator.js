@@ -125,8 +125,35 @@ async function startApiInstance(extraEnv = {}, { port = 3002 } = {}) {
  * arquivo a sua propria copia de `process.env`.
  */
 function runPendingMigrations() {
+  migrate(
+    'up',
+    'Nao foi possivel preparar o banco de teste. Confira se o Postgres ' +
+      'esta no ar (`npm run services:up`) e se o banco tasktab_test existe.',
+  );
+}
+
+/**
+ * Anda `count` migrations para tras (`down`) ou para a frente (`up`) no banco
+ * de teste. Serve ao teste que prova a conversao de dado de uma migration:
+ * volta para antes dela, grava o estado antigo e aplica de novo.
+ *
+ * Quem chama devolve o banco ao topo num `finally`: o resto da suite rodando
+ * sobre o schema velho falharia longe daqui, sem dizer por que.
+ */
+function runMigration(direction, count = 1) {
+  if (!['up', 'down'].includes(direction) || !Number.isInteger(count)) {
+    throw new Error(`migration invalida: ${direction} ${count}`);
+  }
+
+  migrate(
+    `${direction} ${count}`,
+    `Nao foi possivel rodar ${direction} ${count} no banco de teste.`,
+  );
+}
+
+function migrate(args, failure) {
   try {
-    execSync('npx node-pg-migrate --envPath env.test up', {
+    execSync(`npx node-pg-migrate --envPath env.test ${args}`, {
       cwd: ROOT,
       env: process.env,
       stdio: 'pipe',
@@ -137,11 +164,7 @@ function runPendingMigrations() {
       .map((buffer) => buffer.toString())
       .join('\n');
 
-    throw new Error(
-      'Nao foi possivel preparar o banco de teste. Confira se o Postgres ' +
-        'esta no ar (`npm run services:up`) e se o banco tasktab_test existe.' +
-        `\n\n${output}`,
-    );
+    throw new Error(`${failure}\n\n${output}`);
   }
 }
 
@@ -469,6 +492,19 @@ async function updateColumnDirectly(table, id, column, value) {
   return rows[0];
 }
 
+/** Valores de um enum do banco, na ordem em que foram declarados. */
+async function enumLabels(typeName) {
+  const { rows } = await db.query(
+    `SELECT e.enumlabel AS label
+     FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+     WHERE t.typname = $1
+     ORDER BY e.enumsortorder`,
+    [typeName],
+  );
+  return rows.map((row) => row.label);
+}
+
 /** O hash gravado de uma pessoa, para conferir o rehash do login. */
 async function findPasswordHash(userId) {
   const { rows } = await db.query(
@@ -650,6 +686,7 @@ module.exports = {
   waitForAllServices,
   startApiInstance,
   runPendingMigrations,
+  runMigration,
   runScript,
   clearDatabase,
   closeDatabase,
@@ -658,6 +695,7 @@ module.exports = {
   insertReceipt,
   insertMerchant,
   updateColumnDirectly,
+  enumLabels,
   findSessions,
   sessionHoursLeft,
   findPasswordHash,

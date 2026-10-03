@@ -20,7 +20,6 @@ const INVALID_ID = {
 const EXPENSE_CATEGORIES = [
   'alimentacao',
   'combustivel',
-  'estacionamento',
   'lavanderia',
   'transporte',
   'outros',

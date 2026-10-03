@@ -24,7 +24,11 @@ const RULES = [
     'combustivel',
     /\b(posto|combust[íi]vel|gasolina|etanol|[áa]lcool|diesel|ipiranga|petrobras|shell|ale\b|texaco)/i,
   ],
-  ['estacionamento', /\b(estacionament|parking|zona\s*azul|p[áa]tio)/i],
+  // Estacionamento nao tem categoria propria (issue 40): o procedimento manda
+  // para Outros o que nao se encaixa, e no Anexo I ele ja caia em Outras.
+  // Continua reconhecido, para o palpite chegar marcado como Outros em vez de
+  // cair no piso `alimentacao`.
+  ['outros', /\b(estacionament|parking|zona\s*azul|p[áa]tio)/i],
   ['lavanderia', /\b(lavanderia|lavander|laundry|lava\s*e\s*seca)/i],
   [
     'transporte',

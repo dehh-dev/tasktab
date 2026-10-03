@@ -329,6 +329,8 @@ Tudo que e infraestrutura de teste vive em **`tests/orchestrator.js`**:
 | `waitForAllServices()`              | espera o `/api/health` responder 200                       |
 | `runPendingMigrations()`            | aplica as migrations no banco de teste                     |
 | `runScript(file, args)`             | roda um script de `scripts/` contra o banco de teste       |
+| `runMigration(direcao, n)`          | anda n migrations; o teste volta ao topo num `finally`     |
+| `enumLabels(tipo)`                  | valores de um enum do banco, na ordem declarada            |
 | `clearDatabase()`                   | trunca todas as tabelas reiniciando a identidade           |
 | `insertTask(overrides)`             | arranjo direto no banco, sem passar pela API               |
 | `insertUser` / `insertSession`      | usuario e sessao direto no banco                           |
@@ -618,6 +620,14 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   visivel no codigo qual dos dois respondeu.
 - **`hospedagem` saiu do enum** a pedido de quem usa. Remover valor de enum no
   Postgres exige recriar o tipo; ha migration com `up` e `down` testados.
+- **As categorias sao as cinco do procedimento** (issue 40): Alimentacao,
+  Taxi/Locomocao, Combustivel, Lavanderia e Outros, mais `nao_classificado`.
+  `estacionamento` saiu: a migration converte as linhas para `outros` antes de
+  recriar o tipo, e o `down` devolve o valor ao enum, nao as linhas — nao ha
+  como saber quais `outros` eram estacionamento. O palpite que reconhecia
+  estacionamento sugere `outros`, com a marca. `transporte` fica no banco com o
+  rotulo Taxi/Locomocao. `tests/db/expense-category.test.js` roda o `down` e o
+  `up` de verdade (`runMigration`) para provar a conversao.
 - O CNPJ confiavel e o das posicoes 7 a 20 da **chave de acesso**, nao o do
   texto: o cupom traz tambem o da credenciadora do cartao.
 - **CNPJ alfanumerico** (julho de 2026): os 12 primeiros caracteres do CNPJ,
@@ -684,7 +694,7 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   troque pelo formulario oficial e confira `CATEGORY_COLUMN` em
   `anexo-i.service.js`. O mapa ja e o da versao 19 descrita pelo procedimento
   de prestacao de contas (O Passagens, Q Taxi/Conducoes, S Alimentacao,
-  U Hospedagem, W Combustivel, X Outras; estacionamento e lavanderia em X), e
+  U Hospedagem, W Combustivel, X Outras; lavanderia e outros em X), e
   o sintetico tem as mesmas seis colunas, com o total da linha cobrindo todas.
   Ate a issue 38 o mapa era placeholder e o taxi caia em W, a coluna do
   combustivel.

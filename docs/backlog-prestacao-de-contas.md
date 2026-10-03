@@ -1777,12 +1777,23 @@ estacionamento passa a sugerir `outros`, marcado como qualquer palpite.
 
 **Critérios de aceite**
 
-- [ ] Migration reversível; o `down` documenta que o que virou `outros` não
+- [x] Migration reversível; o `down` documenta que o que virou `outros` não
       volta a ser estacionamento
-- [ ] Rótulo "Táxi/Locomoção" nas três saídas e na tela; nome de aba sem a
+- [x] Rótulo "Táxi/Locomoção" nas três saídas e na tela; nome de aba sem a
       barra
-- [ ] `web/src/constants.js` espelhando o enum novo
-- [ ] Palpite de estacionamento sugere `outros`, com a marca
+- [x] `web/src/constants.js` espelhando o enum novo
+- [x] Palpite de estacionamento sugere `outros`, com a marca
+
+**Como ficou**
+
+`tests/db/expense-category.test.js` roda o `down` e o `up` de verdade
+(`runMigration` no orchestrator): volta o banco para antes da migration,
+grava um comprovante e um emitente como estacionamento e confere que o `up`
+os levou para `outros`. O arranjo só funciona se o `down` devolver o valor ao
+enum; trocando a conversão por `alimentacao`, o teste cai. A planilha final de
+Itapipoca chama a categoria só de "Táxi"; ficou o rótulo do procedimento,
+"Táxi/Locomoção" — trocar é uma linha em `labels.js` e outra em
+`web/src/constants.js`.
 
 **Fora de escopo**
 

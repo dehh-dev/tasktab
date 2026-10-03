@@ -69,7 +69,7 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
       'Resumo',
       'Alimentação',
-      'Transporte',
+      'Táxi-Locomoção',
     ]);
   });
 

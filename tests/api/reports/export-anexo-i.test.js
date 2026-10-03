@@ -69,7 +69,6 @@ describe('GET /api/reports/:id/export/anexo-i.xlsx', () => {
       ['alimentacao', 'S'],
       ['combustivel', 'W'],
       ['transporte', 'Q'],
-      ['estacionamento', 'X'],
       ['lavanderia', 'X'],
       ['outros', 'X'],
     ];

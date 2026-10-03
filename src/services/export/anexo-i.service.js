@@ -33,17 +33,17 @@ const MAX_ROWS = LAST_DATA_ROW - FIRST_DATA_ROW + 1;
  * pelo procedimento de prestacao de contas: O Passagens, Q Taxi/Conducoes,
  * S Alimentacao, U Hospedagem, W Combustivel, X Outras.
  *
- * Estacionamento e lavanderia nao tem coluna propria e caem em X — o que o
- * procedimento registra como certo, e nao como erro de classificacao. Ate a
- * Issue 38 o mapa era placeholder e mandava `transporte` para W: uma corrida
- * de taxi saia lancada como abastecimento. Confira o mapa de novo quando o
- * formulario oficial substituir o template sintetico.
+ * Lavanderia nao tem coluna propria e cai em X — o que o procedimento registra
+ * como certo, e nao como erro de classificacao. Estacionamento tambem caia, e
+ * desde a Issue 40 ja chega classificado como Outros. Ate a Issue 38 o mapa
+ * era placeholder e mandava `transporte` para W: uma corrida de taxi saia
+ * lancada como abastecimento. Confira o mapa de novo quando o formulario
+ * oficial substituir o template sintetico.
  */
 const CATEGORY_COLUMN = {
   alimentacao: 'S',
   combustivel: 'W',
   transporte: 'Q',
-  estacionamento: 'X',
   lavanderia: 'X',
   outros: 'X',
   nao_classificado: 'X',

@@ -26,9 +26,8 @@ export function formatDate(isoDate) {
 export const EXPENSE_CATEGORIES = [
   { value: 'alimentacao', label: 'Alimentacao' },
   { value: 'combustivel', label: 'Combustivel' },
-  { value: 'estacionamento', label: 'Estacionamento' },
   { value: 'lavanderia', label: 'Lavanderia' },
-  { value: 'transporte', label: 'Transporte' },
+  { value: 'transporte', label: 'Taxi/Locomocao' },
   { value: 'outros', label: 'Outros' },
   { value: 'nao_classificado', label: 'Nao classificado' },
 ];
