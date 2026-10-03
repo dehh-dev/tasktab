@@ -173,13 +173,14 @@ diferente nao basta, porque a data pode ter sido lida errado.
 
 ## Exportacao
 
-Tres saidas, cada uma com um proposito diferente:
+Quatro saidas, cada uma com um proposito diferente:
 
-| Rota                                       | Para que                                         |
-| ------------------------------------------ | ------------------------------------------------ |
-| `GET /api/reports/:id/export.xlsx`         | A planilha do procedimento, com as abas por tipo |
-| `GET /api/reports/:id/export/anexo-i.xlsx` | O formulario do Anexo I preenchido               |
-| `GET /api/reports/:id/export.pdf`          | Todos os cupons num PDF so, com indice e carimbo |
+| Rota                                                 | Para que                                         |
+| ---------------------------------------------------- | ------------------------------------------------ |
+| `GET /api/reports/:id/export.xlsx`                   | A planilha do procedimento, com as abas por tipo |
+| `GET /api/reports/:id/export/anexo-i.xlsx`           | O formulario do Anexo I preenchido               |
+| `GET /api/reports/:id/export.pdf`                    | Todos os cupons num PDF so, com indice e carimbo |
+| `GET /api/reports/:id/export/pdfs-por-categoria.zip` | Um PDF por categoria, com as paginas originais   |
 
 A **planilha** (`exceljs`, gerada do zero) segue o procedimento de prestacao
 de contas e abre com tres abas:
@@ -237,3 +238,13 @@ numa faixa **nova**, adicionada abaixo do conteudo original ao embutir a
 pagina — fisicamente nao ha como cobrir o cupom. Duplicata entra no PDF e no
 indice, marcada com `[DUPLICATA]`. A ordem usa `id` como desempate, porque
 nenhum parser le a hora do comprovante.
+
+Os **PDFs por categoria** sao a entrega do procedimento: um arquivo por
+categoria com despesa, num ZIP (`01_alimentacao.pdf`, `02_combustivel.pdf`...,
+numerados em sequencia e na ordem das abas da planilha), em ordem cronologica.
+A pagina e **copiada**, e nao embutida como no consolidado: sai com o
+conteudo, o tamanho e o `/Rotate` da origem, sem faixa nem carimbo — "nunca
+rasterizar, nunca recortar". O giro escolhido na revisao soma ao `/Rotate`,
+que e atributo da pagina, sem tocar no conteudo. Toda pagina do relatorio vai
+para exatamente um arquivo: a duplicata vai junto, como comprovacao, e o que
+nao tem categoria vai em `sem-categoria`.

@@ -286,3 +286,8 @@ export function reportAnexoIUrl(id) {
 export function reportPdfUrl(id) {
   return `${REPORTS_URL}/${id}/export.pdf`;
 }
+
+/** Um PDF por categoria, com as paginas originais, num ZIP. */
+export function reportCategoryPdfsUrl(id) {
+  return `${REPORTS_URL}/${id}/export/pdfs-por-categoria.zip`;
+}

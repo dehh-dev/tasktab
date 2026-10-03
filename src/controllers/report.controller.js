@@ -10,6 +10,7 @@ const retention = require('../services/retention.service');
 const planilha = require('../services/export/planilha.service');
 const anexoI = require('../services/export/anexo-i.service');
 const pdfConsolidado = require('../services/export/pdf-consolidado.service');
+const pdfPorCategoria = require('../services/export/pdf-por-categoria.service');
 
 const { reportNotFound } = ownership;
 
@@ -172,6 +173,21 @@ async function exportPdf(req, res) {
     .send(Buffer.from(bytes));
 }
 
+/** GET /api/reports/:id/export/pdfs-por-categoria.zip */
+async function exportCategoryPdfs(req, res) {
+  const id = validator.validateId(req.params.id);
+  await loadReport(req.user, id);
+
+  const receipts = await Receipt.findForExport(id);
+  const buffer = await pdfPorCategoria.buildCategoryZip(receipts);
+
+  res
+    .status(200)
+    .set('Content-Type', 'application/zip')
+    .set('Content-Disposition', `attachment; filename="comprovantes-${id}.zip"`)
+    .send(buffer);
+}
+
 module.exports = {
   index,
   show,
@@ -182,4 +198,5 @@ module.exports = {
   exportXlsx,
   exportAnexoI,
   exportPdf,
+  exportCategoryPdfs,
 };

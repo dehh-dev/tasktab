@@ -2285,11 +2285,35 @@ A duplicata vai junto, como comprovação.
 
 **Critérios de aceite**
 
-- [ ] Um arquivo por categoria com despesa, num ZIP (`jszip` já é dependência)
-- [ ] Página copiada, não embutida: sem faixa e com o `/Rotate` da origem
-- [ ] Teste de cobertura: toda página em exatamente um arquivo, total igual
-- [ ] Teste de pixel: página gerada idêntica à de origem
-- [ ] Rota nova em `tests/api/routes.js`
+- [x] Um arquivo por categoria com despesa, num ZIP (`jszip` já é dependência)
+- [x] Página copiada, não embutida: sem faixa e com o `/Rotate` da origem
+- [x] Teste de cobertura: toda página em exatamente um arquivo, total igual
+- [x] Teste de pixel: página gerada idêntica à de origem
+- [x] Rota nova em `tests/api/routes.js`
+
+**Como ficou**
+
+A rota é `GET /api/reports/:id/export/pdfs-por-categoria.zip`, e a tela ganhou
+o botão "PDFs por categoria". O botão vale assim que há comprovante, como o PDF
+consolidado. O ZIP traz `01_alimentacao.pdf`, `02_combustivel.pdf` e assim por
+diante, na ordem das abas da planilha. A numeração é corrida, porque um número
+pulado faria parecer que faltou um arquivo.
+
+- A página é copiada com `copyPages` e mantém o conteúdo, o tamanho e o
+  `/Rotate` da origem. O giro escolhido na revisão (#43) soma ao `/Rotate`
+  com `setRotation`, sem tocar no conteúdo. O teste de pixel compara cada
+  rotação (0, 90, 180 e 270) com a origem e com o giro somado.
+- Toda página vai para exatamente um arquivo. A duplicata vai junto, como
+  comprovação, e a página sem categoria vai em `sem-categoria`. O teste de
+  cobertura mistura categorias, status e três arquivos de origem.
+- As páginas de um mesmo arquivo saem numa cópia só, para não repetir fonte e
+  imagem a cada página.
+
+O teste de ordem precisou de cuidado. A consulta já devolve os comprovantes em
+ordem cronológica, então tirar a ordenação do serviço não mudava nada. Com os
+dados do primeiro teste, nem tirar as duas ordenações mudava, porque a ordem
+inversa de envio coincidia com a cronológica. Os dados agora não coincidem em
+nenhum sentido, e o teste cai quando nenhuma camada ordena.
 
 ---
 

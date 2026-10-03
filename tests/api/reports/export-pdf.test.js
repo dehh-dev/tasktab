@@ -1,6 +1,6 @@
 'use strict';
 
-const { PDFDocument, PDFName, PDFDict, degrees, rgb } = require('pdf-lib');
+const { PDFDocument, PDFName, PDFDict } = require('pdf-lib');
 const { extractPdfText } = require('../../helpers/pdf-text');
 const {
   renderPdfPage,
@@ -17,7 +17,11 @@ const {
   insertMerchant,
   waitForProcessing,
 } = require('../../orchestrator');
-const { makeReceiptPdf, makeQrReceiptPdf } = require('../../fixtures/pdf');
+const {
+  makeReceiptPdf,
+  makeQrReceiptPdf,
+  makeRotatedPdf,
+} = require('../../fixtures/pdf');
 const fs = require('fs/promises');
 const path = require('path');
 const env = require('../../../src/config/env');
@@ -86,34 +90,6 @@ async function listReceipts(reportId) {
 
 function indexText(buffer) {
   return extractPdfText(buffer)[0];
-}
-
-/**
- * Uma pagina em pe com `/Rotate`. As duas marcas ficam em cantos opostos e em
- * tons diferentes: qualquer giro errado troca uma pela outra ou as tira do
- * lugar, e a comparacao de pixels acusa.
- */
-async function makeRotatedPdf(angle) {
-  const doc = await PDFDocument.create();
-  const page = doc.addPage([200, 600]);
-
-  page.drawRectangle({
-    x: 0,
-    y: 540,
-    width: 60,
-    height: 60,
-    color: rgb(0, 0, 0),
-  });
-  page.drawRectangle({
-    x: 140,
-    y: 0,
-    width: 60,
-    height: 60,
-    color: rgb(0.5, 0.5, 0.5),
-  });
-  page.setRotation(degrees(angle));
-
-  return Buffer.from(await doc.save());
 }
 
 describe('GET /api/reports/:id/export.pdf', () => {

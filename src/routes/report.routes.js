@@ -50,6 +50,11 @@ router.get(
   requireScope('reports:read'),
   asyncHandler(controller.exportPdf),
 );
+router.get(
+  '/:id/export/pdfs-por-categoria.zip',
+  requireScope('reports:read'),
+  asyncHandler(controller.exportCategoryPdfs),
+);
 
 router.get('/', requireScope('reports:read'), asyncHandler(controller.index));
 router.post(

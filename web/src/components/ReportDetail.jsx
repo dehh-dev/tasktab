@@ -409,7 +409,7 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
           {
             // Download por <a href>, nao por fetch: entregar o arquivo baixado
             // exigiria um `blob:`, que a CSP do projeto nao libera. Excel e
-            // Anexo I so levam o confirmado; o PDF leva todo comprovante.
+            // Anexo I so levam o confirmado; os PDFs levam todo comprovante.
           }
           <ExportLink
             href={api.reportXlsxUrl(reportId)}
@@ -431,6 +431,13 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
             enabled={receipts.length > 0}
           >
             PDF consolidado
+          </ExportLink>
+          <ExportLink
+            href={api.reportCategoryPdfsUrl(reportId)}
+            download={`comprovantes-${reportId}.zip`}
+            enabled={receipts.length > 0}
+          >
+            PDFs por categoria
           </ExportLink>
 
           {editable && !editingReport && (

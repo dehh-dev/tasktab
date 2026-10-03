@@ -320,6 +320,7 @@ async function buildConsolidatedPdf(report, receipts) {
 module.exports = {
   buildConsolidatedPdf,
   chronological,
+  pageRotation,
   stampText,
   STAMP_HEIGHT,
 };

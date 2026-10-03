@@ -1,6 +1,6 @@
 'use strict';
 
-const { PDFDocument, StandardFonts } = require('pdf-lib');
+const { PDFDocument, StandardFonts, degrees, rgb } = require('pdf-lib');
 
 /**
  * PDFs sinteticos para a suite.
@@ -186,11 +186,40 @@ function makeNonPdf() {
   return Buffer.from('PK isto parece um zip');
 }
 
+/**
+ * Uma pagina em pe com `/Rotate`. As duas marcas ficam em cantos opostos e em
+ * tons diferentes: qualquer giro errado troca uma pela outra ou as tira do
+ * lugar, e a comparacao de pixels acusa.
+ */
+async function makeRotatedPdf(angle) {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 600]);
+
+  page.drawRectangle({
+    x: 0,
+    y: 540,
+    width: 60,
+    height: 60,
+    color: rgb(0, 0, 0),
+  });
+  page.drawRectangle({
+    x: 140,
+    y: 0,
+    width: 60,
+    height: 60,
+    color: rgb(0.5, 0.5, 0.5),
+  });
+  page.setRotation(degrees(angle));
+
+  return Buffer.from(await doc.save());
+}
+
 module.exports = {
   makePdf,
   makeReceiptPdf,
   makeQrReceiptPdf,
   makeScannedReceiptPdf,
+  makeRotatedPdf,
   receiptLines,
   makeCorruptPdf,
   makeNonPdf,

@@ -35,7 +35,7 @@ src/
     ├── auth/              # senha, sessao, escopos e posse
     ├── extraction/        # texto, QR Code e OCR dos comprovantes
     ├── validation/        # conferencia do relatorio
-    └── export/            # planilhas, Anexo I e PDF consolidado
+    └── export/            # planilha, Anexo I e PDFs
 infra/                     # erros, handlers do Express e logger
 migrations/                # node-pg-migrate
 scripts/                   # users:create, espera do banco, template sintetico

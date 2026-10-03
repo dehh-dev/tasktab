@@ -1,7 +1,8 @@
 # Exportacao
 
 Planilha do procedimento (`planilha.service.js`), Anexo I
-(`anexo-i.service.js`) e PDF consolidado (`pdf-consolidado.service.js`).
+(`anexo-i.service.js`), PDF consolidado (`pdf-consolidado.service.js`) e PDFs
+por categoria (`pdf-por-categoria.service.js`).
 
 ## Anexo I
 
@@ -71,3 +72,17 @@ Planilha do procedimento (`planilha.service.js`), Anexo I
 - Bookmarks usam a API de baixo nivel do pdf-lib (`doc.context`).
 - Teste de PDF gerado **nao chama `unpdf` dentro do Jest**:
   `tests/helpers/pdf-text.js` extrai num subprocesso `node`.
+
+## PDFs por categoria
+
+- A pagina e **copiada** (`copyPages`), nunca embutida: o procedimento manda
+  "nunca rasterizar, nunca recortar", e embutir criaria uma pagina nova sem o
+  `/Rotate`. O giro da revisao vai no `/Rotate` (`setRotation`), que e
+  atributo da pagina. Ha teste de pixel contra a origem em cada rotacao.
+- **Toda pagina em exatamente um arquivo**: duplicata vai junto, sem categoria
+  vai em `sem-categoria`. Ha teste de cobertura com status e categorias
+  misturados.
+- Arquivos numerados em sequencia, na ordem das abas da planilha: um numero
+  pulado parece arquivo faltando.
+- As paginas de um mesmo arquivo de origem saem numa copia so, e dividem fonte
+  e imagem em vez de repeti-las por pagina.

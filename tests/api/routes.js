@@ -63,6 +63,11 @@ const ROUTES = [
     roles: EVERYONE,
   },
   { method: 'GET', path: '/api/reports/:id/export.pdf', roles: EVERYONE },
+  {
+    method: 'GET',
+    path: '/api/reports/:id/export/pdfs-por-categoria.zip',
+    roles: EVERYONE,
+  },
 
   { method: 'GET', path: '/api/receipts/:id', roles: EVERYONE },
   {
