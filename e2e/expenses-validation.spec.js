@@ -14,7 +14,8 @@ test('a conferencia agrupa pela classe, inclusive o alerta do relatorio', async 
 }) => {
   // Adiantamento de R$ 10,00 para dois cupons de R$ 37,60 do mesmo dia: a
   // suspeita de duplicata pede decisao, e o excesso e do relatorio inteiro —
-  // o alerta sem comprovante que antes nao aparecia em lugar nenhum.
+  // o alerta sem comprovante que antes nao aparecia em lugar nenhum. Os dois
+  // cupons vem sem QR, e a soma deles sem chave e o outro informativo.
   const report = await createReport(request, {
     title: 'Conferencia agrupada',
     advance_cents: 1000,
@@ -30,8 +31,11 @@ test('a conferencia agrupa pela classe, inclusive o alerta do relatorio', async 
 
   const panel = page.getByRole('region', { name: 'Conferencia' });
   await expect(panel.getByText('Decisao · 1')).toBeVisible();
-  await expect(panel.getByText('Informativo · 1')).toBeVisible();
+  await expect(panel.getByText('Informativo · 2')).toBeVisible();
   await expect(panel).toContainText('passam do adiantamento');
+  await expect(panel).toContainText(
+    '2 comprovantes sem chave de acesso valida somam 7520 centavos',
+  );
 
   // O alerta de comprovante leva ate ele; o do relatorio nao tem para onde.
   await expect(

@@ -122,7 +122,16 @@ Regras: soma dos itens contra o total impresso, litros vezes preco unitario no
 combustivel, digito verificador da chave, mes, UF e tipo de emissao da chave
 (contingencia), data dentro do periodo, valor fora da faixa historica do
 emitente, comprovante incompleto, despesas acima do adiantamento, suspeita de
-duplicata e valor repetido em documentos diferentes.
+duplicata, valor repetido em documentos diferentes e documentos sem chave de
+acesso somados a parte.
+
+Recibo manuscrito, comanda e cupom de conferencia podem ser glosados, e o
+procedimento manda somar e informar. Por isso os comprovantes **sem chave de
+acesso valida** saem num alerta `informativo` do relatorio inteiro (regra
+`nao_fiscal`), com a quantidade em `count` e a soma em `total_cents`. A base e
+a do total da tela: o que esta em revisao entra, e a duplicata e o comprovante
+sem valor ficam de fora. A NFC-e cuja chave nao foi lida tambem entra, ate
+alguem digitar a chave na revisao.
 
 Fora de escopo hoje, registrado para nao parecer esquecimento: a **coerencia
 horaria** (jantar numa cidade e corrida em outra no mesmo horario) depende de

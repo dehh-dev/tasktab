@@ -53,6 +53,7 @@ const RULE_LEVEL = {
   duplicata_exata: 'verificado',
   adiantamento: 'informativo',
   valor_repetido: 'informativo',
+  nao_fiscal: 'informativo',
 };
 
 function alert(rule, message, extra = {}) {
@@ -456,6 +457,51 @@ function checkAdvance(report, totals) {
 }
 
 /**
+ * Documentos nao fiscais somados a parte (issue 50): recibo manuscrito,
+ * comanda e cupom de conferencia podem ser glosados, e o procedimento manda
+ * somar e informar. Sem chave de acesso valida o documento nao e NFC-e — da
+ * para derivar, sem coluna nova.
+ *
+ * Um alerta do relatorio, com a quantidade e o total em campos proprios: um
+ * por comprovante seria ruido, porque em Itapipoca eram 35 das 42 paginas.
+ *
+ * A base e a do total da tela: o que esta em revisao entra, a duplicata e o
+ * comprovante ainda sem valor ficam de fora — o numero e uma parte do total,
+ * e nao outra conta. A NFC-e cuja chave nao foi lida tambem cai aqui, ate
+ * alguem digitar a chave na revisao.
+ */
+function checkNonFiscal(receipts) {
+  const documents = receipts.filter(
+    (receipt) =>
+      receipt.status !== 'duplicate' &&
+      receipt.amount_cents !== null &&
+      !accessKey.isValid(receipt.access_key),
+  );
+
+  if (documents.length === 0) {
+    return [];
+  }
+
+  const count = documents.length;
+  const totalCents = documents.reduce(
+    (sum, receipt) => sum + receipt.amount_cents,
+    0,
+  );
+  const subject =
+    count === 1
+      ? '1 comprovante sem chave de acesso valida soma'
+      : `${count} comprovantes sem chave de acesso valida somam`;
+
+  return [
+    alert(
+      'nao_fiscal',
+      `${subject} ${totalCents} centavos. Recibo, comanda e cupom de conferencia podem ser glosados; se for NFC-e, digite a chave na revisao.`,
+      { count, total_cents: totalCents },
+    ),
+  ];
+}
+
+/**
  * Fora de escopo hoje, e registrado para nao parecer esquecimento:
  *
  * - **coerencia geografica e horaria** (jantar numa cidade e corrida em outra
@@ -488,6 +534,7 @@ async function validateReport(reportId) {
     ...(await checkDuplicates(receipts)),
     ...checkIncomplete(receipts),
     ...checkAdvance(report, totals),
+    ...checkNonFiscal(receipts),
   ];
 
   return {

@@ -33,6 +33,12 @@ que assina. **Alerta nao bloqueia nada.**
 
 ## Regras
 
+- **Documentos sem chave** (issue 50, `nao_fiscal`): um alerta so, do
+  relatorio, com `count` e `total_cents` em campo proprio — um por comprovante
+  seria ruido (35 das 42 paginas de Itapipoca). A base e a do `total_cents` de
+  `summarizeByReport`: em revisao entra, duplicata e comprovante sem valor
+  nao. Se uma mudar, mude a outra: o numero e uma parte do total da tela, e ha
+  teste comparando os dois.
 - **O que a chave ja diz** (issue 47, `checkAccessKeyFields`): mes da chave
   diferente da data lida e atencao (o OCR trocou agosto por junho num cupom
   real), tipo de emissao diferente de 1 e contingencia, e UF da chave

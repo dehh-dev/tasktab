@@ -2123,8 +2123,24 @@ não é NFC-e — dá para derivar, sem coluna nova.
 
 **Critérios de aceite**
 
-- [ ] Total e quantidade dos comprovantes sem chave, na conferência
+- [x] Total e quantidade dos comprovantes sem chave, na conferência
 - [ ] O mesmo número na planilha (#53)
+
+**Como ficou**
+
+Regra `nao_fiscal`, informativa, com **um alerta do relatório inteiro** que
+leva `count` e `total_cents` em campos próprios, além da mensagem. Um alerta
+por comprovante seria ruído: em Itapipoca eram 35 das 42 páginas.
+
+A base é a do total da tela: o que está em revisão entra, e a duplicata e o
+comprovante ainda sem valor ficam de fora. Assim o número é uma parte do total,
+e não outra conta — há teste comparando os dois. Chave que não fecha o DV não
+prova que o documento é NFC-e, e conta como sem chave. A NFC-e cuja chave não
+foi lida também cai aqui até alguém digitar a chave na revisão (#41), e a
+mensagem diz isso.
+
+O segundo critério fecha com a #53: a planilha deve levar a mesma regra,
+aplicada ao que ela soma.
 
 ---
 

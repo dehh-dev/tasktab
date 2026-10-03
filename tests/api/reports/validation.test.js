@@ -558,6 +558,75 @@ describe('regra: adiantamento', () => {
   });
 });
 
+describe('regra: documentos nao fiscais', () => {
+  // Recibo manuscrito, comanda e cupom de conferencia podem ser glosados: o
+  // procedimento manda somar a parte e informar quem assina.
+  async function relatorio(...receipts) {
+    const report = await insertReport();
+
+    for (const [index, overrides] of receipts.entries()) {
+      await insertReceipt(report.id, {
+        page_number: index + 1,
+        status: 'confirmed',
+        issued_at: '2026-06-19',
+        category: 'alimentacao',
+        ...overrides,
+      });
+    }
+
+    return report;
+  }
+
+  it('soma e conta o que nao tem chave de acesso valida', async () => {
+    const quebrada = `${CHAVE.slice(0, 43)}${(Number(CHAVE[43]) + 1) % 10}`;
+    const report = await relatorio(
+      { amount_cents: 2000 },
+      // Em revisao tambem conta, como no total da tela.
+      { amount_cents: 3000, status: 'needs_review' },
+      // Chave que nao fecha o DV nao prova que o documento e NFC-e.
+      { amount_cents: 4000, access_key: quebrada },
+      { amount_cents: 5000, access_key: CHAVE },
+    );
+
+    expect(porRegra(await validar(report.id), 'nao_fiscal')).toEqual([
+      {
+        rule: 'nao_fiscal',
+        level: 'informativo',
+        message: expect.stringContaining(
+          '3 comprovantes sem chave de acesso valida somam 9000 centavos',
+        ),
+        count: 3,
+        total_cents: 9000,
+      },
+    ]);
+  });
+
+  it('e parte do total da tela: duplicata e comprovante sem valor ficam de fora', async () => {
+    const report = await relatorio(
+      { amount_cents: 3000, status: 'needs_review' },
+      { amount_cents: 3000, status: 'duplicate' },
+      { amount_cents: null, status: 'needs_review', category: null },
+    );
+
+    const [alerta] = porRegra(await validar(report.id), 'nao_fiscal');
+    const { meta } = (
+      await request('GET', `/api/reports/${report.id}/receipts`)
+    ).body;
+
+    expect(alerta).toMatchObject({ count: 1, total_cents: 3000 });
+    expect(alerta.message).toContain(
+      '1 comprovante sem chave de acesso valida soma 3000 centavos',
+    );
+    expect(meta.total_cents).toBe(alerta.total_cents);
+  });
+
+  it('relatorio so com NFC-e nao gera o aviso', async () => {
+    const report = await relatorio({ amount_cents: 5000, access_key: CHAVE });
+
+    expect(porRegra(await validar(report.id), 'nao_fiscal')).toHaveLength(0);
+  });
+});
+
 describe('regra: combustivel', () => {
   // As duas notas de combustivel da prestacao de Itapipoca, como sairam do
   // OCR: na primeira a linha fecha e o total foi lido com um digito a mais;
