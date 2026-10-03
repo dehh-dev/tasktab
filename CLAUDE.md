@@ -725,6 +725,11 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - O carimbo do PDF fica numa faixa **nova**, criada ao embutir a pagina
   original numa pagina maior — nunca um retangulo desenhado por cima.
   Fisicamente nao ha como cobrir o cupom.
+- A pagina e embutida **ja girada pelo `/Rotate` da origem** (`placement` em
+  `pdf-consolidado.service.js`). O `/Rotate` e atributo da pagina, nao do
+  conteudo, e o `embedPdf` nao o leva: o cupom de cabeca para baixo ja
+  corrigido na origem — uma das 42 paginas de Itapipoca — voltava invertido.
+  Ha teste comparando os pixels das tres rotacoes com a origem.
 - Ordem cronologica do PDF usa `id` como desempate, nao hora: nenhum parser de
   extracao le hora do comprovante ainda.
 - Bookmarks (outlines) do PDF usam a API de baixo nivel do pdf-lib

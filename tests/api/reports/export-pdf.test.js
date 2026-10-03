@@ -1,7 +1,14 @@
 'use strict';
 
-const { PDFDocument, PDFName, PDFDict } = require('pdf-lib');
+const { PDFDocument, PDFName, PDFDict, degrees, rgb } = require('pdf-lib');
 const { extractPdfText } = require('../../helpers/pdf-text');
+const {
+  renderPdfPage,
+  maxPixelDifference,
+} = require('../../helpers/pdf-render');
+const {
+  STAMP_HEIGHT,
+} = require('../../../src/services/export/pdf-consolidado.service');
 const {
   requestBinary,
   request,
@@ -79,6 +86,34 @@ async function listReceipts(reportId) {
 
 function indexText(buffer) {
   return extractPdfText(buffer)[0];
+}
+
+/**
+ * Uma pagina em pe com `/Rotate`. As duas marcas ficam em cantos opostos e em
+ * tons diferentes: qualquer giro errado troca uma pela outra ou as tira do
+ * lugar, e a comparacao de pixels acusa.
+ */
+async function makeRotatedPdf(angle) {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 600]);
+
+  page.drawRectangle({
+    x: 0,
+    y: 540,
+    width: 60,
+    height: 60,
+    color: rgb(0, 0, 0),
+  });
+  page.drawRectangle({
+    x: 140,
+    y: 0,
+    width: 60,
+    height: 60,
+    color: rgb(0.5, 0.5, 0.5),
+  });
+  page.setRotation(degrees(angle));
+
+  return Buffer.from(await doc.save());
 }
 
 describe('GET /api/reports/:id/export.pdf', () => {
@@ -234,5 +269,52 @@ describe('GET /api/reports/:id/export.pdf', () => {
     expect(response.status).toBe(200);
     const doc = await PDFDocument.load(response.buffer);
     expect(doc.getPageCount()).toBe(1);
+  });
+});
+
+// O escaneamento chega com orientacao variada, e a pagina de cabeca para
+// baixo e corrigida pelo `/Rotate` — na prestacao de Itapipoca, uma das 42.
+// Embutida sem a rotacao, ela voltava invertida no consolidado, enquanto a
+// revisao a mostrava certa.
+describe('GET /api/reports/:id/export.pdf com pagina girada', () => {
+  it.each([90, 180, 270])(
+    '/Rotate %i sai como a origem e exibida',
+    async (angle) => {
+      const report = await insertReport();
+      const source = await makeRotatedPdf(angle);
+      await insertConfirmedWithFile(report.id, source);
+
+      const response = await requestBinary(
+        'GET',
+        `/api/reports/${report.id}/export.pdf`,
+      );
+
+      const original = renderPdfPage(source, 1);
+      // A pagina 1 e o indice; a 2, o comprovante.
+      const exported = renderPdfPage(response.buffer, 2);
+
+      expect(exported.width).toBe(original.width);
+      expect(exported.height).toBe(original.height + STAMP_HEIGHT);
+      expect(maxPixelDifference(original, exported, original.height)).toBe(0);
+    },
+  );
+
+  it('o carimbo continua no rodape, na horizontal', async () => {
+    const report = await insertReport();
+    await insertConfirmedWithFile(report.id, await makeRotatedPdf(90));
+
+    const response = await requestBinary(
+      'GET',
+      `/api/reports/${report.id}/export.pdf`,
+    );
+    const exported = renderPdfPage(response.buffer, 2);
+    const band = exported.pixels.subarray(
+      (exported.height - STAMP_HEIGHT) * exported.width,
+    );
+
+    expect(Math.min(...band)).toBeLessThan(128);
+    expect(extractPdfText(response.buffer)[1]).toMatch(
+      /Item 01 \| 19\/06\/2026/,
+    );
   });
 });
