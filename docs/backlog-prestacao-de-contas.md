@@ -92,6 +92,19 @@ Os três primeiros são exigidos pelo hook de pre-commit; o CI roda os quatro.
 Transversais (23, 24) entram a qualquer momento depois do M1 — entraram no
 #16.
 
+A segunda rodada nasceu do procedimento consolidado de prestação de contas e
+da prestação finalizada de Itapipoca — ver
+[Segunda rodada](#segunda-rodada--o-processo-completo):
+
+| Marco                 | Issues  | Entrega                                          | PR  |
+| --------------------- | ------- | ------------------------------------------------ | --- |
+| M8 — Correções        | 33 a 39 | O que já existia e estava errado                 | —   |
+| M9 — Revisão completa | 40 a 44 | Tudo o que o comprovante traz, digitável na tela | —   |
+| M10 — Extração        | 45 e 46 | Conta do combustível e recortes de leitura       | —   |
+| M11 — Conferência     | 47 a 52 | As regras de "o que sinalizar" do procedimento   | —   |
+| M12 — Saídas          | 53 a 56 | Planilha, PDFs por categoria e Anexo I oficial   | —   |
+| M13 — Fechamento      | 57      | Checagem final antes de fechar                   | —   |
+
 Os critérios das issues 0 a 22, 25 e 26 ficaram sem marcação: foram escritos
 antes da execução, e alguns mudaram depois dela — a regra de categoria da #11,
 por exemplo, foi invertida pela #30. Da #23 em diante, cada issue foi marcada
@@ -1395,3 +1408,722 @@ com teste que os trava:
 - `loadReport` tinha duas cópias e o 404 de relatório, três. A igualdade entre
   "não existe" e "não é seu" dependia de elas nunca divergirem; agora há um
   lugar só, e um teste comparando as duas respostas.
+
+---
+
+# Segunda rodada — o processo completo
+
+Duas fontes, lidas lado a lado com o código em outubro de 2026:
+
+1. **O procedimento consolidado** (`prestacao-de-contas-processo.md`), escrito
+   a partir de quatro prestações reais (Itapipoca/CE, Formosa/GO, Viamão/RS e
+   Palmas/TO): leitura dos PDFs, validação, deduplicação, separação por
+   categoria, planilha de acompanhamento, Anexo I e o que sinalizar.
+2. **A prestação finalizada de Itapipoca**: os seis PDFs por categoria (42
+   páginas) e a planilha final conferida por uma pessoa. Fica **fora do
+   repositório** — traz CNPJ e CPF de terceiros — e serve de corpus de
+   medição.
+
+**A fonte da verdade é o comprovante.** Quando o procedimento, a planilha e o
+papel discordam, vale o papel. Foi o que resolveu a única contradição do
+procedimento: o texto diz que a caixa de chocolate do Mateus (R$ 205,59) foi
+para Outros, a planilha final a lançou em Alimentação, e a tabela de
+distribuição do próprio procedimento concorda com a planilha.
+
+## Decisões desta rodada
+
+| Pergunta                           | Decisão                                                   |
+| ---------------------------------- | --------------------------------------------------------- |
+| Categorias                         | as cinco do procedimento (#40)                            |
+| Piso `alimentacao` do palpite      | continua                                                  |
+| Hora e número do documento         | não voltam; só a data                                     |
+| Anexo I oficial                    | ainda não chegou; o mapa da versão 19 vem do procedimento |
+| Recibo padrão Buriti               | não agora: só é emitido quando não há comprovante         |
+| Comprovante sem CNPJ legível       | nome e cidade lidos do próprio comprovante (#42)          |
+| Reprocessar o que já foi conferido | permitido, com confirmação explícita (#35)                |
+| Procedimento × planilha × papel    | vale o comprovante                                        |
+| Valor em revisão na tela           | soma no total, sem categoria e sem bloco à parte (#39)    |
+
+## O que a prestação de Itapipoca mostrou
+
+Medido com a cascata atual (texto → QR → OCR → parsers) sobre as 42
+páginas, sem banco, comparando cada página com a planilha final:
+
+| Páginas                       | Qtd | QR lido | Data e valor certos  | Sem valor |
+| ----------------------------- | --- | ------- | -------------------- | --------- |
+| Fotos de comprovante (OCR)    | 22  | 3       | 5                    | 16        |
+| Recibos padrão Buriti (texto) | 20  | 0       | 0 (data certa em 20) | 20        |
+
+- **O QR leu 3 das 7 NFC-e** — o mesmo número que o procedimento registra
+  com várias escalas e binarização. Ler o QR de outro jeito não prometia
+  ganho, e ficou de fora.
+- **O OCR leu o combustível como R$ 2.225,49**, e o papel diz R$ 225,49. A
+  conta litros × preço unitário pegaria isso sozinha (#45).
+- **As 15 páginas de recibo manuscrito não renderam nada**, como esperado: o
+  Tesseract não lê caneta. O que acelera esses é o recorte na revisão (#46).
+- **Uma página chegou com `/Rotate 180`** (`03_combustivel_comprovantes.pdf`,
+  página 2) — o caso real da página de cabeça para baixo, e o que o PDF
+  consolidado descartava (#36).
+- **A planilha final soma 7 pares de mesmo dia e mesmo valor**, em linhas
+  vizinhas, totalizando R$ 269,62 — o valor que o procedimento descreve como
+  redocumentação. Não são duplicatas: foi um caso isolado em que o
+  colaborador não tinha os comprovantes de almoço e janta do mesmo dia, e os
+  recibos foram validados como exceção. É o exemplo de livro de por que a
+  regra `possivel_duplicata` aponta e não decide — ela marca os sete, e
+  colapsar sozinha teria apagado R$ 269,62 legítimos.
+- OCR leva **5,9 s por página** (mediana; 11,9 s no pior caso). Um lote como
+  este fica uns dois minutos em processamento com a tela consultando.
+
+## Fora desta rodada, de propósito
+
+- **Recibo padrão Buriti** — decisão acima. Registro para quando voltar: eram
+  20 das 42 páginas, todas com camada de texto, e a extração não leu o valor
+  de nenhuma.
+- **Hora e número do documento** — e com eles a ordem por hora no mesmo dia,
+  a numeração de recibo fora de sequência e a incoerência de horário.
+- **QR com várias escalas** — medido acima: o método do procedimento acertou
+  o mesmo que o projeto já acerta.
+- **Julgamento de conteúdo** — item que não pertence à categoria, emissor
+  incompatível com a despesa, finalidade indeterminada. A ferramenta aponta
+  Outros (#51); decidir é de quem assina.
+- **`trust proxy`** — só importa se a produção ficar atrás de proxy reverso.
+
+---
+
+# M8 — Correções
+
+## Issue 33 — Cada família de rota com um teto de escrita só
+
+`area:api` · `infra` · sem dependência
+
+O teto geral de escrita (`writeLimiter`, 100 por janela) era aplicado no
+`app.js` a toda escrita em `/api`, inclusive em `/reports`, `/receipts` e
+`/merchants` — que passavam também pelo teto de lote (`batchWriteLimiter`,
+600). O de lote era um segundo filtro por cima, e não um substituto: com os
+limitadores reais e `WRITE_MAX=3`, `BATCH_WRITE_MAX=10`, a sequência de
+PATCH num relatório saía `204 204 204 429 429 429`. Revisar um relatório de
+41 comprovantes cortava na centésima escrita, não na seiscentésima.
+
+**Escopo**
+
+Os dois tetos de escrita passam a ser montados em `src/routes/index.js`, um
+por família, antes do `authenticate` — recusar barato, sem consultar sessão.
+O limitador pode ser ligado em teste por `RATE_LIMIT_ENABLED=true`, que é como
+uma instância própria da API o exercita sem mudar nada para a suíte.
+
+**Critérios de aceite**
+
+- [x] Escrita em `/reports`, `/receipts` e `/merchants` só conta no teto de
+      lote
+- [x] Escrita em `/auth`, `/users` e `/tasks` continua no teto geral
+- [x] Os dois tetos rodam antes do `authenticate`
+- [x] Teste de integração numa instância própria da API, com o limitador
+      ligado e tetos baixos, que cai com o código anterior
+- [x] A suíte principal continua com o limitador desligado
+
+**Como ficou**
+
+`tests/api/rate-limit.test.js` sobe uma instância por teste
+(`startApiInstance`): o contador vive na memória do processo e só zera no fim
+da janela. Com a montagem antiga, dois dos quatro casos caem com 429 na
+quarta escrita. A instância espera até 60 s para subir: com o disco disputado
+por outro programa, uma partida levou 38 s, contra 0,4 s de costume.
+
+**Fora de escopo**
+
+Teto de leitura próprio para lote e `trust proxy`.
+
+---
+
+## Issue 34 — A tela acompanha o processamento sem travar e sem gastar o teto
+
+`area:web` · sem dependência
+
+Enquanto houvesse página em processamento, a tela do relatório buscava três
+coisas a cada 1,5 s — relatório, comprovantes e conferência. O teto de
+leitura é de 600 por janela: cinco minutos de processamento contínuo o
+esgotavam, e o lote de Itapipoca, com OCR de 5,9 s por página, passa de dois.
+A conferência ainda custa duas consultas por comprovante (#52).
+
+Pior: quando um ciclo falhava, o `.catch(() => {})` engolia o erro e nenhum
+ciclo novo era agendado. A tela ficava em "processando" sem aviso nenhum.
+
+**Escopo**
+
+Durante o processamento, cada ciclo busca só a lista de comprovantes;
+relatório e conferência são recarregados uma vez, quando nada mais está em
+processamento. Um ciclo que falha mostra o motivo e tenta de novo com espera
+crescente; o 401 continua levando ao login.
+
+**Critérios de aceite**
+
+- [x] Durante o processamento, cada ciclo faz uma requisição só
+- [x] Terminado o processamento, relatório e conferência recarregam uma vez
+- [x] Ciclo que falha mostra aviso com a ação, e o acompanhamento continua
+- [x] O aviso some quando a consulta volta a responder
+- [x] Spec E2E contando as requisições durante o processamento
+- [x] Spec E2E da falha transitória no meio do acompanhamento
+
+**Como ficou**
+
+A falha da spec é real, não interceptada: `context.setOffline(true)` derruba a
+rede do navegador sem inventar resposta — a regra de não mockar continua com
+uma exceção só. Com a tela antiga, a conferência era buscada 6 vezes durante
+um lote de 60 páginas (agora, uma), e a queda de rede não gerava aviso
+nenhum. A espera cresce de 1,5 s até 15 s, e uma recarga completa bem-sucedida
+apaga o aviso.
+
+**Fora de escopo**
+
+Trocar o polling por SSE ou WebSocket.
+
+---
+
+## Issue 35 — Reprocessar o que já foi conferido pede confirmação explícita
+
+`area:api` · `area:web` · sem dependência
+
+`POST /api/receipts/:id/reprocess` não olhava o status: devolvia a página a
+`pending`, e a extração regravava data, valor e categoria por cima do que uma
+pessoa tinha conferido. A tela só oferecia o botão para `failed`, `pending` e
+`processing`, mas a API aceitava qualquer um.
+
+**Decisão:** reprocessar o que já foi conferido continua possível, com
+confirmação explícita.
+
+**Escopo**
+
+Comprovante `confirmed`, ou corrigido à mão (`extraction_source = 'manual'`),
+só é reprocessado com `{ "discard_review": true }` no corpo; sem isso, `409`
+com a ação que explica o que se perde. A tela oferece "Reprocessar" também
+para o confirmado, atrás de um diálogo que diz o que vai ser descartado.
+
+**Critérios de aceite**
+
+- [x] Sem a confirmação, `409 ConflictError` com `action`, e nada muda no
+      banco
+- [x] Com `discard_review: true`, `202`, e a página volta à revisão com o que
+      a extração ler
+- [x] O que veio da extração e ninguém tocou segue sem confirmação
+- [x] `discard_review` que não seja booleano: `422` com `details`
+- [x] Relatório fechado continua respondendo `409` antes de tudo
+- [x] Tela: "Reprocessar" no confirmado, com diálogo; spec E2E
+
+**Como ficou**
+
+Um teste antigo do OCR simulava a página presa zerando o valor por `PATCH` —
+o que agora conta como correção à mão. O arranjo passou a escrever o estado
+direto no banco (`updateColumnDirectly`), que é o caminho para o que a API não
+produz: a página presa em `processing` depois de um reinício.
+
+**Fora de escopo**
+
+Guardar a conferência descartada para desfazer.
+
+---
+
+## Issue 36 — O PDF consolidado respeita a rotação da página original
+
+`area:export` · sem dependência
+
+O consolidado embute a página original numa página nova, maior, para abrir a
+faixa do carimbo — e o `embedPdf`/`drawPage` do `pdf-lib` não leva o
+`/Rotate` junto. Página com `/Rotate 90`, exibida 600×200, saía 200×626; com
+`/Rotate 180`, saía de cabeça para baixo. A imagem da revisão respeita a
+rotação, então quem conferia via a página de um jeito e o arquivo exportado
+saía de outro. Na prestação de Itapipoca isso aconteceria com uma página.
+
+**Escopo**
+
+A página é desenhada já girada, de modo que a página nova sai sem `/Rotate` e
+mostra exatamente o que a original mostra. A faixa do carimbo continua no
+rodapé e legível.
+
+**Critérios de aceite**
+
+- [x] `/Rotate` 90, 180 e 270 saem no consolidado como a origem é exibida
+- [x] Teste compara pixel a pixel a página exportada, sem a faixa, com a
+      origem renderizada
+- [x] Carimbo continua no rodapé, na horizontal
+
+**Como ficou**
+
+Diferença máxima de pixel **zero** nas três rotações. Forçando a rotação 0 —
+o comportamento antigo —, as três caem. A renderização do teste roda em
+subprocesso (`tests/helpers/pdf-render.js`), pelo mesmo motivo do
+`pdf-text.js`.
+
+**Fora de escopo**
+
+Girar a página pela revisão (#43).
+
+---
+
+## Issue 37 — A planilha de resumo abre com os totais em qualquer leitor
+
+`area:export` · sem dependência
+
+O exceljs grava a fórmula sem valor guardado, e o `workbook.xml` saía sem
+`fullCalcOnLoad`. O Excel recalcula ao abrir; a pré-visualização do WhatsApp,
+do Gmail e do Drive, e qualquer leitor que use o valor guardado, mostram os
+totais em branco — o problema que o procedimento descreve para o openpyxl.
+
+**Escopo**
+
+Toda fórmula leva o resultado guardado, calculado em centavos inteiros, e o
+arquivo marca `fullCalcOnLoad` para quem recalcula.
+
+**Critérios de aceite**
+
+- [x] Toda célula com fórmula tem valor guardado
+- [x] O valor guardado bate com a fórmula resolvida contra as células
+      (`tests/helpers/xlsx-formula.js`)
+- [x] `fullCalcOnLoad` no `workbook.xml`
+
+**Fora de escopo**
+
+Valor guardado nas fórmulas do Anexo I: elas são do template, e o oficial
+ainda não chegou (#55).
+
+---
+
+## Issue 38 — Anexo I: cada categoria na coluna do formulário
+
+`area:export` · sem dependência
+
+O mapa de colunas era placeholder e mandava `transporte` e `estacionamento`
+para W — que, no formulário versão 19, é Combustível. Uma corrida de táxi saía
+lançada como abastecimento, o mesmo tipo de erro que o procedimento lista
+entre os já encontrados nesse formulário. O template sintético tinha só S, W e
+X, e o total da linha era `S+W+X`: corrigir só o mapa faria o táxi sumir do
+total.
+
+**Escopo**
+
+Mapa da versão 19 — O Passagens, Q Táxi/Conduções, S Alimentação,
+U Hospedagem, W Combustível, X Outras — no serviço e no template sintético,
+com o total da linha cobrindo as seis colunas. Estacionamento e lavanderia
+não têm coluna própria e vão para X, como o procedimento manda.
+
+**Critérios de aceite**
+
+- [x] `transporte` em Q, `estacionamento` e `lavanderia` em X, combustível
+      em W
+- [x] Template sintético com as seis colunas e `Y = O+Q+S+U+W+X`
+- [x] Teste por categoria afirmando a coluna e o total da linha
+
+**Fora de escopo**
+
+O formulário oficial (#55).
+
+---
+
+## Issue 39 — Os totais da tela: categoria só com o confirmado
+
+`area:api` · `area:web` · sem dependência
+
+O mesmo relatório tinha três totais: a planilha e o Anexo I somam só os
+confirmados, e a tela e o alerta de adiantamento somavam tudo menos duplicata,
+inclusive valor de OCR que ninguém conferiu — distribuído pela categoria que a
+extração adivinhou.
+
+**Decisão:** o valor em revisão vai para o total, sem categoria e sem bloco à
+parte. Uma primeira versão desta issue tirou o valor em revisão do total e o
+mostrou num bloco "Fora da prestação"; quem usa preferiu o total único, com o
+provisório dentro. A planilha e o Anexo I continuam só com o confirmado, e os
+totais batem quando o relatório está conferido.
+
+**Escopo**
+
+`meta` da listagem: `total_cents` com tudo o que tem valor menos duplicata, e
+`by_category` só com o confirmado — a categoria de quem ainda está em revisão
+é palpite, e distribuir valor por palpite faria o subtotal de um tipo mudar a
+cada correção. O alerta de adiantamento compara o mesmo total da tela.
+
+**Critérios de aceite**
+
+- [x] `total_cents` soma o que está em revisão e deixa a duplicata de fora
+- [x] `by_category` só com o confirmado
+- [x] Alerta de adiantamento com o mesmo total, com teste dos dois lados
+- [x] Com o relatório conferido, o total da tela é o da planilha
+
+**Como ficou**
+
+A consulta de totais tinha um defeito latente: o grupo dos comprovantes sem
+categoria e a linha de total do `ROLLUP` chegavam os dois com categoria nula,
+e qual valia dependia da ordem das linhas — todo upload cria comprovantes sem
+categoria. `GROUPING()` separa os dois. O alerta de adiantamento não tinha
+teste nenhum; ganhou os dois lados (em revisão conta, duplicata não).
+
+---
+
+# M9 — Revisão completa
+
+## Issue 40 — As cinco categorias do procedimento
+
+`area:db` · `area:extracao` · `area:export` · `area:web` · depende de #38
+
+O enum tem seis categorias de despesa; o procedimento usa cinco: Alimentação,
+Táxi/Locomoção, Combustível, Lavanderia e Outros. `estacionamento` sobra — e
+no Anexo I já cai em Outras.
+
+**Escopo**
+
+Migration que recria o enum sem `estacionamento`, convertendo o que existir
+para `outros` em `receipts` e `merchants`, com `up` e `down` testados como na
+remoção de `hospedagem`. O valor `transporte` fica, com o rótulo
+"Táxi/Locomoção" nas saídas e na tela. O palpite por nome que achava
+estacionamento passa a sugerir `outros`, marcado como qualquer palpite.
+
+**Critérios de aceite**
+
+- [ ] Migration reversível; o `down` documenta que o que virou `outros` não
+      volta a ser estacionamento
+- [ ] Rótulo "Táxi/Locomoção" nas três saídas e na tela; nome de aba sem a
+      barra
+- [ ] `web/src/constants.js` espelhando o enum novo
+- [ ] Palpite de estacionamento sugere `outros`, com a marca
+
+**Fora de escopo**
+
+Renomear o valor `transporte` no banco.
+
+---
+
+## Issue 41 — Chave de acesso digitada na revisão, conferida pelo DV
+
+`area:api` · `area:web` · sem dependência
+
+O `PATCH` do comprovante aceita só data, valor, categoria e status. Quando o
+QR e o texto falham, a chave some e ninguém consegue informá-la — e é a chave
+que o procedimento chama de fonte da verdade para emitente e data. O caso que
+o procedimento conta (AAMM borrado lido como 2606, quando era 2608) só se
+resolve digitando e deixando o DV julgar. A regra `chave_acesso` da
+conferência hoje só dispara com dado gravado direto no banco.
+
+**Escopo**
+
+`PATCH` aceita `access_key`, recusada com `422` se não fechar o DV. Do CNPJ da
+chave sai o emitente, pelo mesmo caminho da extração; chave repetida no
+relatório marca a duplicata como a extração marca. Na revisão, o campo
+aparece quando o comprovante não tem chave.
+
+**Critérios de aceite**
+
+- [ ] Chave que não fecha o DV: `422` no campo `access_key`
+- [ ] Chave válida vincula o emitente pelo CNPJ das posições 7 a 20
+- [ ] Mesma chave de outro comprovante do relatório: vira duplicata
+- [ ] Campo na revisão só quando falta a chave; spec E2E
+
+---
+
+## Issue 42 — Emitente, CNPJ e cidade lidos do próprio comprovante
+
+`area:db` · `area:api` · `area:extracao` · `area:web` · `area:export` ·
+depende de #41
+
+Comprovante sem CNPJ legível — o recibo manuscrito, onde o procedimento diz
+que se concentra a Alimentação — sai na planilha sem nome e sem cidade, duas
+das cinco colunas obrigatórias. Não há como informá-los: o `PATCH` não aceita
+emitente, e o cadastro de emitente exige CNPJ.
+
+**Decisão:** procurar no próprio comprovante. A cidade é a do documento,
+nunca a do destino da viagem.
+
+**Escopo**
+
+`PATCH` aceita `cnpj` (vincula ou cria o emitente). Sem CNPJ, o comprovante
+guarda nome e cidade como estão no papel, preenchidos pela extração quando o
+texto os traz e editáveis na revisão. As saídas usam o emitente quando há, e o
+que o comprovante traz quando não há.
+
+**Critérios de aceite**
+
+- [ ] `cnpj` válido no `PATCH` vincula o emitente; inválido, `422`
+- [ ] Nome e cidade próprios do comprovante, quando não há emitente
+- [ ] Extração preenche os dois mesmo sem CNPJ, quando o texto os traz
+- [ ] Planilha e Anexo I usam o emitente, ou o que o comprovante traz
+- [ ] Spec E2E de um manuscrito revisado à mão
+
+---
+
+## Issue 43 — Girar a página na revisão
+
+`area:db` · `area:api` · `area:web` · `area:export` · depende de #36
+
+"Página de cabeça para baixo. Acontece." O escaneamento do WhatsApp chega com
+orientação variada, e hoje não há como girar uma página: o QR e o OCR leem a
+imagem como veio.
+
+**Escopo**
+
+Rotação por comprovante (0, 90, 180, 270), escolhida na revisão. Vale para a
+imagem da revisão, para o reprocessamento e para o PDF consolidado, somada ao
+`/Rotate` da origem.
+
+**Critérios de aceite**
+
+- [ ] Coluna com check de múltiplo de 90; migration reversível
+- [ ] Girar na revisão atualiza a imagem e não perde zoom nem posição
+- [ ] Reprocessar lê a página girada
+- [ ] Consolidado sai girado, sem mexer no arquivo original
+
+---
+
+## Issue 44 — Editar o relatório pela tela, com cidade principal
+
+`area:db` · `area:api` · `area:web` · sem dependência
+
+A tela só cria relatório e muda o status. Título, período e adiantamento não
+se corrigem depois — e o procedimento manda sinalizar "adiantamento não
+informado", porque sem ele não há saldo. Hoje adiantamento esquecido é
+`0`, indistinguível de "não houve adiantamento".
+
+**Escopo**
+
+Formulário de edição usando o `PATCH` que já existe. `advance_cents` passa a
+aceitar nulo (não informado), e o relatório ganha a cidade principal da
+viagem, base das regras de #51.
+
+**Critérios de aceite**
+
+- [ ] Editar título, período, adiantamento e cidade principal pela tela
+- [ ] Adiantamento nulo é "não informado"; zero é "não houve"
+- [ ] Migration reversível para as duas colunas
+- [ ] Relatório fechado continua aceitando só a reabertura
+
+---
+
+# M10 — Extração
+
+## Issue 45 — Combustível: litros × preço unitário
+
+`area:extracao` · sem dependência
+
+"É a checagem que pega erro de um dígito." O OCR leu o abastecimento de
+Itapipoca como R$ 2.225,49; o cupom diz 39,56 L × R$ 5,70 = R$ 225,49.
+
+**Escopo**
+
+Ler litros e preço unitário do cupom de combustível e conferir contra o
+total, arredondando ao centavo. Regra nova na conferência, sem bloquear nada.
+
+**Critérios de aceite**
+
+- [ ] Os dois exemplos do procedimento fecham (39,56 × 5,70 e 18,461 × 4,97)
+- [ ] Divergência vira alerta no comprovante
+- [ ] Sem litros ou sem preço legível, a regra não dispara
+- [ ] Casos puros em `tests/services/`
+
+---
+
+## Issue 46 — Atalhos de recorte na revisão
+
+`area:web` · sem dependência
+
+A página inteira não é legível campo a campo. O procedimento recorta por
+tipo, e a proporção da página já diz o tipo: paisagem é recibo manuscrito,
+retrato muito alto é cupom térmico.
+
+**Escopo**
+
+Atalhos de zoom sobre a mesma imagem, sem renderizar nada novo: no
+manuscrito, a faixa do valor (55–100% da largura, 0–42% da altura) e a da data
+(70–100% da altura); no cupom, três fatias com 3% de sobreposição; em
+qualquer página, o cabeçalho do emitente (0–75% × 0–40%).
+
+**Critérios de aceite**
+
+- [ ] Atalhos escolhidos pela proporção da imagem
+- [ ] Teclado e mouse, sem perder o arrastar da #28
+- [ ] Spec E2E medindo o recorte de um atalho
+
+---
+
+# M11 — Conferência
+
+## Issue 47 — O que a chave de acesso já diz
+
+`area:extracao` · sem dependência
+
+A chave tem a UF (posições 1–2), o mês da emissão (3–6) e o tipo de emissão
+(35). Nenhum dos três é conferido.
+
+**Critérios de aceite**
+
+- [ ] Mês da chave diferente da data do comprovante: erro — o caso 2606/2608
+- [ ] Tipo de emissão diferente de normal: "emitido em contingência"
+- [ ] UF da chave diferente da UF da cidade do emitente: aviso
+
+---
+
+## Issue 48 — A classificação do procedimento nos alertas
+
+`area:api` · `area:web` · sem dependência
+
+Hoje há `erro` e `aviso`. O procedimento classifica em PENDENTE, DECISÃO,
+ATENÇÃO, VERIFICADO e INFORMATIVO — e é a mesma classificação da aba de
+Observações da planilha (#53).
+
+**Critérios de aceite**
+
+- [ ] Cada regra com a sua classe, documentada
+- [ ] A tela agrupa pela classe
+- [ ] Mudança de contrato da `/validation` registrada no README
+
+---
+
+## Issue 49 — Valores repetidos que não são duplicata
+
+`area:api` · sem dependência
+
+"Avisar quando houver valores repetidos que não são duplicata, para ninguém
+apagar na conferência." Duas notas com chave diferente são documentos
+diferentes, e hoje nem entram em alerta nenhum.
+
+**Critérios de aceite**
+
+- [ ] Mesmo valor em documentos provadamente diferentes: INFORMATIVO, "não
+      apague"
+- [ ] O contraexemplo dos dois almoços continua não sendo duplicata
+
+---
+
+## Issue 50 — Documentos não fiscais somados à parte
+
+`area:api` · `area:export` · sem dependência
+
+Recibo manuscrito, comanda e cupom de conferência podem ser glosados. O
+procedimento manda somar e informar. Sem chave de acesso válida, o documento
+não é NFC-e — dá para derivar, sem coluna nova.
+
+**Critérios de aceite**
+
+- [ ] Total e quantidade dos comprovantes sem chave, na conferência
+- [ ] O mesmo número na planilha (#53)
+
+---
+
+## Issue 51 — Regras da viagem
+
+`area:api` · depende de #44
+
+O que o procedimento manda sinalizar e depende do relatório inteiro:
+
+**Critérios de aceite**
+
+- [ ] Categoria Outros: DECISÃO — finalidade a confirmar
+- [ ] Despesa fora da cidade principal: INFORMATIVO
+- [ ] Duas cidades no mesmo dia: INFORMATIVO, lembrando que conexão de voo
+      explica a maioria
+- [ ] Valor muito acima do padrão da categoria na viagem, com amostra mínima
+- [ ] Adiantamento não informado: PENDENTE
+
+---
+
+## Issue 52 — Conferência sem uma consulta por comprovante
+
+`area:api` · sem dependência
+
+`checkMerchantRange` e `checkDuplicates` fazem uma consulta por comprovante:
+80 consultas num relatório de 40, a cada abertura da tela.
+
+**Critérios de aceite**
+
+- [ ] Número de consultas constante no tamanho do relatório
+- [ ] Os testes de conferência passam sem alteração
+
+---
+
+# M12 — Saídas
+
+## Issue 53 — Planilha de acompanhamento no formato do procedimento
+
+`area:export` · depende de #39 e #48
+
+A planilha final de Itapipoca tem duas abas: `Despesas` (Data, Local, Cidade,
+Tipo, Valor — 41 linhas e o TOTAL GERAL) e `Resumo` (`COUNTIF`/`SUMIF` sobre
+`Despesas`). O procedimento acrescenta o resumo por cidade, o bloco de
+conferência, o saldo e a aba de Observações.
+
+**Em aberto:** as abas por tipo da #29 ficam ao lado ou saem.
+
+**Critérios de aceite**
+
+- [ ] `Despesas` com as cinco colunas na ordem, e as de apoio depois
+- [ ] Resumo por categoria e por cidade por fórmula
+- [ ] Bloco de conferência: as quatro somas e a célula OK/DIVERGÊNCIA
+- [ ] Adiantamento e saldo
+- [ ] Aba de Observações com a classificação da #48
+- [ ] Cor nas linhas que pedem atenção, sem cor como único canal
+- [ ] Paisagem, `fitToWidth = 1`, cabeçalho congelado e autofiltro
+
+---
+
+## Issue 54 — PDFs por categoria, com a página original intacta
+
+`area:export` · depende de #36
+
+O procedimento entrega um PDF por categoria com despesa, em ordem
+cronológica, com as páginas originais — "nunca rasterizar, nunca recortar".
+A duplicata vai junto, como comprovação.
+
+**Critérios de aceite**
+
+- [ ] Um arquivo por categoria com despesa, num ZIP (`jszip` já é dependência)
+- [ ] Página copiada, não embutida: sem faixa e com o `/Rotate` da origem
+- [ ] Teste de cobertura: toda página em exatamente um arquivo, total igual
+- [ ] Teste de pixel: página gerada idêntica à de origem
+- [ ] Rota nova em `tests/api/routes.js`
+
+---
+
+## Issue 55 — Anexo I oficial (versão 19)
+
+`area:export` · `bloqueada`
+
+O template continua sintético. O mapa da versão 19 já está no serviço desde a
+#38; falta o arquivo.
+
+**Critérios de aceite**
+
+- [ ] Template oficial em branco em `assets/`, sem dado de ninguém
+- [ ] Valor numa coluna só por linha, limpando as demais
+- [ ] Diff célula a célula: nada fora do bloco de dados muda
+
+---
+
+## Issue 56 — Anexo já preenchido: comparar antes de sobrescrever
+
+`area:api` · `area:web` · depende de #55
+
+"O arquivo pode já vir preenchido por outra pessoa." Os erros já achados
+nesse formulário: duas linhas duplicadas desalinhando as seguintes, valor na
+coluna errada, dígitos trocados, lançamento faltando.
+
+**Critérios de aceite**
+
+- [ ] Envio do Anexo preenchido devolve a diferença linha a linha
+- [ ] Os quatro erros do procedimento aparecem cada um com o seu nome
+- [ ] Nada é sobrescrito sem a pessoa ver a diferença
+- [ ] Rota nova em `tests/api/routes.js`
+
+---
+
+# M13 — Fechamento
+
+## Issue 57 — Checagem final ao fechar
+
+`area:api` · `area:web` · depende de #53 e #54
+
+A checagem final do procedimento, mostrada ao fechar o relatório. Informa,
+não bloqueia.
+
+**Critérios de aceite**
+
+- [ ] Soma das linhas = total = subtotais por categoria = subtotais por
+      cidade
+- [ ] Toda página em exatamente um PDF de categoria; páginas geradas =
+      recebidas
+- [ ] Toda chave com DV validado; todo valor confirmado por uma pessoa
+- [ ] Diálogo antes de fechar, com o que falta
