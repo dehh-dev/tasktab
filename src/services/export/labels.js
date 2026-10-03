@@ -22,6 +22,15 @@ const CATEGORY_LABELS = {
 
 const NO_CATEGORY_LABEL = 'Sem categoria';
 
+// As classes da conferencia (issue 48), como a aba de Observacoes as escreve.
+const LEVEL_LABELS = {
+  pendente: 'Pendente',
+  decisao: 'Decisão',
+  atencao: 'Atenção',
+  verificado: 'Verificado',
+  informativo: 'Informativo',
+};
+
 const STATUS_LABELS = {
   pending: 'Pendente',
   processing: 'Processando',
@@ -49,6 +58,10 @@ function statusLabel(status) {
   return STATUS_LABELS[status] || status;
 }
 
+function levelLabel(level) {
+  return LEVEL_LABELS[level] || level;
+}
+
 module.exports = {
   CATEGORY_LABELS,
   STATUS_LABELS,
@@ -56,4 +69,5 @@ module.exports = {
   categoryKey,
   categoryLabel,
   statusLabel,
+  levelLabel,
 };

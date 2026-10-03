@@ -7,7 +7,7 @@ const validation = require('../services/validation');
 const ownership = require('../services/auth/ownership');
 const { loadReport, reportClosed } = require('../services/auth/access.service');
 const retention = require('../services/retention.service');
-const xlsxPorTipo = require('../services/export/xlsx-por-tipo.service');
+const planilha = require('../services/export/planilha.service');
 const anexoI = require('../services/export/anexo-i.service');
 const pdfConsolidado = require('../services/export/pdf-consolidado.service');
 
@@ -116,8 +116,16 @@ async function exportXlsx(req, res) {
   const id = validator.validateId(req.params.id);
   const report = await loadReport(req.user, id);
 
-  const receipts = await Receipt.findForExport(id);
-  const workbook = await xlsxPorTipo.buildWorkbook(report, receipts);
+  // A aba de Observacoes e a conferencia do relatorio, a mesma da tela.
+  const [receipts, conference] = await Promise.all([
+    Receipt.findForExport(id),
+    validation.validateReport(id),
+  ]);
+  const workbook = await planilha.buildWorkbook(
+    report,
+    receipts,
+    conference?.alerts ?? [],
+  );
 
   res
     .status(200)

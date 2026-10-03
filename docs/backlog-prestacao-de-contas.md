@@ -2124,7 +2124,7 @@ não é NFC-e — dá para derivar, sem coluna nova.
 **Critérios de aceite**
 
 - [x] Total e quantidade dos comprovantes sem chave, na conferência
-- [ ] O mesmo número na planilha (#53)
+- [x] O mesmo número na planilha (#53)
 
 **Como ficou**
 
@@ -2139,8 +2139,10 @@ prova que o documento é NFC-e, e conta como sem chave. A NFC-e cuja chave não
 foi lida também cai aqui até alguém digitar a chave na revisão (#41), e a
 mensagem diz isso.
 
-O segundo critério fecha com a #53: a planilha deve levar a mesma regra,
-aplicada ao que ela soma.
+O segundo critério fechou com a #53. A coluna Documento da aba `Despesas`
+aplica a mesma regra, e o `Resumo` soma "Sem chave" por fórmula. Com o
+relatório todo conferido, os dois números batem, e há teste disso, inclusive
+com uma chave que não fecha o DV.
 
 ---
 
@@ -2229,13 +2231,47 @@ conferência, o saldo e a aba de Observações.
 
 **Critérios de aceite**
 
-- [ ] `Despesas` com as cinco colunas na ordem, e as de apoio depois
-- [ ] Resumo por categoria e por cidade por fórmula
-- [ ] Bloco de conferência: as quatro somas e a célula OK/DIVERGÊNCIA
-- [ ] Adiantamento e saldo
-- [ ] Aba de Observações com a classificação da #48
-- [ ] Cor nas linhas que pedem atenção, sem cor como único canal
-- [ ] Paisagem, `fitToWidth = 1`, cabeçalho congelado e autofiltro
+- [x] `Despesas` com as cinco colunas na ordem, e as de apoio depois
+- [x] Resumo por categoria e por cidade por fórmula
+- [x] Bloco de conferência: as quatro somas e a célula OK/DIVERGÊNCIA
+- [x] Adiantamento e saldo
+- [x] Aba de Observações com a classificação da #48
+- [x] Cor nas linhas que pedem atenção, sem cor como único canal
+- [x] Paisagem, `fitToWidth = 1`, cabeçalho congelado e autofiltro
+
+**Como ficou**
+
+A rota continua `export.xlsx`, e o serviço virou `planilha.service.js`. A
+planilha abre com `Despesas`, `Resumo` e `Observações`, e as abas por tipo
+vêm depois.
+
+- **`Despesas`** traz Data, Local, Cidade, Tipo e Valor, e depois duas
+  colunas de apoio. Documento diz "Com chave" ou "Sem chave" (#50).
+  Conferência traz a classe mais grave dos alertas do comprovante. A linha
+  ganha amarelo quando o alerta é pendente ou de decisão, e laranja quando é
+  de atenção. A classe vem escrita ao lado da cor.
+- **`Resumo`** é todo fórmula sobre `Despesas`, como a planilha de
+  Itapipoca: `COUNTIF`/`SUMIF` por tipo, por cidade e por documento. Também
+  traz o bloco de conferência, o saldo ("A devolver", "A receber" ou
+  "Zerado") e o "Fora da prestação". Com o adiantamento nulo, aparece "Não
+  informado" no lugar de um saldo inventado.
+- **`Observações`** usa o mesmo texto da conferência da tela, agrupado na
+  ordem das classes.
+
+Três decisões no caminho:
+
+- O `COUNTIF` do Excel não distingue caixa. Por isso as cidades se agrupam
+  sem caixa, senão "ITAPIPOCA/CE" e "Itapipoca/CE" virariam duas linhas
+  somando a mesma despesa duas vezes.
+- O resultado da conferência compara as somas arredondadas no centavo. Há um
+  teste para cada soma que desfaz só ela: tipo sem acento, cidade trocada e
+  total digitado por cima.
+- As abas por tipo continuam como cópia dos confirmados, com o total de
+  cada uma. Quem conta para o `Resumo` e para a conferência é a `Despesas`.
+
+O avaliador de fórmulas dos testes (`tests/helpers/xlsx-formula.js`) passou
+a resolver `COUNTIF`, `SUMIF`, `ROUND`, `IF`, `AND` e referência. Toda
+fórmula da planilha é conferida contra as células, e não contra o texto.
 
 ---
 

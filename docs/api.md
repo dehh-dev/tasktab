@@ -58,7 +58,7 @@ Como cada etapa funciona esta em
 | `GET`    | `/api/receipts/:id/image`              | Pagina do comprovante (WebP)  |
 | `POST`   | `/api/receipts/:id/reprocess`          | Reenvia para a fila           |
 | `GET`    | `/api/reports/:id/validation`          | Alertas de conferencia        |
-| `GET`    | `/api/reports/:id/export.xlsx`         | Resumo por tipo (Excel)       |
+| `GET`    | `/api/reports/:id/export.xlsx`         | Planilha do procedimento      |
 | `GET`    | `/api/reports/:id/export/anexo-i.xlsx` | Anexo I (Excel)               |
 | `GET`    | `/api/reports/:id/export.pdf`          | PDF consolidado               |
 

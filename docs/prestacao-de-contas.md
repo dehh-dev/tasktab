@@ -175,26 +175,40 @@ diferente nao basta, porque a data pode ter sido lida errado.
 
 Tres saidas, cada uma com um proposito diferente:
 
-| Rota                                       | Para que                                             |
-| ------------------------------------------ | ---------------------------------------------------- |
-| `GET /api/reports/:id/export.xlsx`         | Resumo por tipo: uma aba por categoria, com formulas |
-| `GET /api/reports/:id/export/anexo-i.xlsx` | O formulario do Anexo I preenchido                   |
-| `GET /api/reports/:id/export.pdf`          | Todos os cupons num PDF so, com indice e carimbo     |
+| Rota                                       | Para que                                         |
+| ------------------------------------------ | ------------------------------------------------ |
+| `GET /api/reports/:id/export.xlsx`         | A planilha do procedimento, com as abas por tipo |
+| `GET /api/reports/:id/export/anexo-i.xlsx` | O formulario do Anexo I preenchido               |
+| `GET /api/reports/:id/export.pdf`          | Todos os cupons num PDF so, com indice e carimbo |
 
-O **resumo por tipo** (`exceljs`, gerado do zero) tem uma aba `Resumo` e uma
-aba por tipo de despesa **com lancamento** — na ordem do enum, para dois
-relatorios da mesma pessoa sairem com o mesmo layout. So entram comprovantes
-`confirmed`, o mesmo criterio do Anexo I; confirmar ja exige categoria, entao
-toda linha tem tipo. Cada aba traz **Data, Local, Cidade e Valor**, com
-cabecalho congelado, autofiltro, zebra e linha de total — o mesmo layout da
-planilha manual que o projeto substitui.
+A **planilha** (`exceljs`, gerada do zero) segue o procedimento de prestacao
+de contas e abre com tres abas:
 
-O valor de cada tipo no `Resumo` e **formula cruzando abas**
-(`SUM('Alimentação'!D2:D9)`), nao numero repetido: corrigir um lancamento na
-aba do tipo muda o resumo e o total sozinho. O que ficou de fora (aguardando
-revisao, duplicata, falha) aparece contado no bloco "Fora da prestação", sem
-entrar em soma nenhuma — planilha que so mostra o confirmado esconde de quem
-vai assinar o trabalho que falta.
+- **`Despesas`**: um comprovante confirmado por linha, em ordem cronologica,
+  com as cinco colunas do procedimento — Data, Local, Cidade, Tipo e Valor — e
+  duas de apoio: Documento ("Com chave" ou "Sem chave") e Conferencia (a
+  classe do alerta mais grave do comprovante). A linha que pede atencao ganha
+  cor, e a classe vai escrita ao lado: a cor nunca e o unico canal. Sai
+  deitada, na largura da folha, com cabecalho congelado, autofiltro e TOTAL
+  GERAL.
+- **`Resumo`**: todo por formula sobre `Despesas` (`COUNTIF`/`SUMIF`), nunca
+  numero repetido — corrigir uma linha corrige o resto. Traz o total por tipo
+  e por cidade; a **conferencia** (soma das linhas, total geral, soma por tipo
+  e soma por cidade, com a celula `OK` ou `DIVERGÊNCIA`); o adiantamento e o
+  saldo ("a devolver" ou "a receber", e nada de saldo quando o adiantamento
+  nao foi informado); os documentos com e sem chave de acesso, o mesmo numero
+  da conferencia da tela; e o que ficou "Fora da prestação".
+- **`Observações`**: a conferencia do relatorio com o mesmo texto da tela,
+  agrupada pela classe do procedimento, com data, local e valor do comprovante
+  de cada alerta.
+
+Depois vem uma aba por tipo de despesa **com lancamento**, na ordem do enum,
+para dois relatorios da mesma pessoa sairem com o mesmo layout, cada uma com
+**Data, Local, Cidade e Valor** e o total da aba. So entram comprovantes
+`confirmed`, o mesmo criterio do Anexo I. O que ficou de fora (aguardando
+revisao, duplicata, falha) aparece contado em "Fora da prestação", sem entrar
+em soma nenhuma — planilha que so mostra o confirmado esconde de quem vai
+assinar o trabalho que falta.
 
 O **Anexo I** tambem so leva comprovantes `confirmed` — o unico status que
 significa "revisado por uma pessoa". O relatorio nao e gerado do zero: o

@@ -1,7 +1,7 @@
 # Exportacao
 
-Resumo por tipo (`xlsx-por-tipo.service.js`), Anexo I (`anexo-i.service.js`) e
-PDF consolidado (`pdf-consolidado.service.js`).
+Planilha do procedimento (`planilha.service.js`), Anexo I
+(`anexo-i.service.js`) e PDF consolidado (`pdf-consolidado.service.js`).
 
 ## Anexo I
 
@@ -23,18 +23,30 @@ PDF consolidado (`pdf-consolidado.service.js`).
 
 - So `confirmed` entra nas duas saidas Excel (issue 29). O resto vai contado
   no bloco "Fora da prestação", sem entrar em soma.
-- O resumo tem **uma aba por tipo** com lancamento, mais a aba `Resumo`, na
-  ordem do enum — ordenar por valor mudaria o layout de um mes para o outro.
-  As abas por tipo ficam tambem quando vier a planilha do procedimento
-  (issue 53).
+- A planilha segue o procedimento (issue 53): `Despesas`, `Resumo` e
+  `Observações`, e as abas por tipo da issue 29 ao lado, na ordem do enum —
+  ordenar por valor mudaria o layout de um mes para o outro.
+- **`Despesas` e a fonte, e o `Resumo` e todo formula sobre ela**
+  (`COUNTIF`/`SUMIF` nas colunas de letra fixa), nunca numero repetido. As
+  cinco colunas do procedimento vem primeiro, na ordem dele, e as de apoio
+  (Documento, Conferencia) depois.
+- No `Resumo`, cidade se agrupa **sem caixa**: o `COUNTIF` do Excel nao
+  distingue, e uma linha para "ITAPIPOCA/CE" e outra para "Itapipoca/CE"
+  somariam a mesma despesa duas vezes — a conferencia acusaria DIVERGÊNCIA
+  numa planilha certa.
+- O bloco de conferencia compara as somas **no centavo** (`ROUND(...,2)`), e
+  ha um teste por soma que desfaz so ela: o primeiro teste so desfazia o
+  tipo, e tirar a comparacao da cidade passava.
+- Linha que pede atencao: cor **e** a classe escrita na coluna Conferencia.
+- `Observações` repete o texto da conferencia (`validateReport`) como a tela
+  o mostra, sem acento e em centavos: as duas nunca contam historias
+  diferentes.
 - Colunas da aba de tipo: **Data, Local, Cidade, Valor**. Local e cidade saem
   do cadastro do emitente, ou do papel quando nao ha cadastro.
 - A formatacao e a da planilha que quem confere ja conhece: cabecalho branco
   sobre `FF1F3864`, zebra `FFF2F2F2`, bordas, TOTAL mesclado e invertido,
   cabecalho congelado e autofiltro. Nenhuma cor carrega informacao sozinha. Ha
   teste de cada item — formatacao sem teste some na proxima refatoracao.
-- O valor de cada tipo no `Resumo` e **formula cruzando abas**
-  (`SUM('Alimentação'!D2:D9)`), nunca numero repetido.
 - **Toda formula leva o resultado guardado** (`formulaWithResult`), e o
   workbook marca `fullCalcOnLoad`: o exceljs grava formula sem valor, e a
   pre-visualizacao do WhatsApp e do Drive abria os totais em branco.
@@ -45,7 +57,8 @@ PDF consolidado (`pdf-consolidado.service.js`).
   subtotal. **Nao volte a dar rotulo proprio ao `nao_classificado`.**
 - Teste de planilha **resolve a formula contra as celulas**
   (`tests/helpers/xlsx-formula.js`): foi a comparacao de string que deixou
-  passar um subtotal apontando para rotulo nenhum.
+  passar um subtotal apontando para rotulo nenhum. O avaliador cobre so as
+  funcoes que a planilha usa; funcao nova entra nele junto.
 
 ## PDF consolidado
 
