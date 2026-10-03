@@ -2089,9 +2089,25 @@ diferentes, e hoje nem entram em alerta nenhum.
 
 **Critérios de aceite**
 
-- [ ] Mesmo valor em documentos provadamente diferentes: INFORMATIVO, "não
+- [x] Mesmo valor em documentos provadamente diferentes: INFORMATIVO, "não
       apague"
-- [ ] O contraexemplo dos dois almoços continua não sendo duplicata
+- [x] O contraexemplo dos dois almoços continua não sendo duplicata
+
+**Como ficou**
+
+Regra `valor_repetido`, informativa, com um alerta em cada comprovante — a
+revisão mostra os alertas do comprovante aberto, e quem apaga a cópia aparente
+está olhando para ela. "Provadamente diferente" ficou **só pela chave**: duas
+chaves válidas e diferentes são dois documentos fiscais. Data diferente ficou
+de fora de propósito — é lida pelo OCR, que já trocou agosto por junho, e um
+"não apague" sobre duas cópias do mesmo cupom seria o pior alerta errado.
+
+Na tela, "apagar" também é marcar como duplicata, que tira da soma: foi assim
+que os R$ 48,60 sumiram. Por isso a marcada à mão continua avisada quando
+nenhum comprovante somado carrega a chave dela, e a mensagem diz "não apague
+nem marque como duplicata". A cópia de um documento que segue na soma não é
+avisada. O contraexemplo dos dois almoços passou a conferir também o aviso, de
+ponta a ponta, com as chaves lidas do QR.
 
 ---
 

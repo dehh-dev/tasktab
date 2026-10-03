@@ -315,8 +315,8 @@ contas decide; a ferramenta aponta, nao veta.
 Regras: soma dos itens contra o total impresso, litros vezes preco unitario
 no combustivel, digito verificador da chave, mes, UF e tipo de emissao da
 chave (contingencia), data dentro do periodo, valor fora da faixa historica do
-emitente, comprovante incompleto, despesas acima do adiantamento e suspeita de
-duplicata.
+emitente, comprovante incompleto, despesas acima do adiantamento, suspeita de
+duplicata e valor repetido em documentos diferentes.
 
 Fora de escopo hoje, registrado para nao parecer esquecimento: **coerencia
 geografica e horaria** (jantar numa cidade e corrida em outra no mesmo
@@ -333,6 +333,11 @@ assimetrico: deixar passar uma duplicata infla o total e a conferencia pega,
 mas marcar como duplicata o que nao e some com uma despesa legitima. Foi assim
 que R$ 48,60 sumiram da planilha que originou este projeto — dois almocos do
 mesmo restaurante, mesmo valor, dias diferentes. Ha teste desse contraexemplo.
+
+O caminho inverso tambem e avisado: mesmo valor em notas de **chave diferente**
+sai na conferencia como `informativo`, em cada uma, com "nao apague nem marque
+como duplicata". So a chave prova que sao documentos diferentes — data
+diferente nao basta, porque a data pode ter sido lida errado.
 
 Nada e confirmado sozinho: a extracao troca digitar por conferir.
 

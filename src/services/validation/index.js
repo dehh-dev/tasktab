@@ -52,6 +52,7 @@ const RULE_LEVEL = {
   faixa_emitente: 'atencao',
   duplicata_exata: 'verificado',
   adiantamento: 'informativo',
+  valor_repetido: 'informativo',
 };
 
 function alert(rule, message, extra = {}) {
@@ -314,6 +315,72 @@ function checkExactDuplicates(receipts) {
     );
 }
 
+/** "do comprovante 2", "dos comprovantes 2, 3 e 4". */
+function receiptList(ids) {
+  if (ids.length === 1) {
+    return `do comprovante ${ids[0]}`;
+  }
+
+  return `dos comprovantes ${ids.slice(0, -1).join(', ')} e ${ids.at(-1)}`;
+}
+
+/**
+ * Mesmo valor em documentos provadamente diferentes (issue 49): "avisar
+ * quando houver valores repetidos que nao sao duplicata, para ninguem apagar
+ * na conferencia". Foi assim que R$ 48,60 sumiram da planilha que originou o
+ * projeto: dois almocos do mesmo restaurante, mesmo valor, tomados por um so.
+ *
+ * Provadamente e pela chave de acesso: duas chaves validas e diferentes sao
+ * dois documentos fiscais, como a mesma chave e um so (`duplicata_exata`).
+ * Data diferente nao basta — e lida pelo OCR, que ja trocou agosto por junho,
+ * e um "nao apague" sobre duas copias do mesmo cupom seria o pior alerta
+ * errado. Mesmo valor e mesma data sem chave segue como suspeita, na
+ * `possivel_duplicata`.
+ *
+ * Um alerta por comprovante, e nao por par: a revisao mostra os alertas do
+ * comprovante aberto, e quem apaga a copia aparente esta olhando para ela.
+ *
+ * Na tela, "apagar" tambem e marcar como duplicata, que tira da soma. A copia
+ * de um documento que segue somado pode ficar assim, e nao e avisada; a
+ * marcada a mao com uma chave que nenhum comprovante somado carrega continua
+ * avisada — e um documento diferente fora da soma, o erro dos R$ 48,60.
+ */
+function checkRepeatedValues(receipts) {
+  const counted = new Set(
+    receipts
+      .filter((receipt) => receipt.status !== 'duplicate')
+      .map((receipt) => receipt.access_key),
+  );
+  const documents = receipts.filter(
+    (receipt) =>
+      receipt.amount_cents !== null &&
+      accessKey.isValid(receipt.access_key) &&
+      (receipt.status !== 'duplicate' || !counted.has(receipt.access_key)),
+  );
+
+  return documents.flatMap((receipt) => {
+    const others = documents
+      .filter(
+        (other) =>
+          other.amount_cents === receipt.amount_cents &&
+          other.access_key !== receipt.access_key,
+      )
+      .map((other) => other.id);
+
+    if (others.length === 0) {
+      return [];
+    }
+
+    return [
+      alert(
+        'valor_repetido',
+        `Mesmo valor ${receiptList(others)}, com outra chave de acesso: sao documentos diferentes, nao apague nem marque como duplicata.`,
+        { receipt_id: receipt.id, related_id: others[0] },
+      ),
+    ];
+  });
+}
+
 /** Suspeitas de duplicata que exigem decisao humana. */
 async function checkDuplicates(receipts) {
   const alerts = [];
@@ -417,6 +484,7 @@ async function validateReport(reportId) {
     ...checkFuelArithmetic(receipts),
     ...(await checkMerchantRange(receipts)),
     ...checkExactDuplicates(receipts),
+    ...checkRepeatedValues(receipts),
     ...(await checkDuplicates(receipts)),
     ...checkIncomplete(receipts),
     ...checkAdvance(report, totals),

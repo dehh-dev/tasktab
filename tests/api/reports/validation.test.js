@@ -12,6 +12,24 @@ const { LEVELS, RULE_LEVEL } = require('../../../src/services/validation');
 
 const CHAVE = '52260626048802000165650010001631601303284889';
 
+/**
+ * Uma chave que fecha o DV, com UF, mes, numero da nota e tipo de emissao
+ * escolhidos: o resto e o do cupom do caso-base.
+ */
+function chave({
+  uf = '23',
+  aamm = '2608',
+  numero = '000163160',
+  tipo = '1',
+} = {}) {
+  const cnpj = '26048802000165';
+  const modelo = '65';
+  const serie = '001';
+  const codigo = '30328488';
+  const sem = `${uf}${aamm}${cnpj}${modelo}${serie}${numero}${tipo}${codigo}`;
+  return `${sem}${checkDigit(sem)}`;
+}
+
 // Cupom completo: quatro itens que somam 37,60 e o total impresso.
 function cupomComItens(total = '37,60') {
   return [
@@ -117,6 +135,145 @@ describe('regra: duplicata exata', () => {
     await insertReceipt(report.id, { status: 'duplicate' });
 
     expect(porRegra(await validar(report.id), 'duplicata_exata')).toEqual([]);
+  });
+});
+
+describe('regra: valor repetido', () => {
+  // Almocos de R$ 48,60 no mesmo restaurante. Dois deles, em 17/06 e 23/06,
+  // foram tomados por um so na planilha que originou o projeto, e um
+  // lancamento legitimo sumiu.
+  async function almocos(...receipts) {
+    const report = await insertReport();
+    const inserted = [];
+
+    for (const [index, overrides] of receipts.entries()) {
+      inserted.push(
+        await insertReceipt(report.id, {
+          page_number: index + 1,
+          status: 'needs_review',
+          amount_cents: 4860,
+          category: 'alimentacao',
+          ...overrides,
+        }),
+      );
+    }
+
+    return { report, receipts: inserted };
+  }
+
+  it('avisa nos dois documentos para ninguem apagar', async () => {
+    const {
+      report,
+      receipts: [dia17, dia23],
+    } = await almocos(
+      { issued_at: '2026-06-17', access_key: chave({ numero: '000163119' }) },
+      { issued_at: '2026-06-23', access_key: chave({ numero: '000163160' }) },
+    );
+
+    expect(porRegra(await validar(report.id), 'valor_repetido')).toEqual([
+      expect.objectContaining({
+        level: 'informativo',
+        receipt_id: dia17.id,
+        related_id: dia23.id,
+        message: expect.stringContaining('nao apague'),
+      }),
+      expect.objectContaining({
+        level: 'informativo',
+        receipt_id: dia23.id,
+        related_id: dia17.id,
+        message: expect.stringContaining('nao apague'),
+      }),
+    ]);
+  });
+
+  it('um aviso por comprovante, com os outros documentos de mesmo valor', async () => {
+    const {
+      report,
+      receipts: [primeiro, segundo, terceiro],
+    } = await almocos(
+      { access_key: chave({ numero: '000163119' }) },
+      { access_key: chave({ numero: '000163160' }) },
+      { access_key: chave({ numero: '000163284' }) },
+    );
+
+    const alertas = porRegra(await validar(report.id), 'valor_repetido');
+
+    expect(alertas.map((alerta) => alerta.receipt_id)).toEqual([
+      primeiro.id,
+      segundo.id,
+      terceiro.id,
+    ]);
+    expect(alertas[0].message).toContain(
+      `dos comprovantes ${segundo.id} e ${terceiro.id}`,
+    );
+  });
+
+  it('data diferente sem chave nao prova que sao dois documentos', async () => {
+    // Pode ser o mesmo recibo enviado duas vezes, com a data lida errado numa
+    // delas: um "nao apague" ali seria o alerta errado.
+    const { report } = await almocos(
+      { issued_at: '2026-06-17' },
+      { issued_at: '2026-06-23' },
+    );
+
+    expect(porRegra(await validar(report.id), 'valor_repetido')).toEqual([]);
+  });
+
+  it('a marcada a mao como duplicata segue avisada se a chave e outra', async () => {
+    // Marcar como duplicata tira da soma: e o "apagar" da tela, e foi assim
+    // que os R$ 48,60 sumiram.
+    const {
+      report,
+      receipts: [dia17, dia23],
+    } = await almocos(
+      { access_key: chave({ numero: '000163119' }) },
+      { access_key: chave({ numero: '000163160' }), status: 'duplicate' },
+    );
+
+    const alertas = porRegra(await validar(report.id), 'valor_repetido');
+
+    expect(alertas.map((alerta) => alerta.receipt_id)).toEqual([
+      dia17.id,
+      dia23.id,
+    ]);
+    expect(alertas[1].message).toContain('nem marque como duplicata');
+  });
+
+  it('a copia de um documento que segue na soma nao e avisada', async () => {
+    const {
+      report,
+      receipts: [original, , outro],
+    } = await almocos(
+      { access_key: CHAVE },
+      { access_key: CHAVE, status: 'duplicate' },
+      { access_key: chave({ numero: '000163119' }) },
+    );
+
+    const alertas = porRegra(await validar(report.id), 'valor_repetido');
+
+    expect(alertas.map((alerta) => alerta.receipt_id)).toEqual([
+      original.id,
+      outro.id,
+    ]);
+  });
+
+  it('a copia do mesmo documento nao e valor repetido', async () => {
+    // Mesma chave e o mesmo cupom: a duplicata exata, que conta uma vez so.
+    const { report } = await almocos(
+      { access_key: CHAVE },
+      { access_key: CHAVE, status: 'duplicate' },
+    );
+
+    expect(porRegra(await validar(report.id), 'valor_repetido')).toEqual([]);
+  });
+
+  it('valor diferente nao e repetido', async () => {
+    const { report } = await almocos(
+      { access_key: chave({ numero: '000163119' }) },
+      { access_key: chave({ numero: '000163160' }), amount_cents: 4870 },
+    );
+
+    expect(porRegra(await validar(report.id), 'valor_repetido')).toEqual([]);
   });
 });
 
@@ -450,20 +607,6 @@ describe('regra: combustivel', () => {
 });
 
 describe('regras: o que a chave de acesso ja diz', () => {
-  /**
-   * Uma chave que fecha o DV, com UF, mes e tipo de emissao escolhidos: o
-   * resto e o do cupom do caso-base.
-   */
-  function chave({ uf = '23', aamm = '2608', tipo = '1' } = {}) {
-    const cnpj = '26048802000165';
-    const modelo = '65';
-    const serie = '001';
-    const numero = '000163160';
-    const codigo = '30328488';
-    const sem = `${uf}${aamm}${cnpj}${modelo}${serie}${numero}${tipo}${codigo}`;
-    return `${sem}${checkDigit(sem)}`;
-  }
-
   async function comChave(key, overrides = {}) {
     const report = await insertReport({
       period_start: '2026-06-01',

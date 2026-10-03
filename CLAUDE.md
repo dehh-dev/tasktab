@@ -713,6 +713,14 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - Regra agressiva demais recria o erro que a ferramenta existe para evitar: ha
   teste do contraexemplo (dois almocos iguais em dias diferentes **nao** sao
   duplicata). **Nao afrouxe esse teste.**
+- **Mesmo valor em documentos provadamente diferentes** vira `informativo`,
+  "nao apague nem marque como duplicata" (issue 49, `valor_repetido`), um
+  alerta em cada comprovante, porque a revisao mostra os do comprovante
+  aberto. Provadamente e **pela chave**: duas chaves validas e diferentes sao
+  dois documentos. **Nao aceite data diferente como prova** — a data e lida
+  pelo OCR, e um "nao apague" sobre duas copias do mesmo cupom e o pior alerta
+  errado. A marcada a mao como duplicata segue avisada se nenhum comprovante
+  somado carrega a chave dela: marcar tira da soma, e e o "apagar" da tela.
 - Regra de conferencia so dispara com evidencia suficiente — a de itens exige
   ao menos dois itens legiveis, a de faixa exige historico minimo. Alarme falso
   destroi a confianca mais rapido que um erro nao detectado.
