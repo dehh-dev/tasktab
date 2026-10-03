@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const controller = require('../controllers/user.controller');
 const asyncHandler = require('../middlewares/async-handler');
+const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireAuth, requireScope } = require('../middlewares/authorize');
 
 const router = Router();
@@ -22,4 +23,4 @@ router.delete(
   asyncHandler(controller.destroy),
 );
 
-module.exports = router;
+module.exports = rejectOtherMethods(router);

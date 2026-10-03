@@ -1,6 +1,7 @@
 'use strict';
 
 const normalize = require('../normalize');
+const accessKeyRules = require('../access-key');
 
 /**
  * NFC-e — Nota Fiscal de Consumidor Eletronica.
@@ -22,9 +23,10 @@ const SIGNATURES = [
   /cupom\s+fiscal\s+eletr/i,
 ];
 
-const ACCESS_KEY = /\b(\d{44})\b/;
-// A chave costuma vir impressa em grupos de quatro.
-const SPACED_ACCESS_KEY = /\b(?:\d{4}[\s.-]?){10}\d{4}\b/;
+// A chave costuma vir impressa em grupos de quatro. Com o CNPJ alfanumerico
+// um grupo pode ter letra; o `normalizeKey` confere depois em que posicoes.
+const SPACED_ACCESS_KEY =
+  /(?<![A-Z0-9])(?:[A-Z0-9]{4}[\s.-]?){10}[A-Z0-9]{4}(?![A-Z0-9])/g;
 
 const name = 'nfce';
 
@@ -33,17 +35,18 @@ function matches(text) {
 }
 
 function findAccessKey(text) {
-  const direct = text.match(ACCESS_KEY);
+  const direct = text.match(accessKeyRules.IN_TEXT);
 
   if (direct) {
-    return direct[1];
+    return direct[0];
   }
 
-  const spaced = text.match(SPACED_ACCESS_KEY);
+  for (const [spaced] of text.matchAll(SPACED_ACCESS_KEY)) {
+    const key = accessKeyRules.normalizeKey(spaced);
 
-  if (spaced) {
-    const digits = spaced[0].replace(/\D/g, '');
-    return digits.length === 44 ? digits : null;
+    if (key) {
+      return key;
+    }
   }
 
   return null;

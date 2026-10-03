@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs/promises');
+
 const {
   requestBinary,
   request,
@@ -7,8 +9,9 @@ const {
   waitForProcessing,
   insertReport,
   createUserWithSession,
+  uploadedFilePath,
 } = require('../../orchestrator');
-const { makeReceiptPdf } = require('../../fixtures/pdf');
+const { makeReceiptPdf, makeCorruptPdf } = require('../../fixtures/pdf');
 
 async function uploadOne(reportId, buffer) {
   await requestUpload(`/api/reports/${reportId}/receipts`, [
@@ -78,5 +81,56 @@ describe('GET /api/receipts/:id/image', () => {
     });
 
     expect(response.status).toBe(404);
+  });
+
+  it('arquivo ausente no disco e 422: reenviar e o que resolve', async () => {
+    const report = await insertReport();
+    const receipt = await uploadOne(report.id, await makeReceiptPdf());
+    await fs.unlink(uploadedFilePath(receipt.file_path));
+
+    const response = await request('GET', `/api/receipts/${receipt.id}/image`);
+
+    expect(response.status).toBe(422);
+    expect(response.body.name).toBe('ValidationError');
+    expect(response.body.details).toEqual([
+      { field: 'file_path', message: 'arquivo ausente' },
+    ]);
+  });
+
+  it('PDF que o pdf.js recusa e 422, sem a mensagem interna no corpo', async () => {
+    const report = await insertReport();
+    const receipt = await uploadOne(report.id, makeCorruptPdf());
+
+    const response = await request('GET', `/api/receipts/${receipt.id}/image`);
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      { field: 'file_path', message: 'PDF ilegivel' },
+    ]);
+    expect(JSON.stringify(response.body)).not.toContain('Invalid PDF');
+  });
+
+  it('falha de leitura que nao e arquivo ausente e 500, nao "reenvie o PDF"', async () => {
+    const report = await insertReport();
+    const receipt = await uploadOne(report.id, await makeReceiptPdf());
+    const filePath = uploadedFilePath(receipt.file_path);
+
+    // Um diretorio no lugar do arquivo da EISDIR: falha real de disco, que
+    // nenhum reenvio conserta.
+    await fs.unlink(filePath);
+    await fs.mkdir(filePath);
+
+    try {
+      const response = await request(
+        'GET',
+        `/api/receipts/${receipt.id}/image`,
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.body.name).toBe('InternalServerError');
+      expect(response.body.request_id).toEqual(expect.any(String));
+    } finally {
+      await fs.rmdir(filePath);
+    }
   });
 });

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Chave de acesso da NFe/NFC-e: 44 digitos autodescritivos.
+ * Chave de acesso da NFe/NFC-e: 44 caracteres autodescritivos.
  *
  * E a peca mais valiosa da extracao. Diferente de qualquer outro campo, ela
  * **valida a propria leitura**: o ultimo digito e um verificador mod-11 sobre
@@ -24,18 +24,27 @@
  * | 35      | tpEmis |
  * | 36–43   | cNF    |
  * | 44      | cDV    |
+ *
+ * Desde julho de 2026 o CNPJ pode ser alfanumerico, e a chave leva junto: as
+ * posicoes 7 a 18 aceitam letra maiuscula. Todo o resto continua digito. No DV
+ * cada caractere vale o codigo ASCII menos 48, a mesma conversao do CNPJ — um
+ * digito vale o que sempre valeu, entao as chaves antigas fecham igual.
  */
 
 const LENGTH = 44;
+const FORMAT = /^\d{6}[A-Z0-9]{12}\d{26}$/;
 
-/** Digito verificador mod-11 sobre os 43 primeiros digitos. */
+/** Como a chave aparece num texto ou no QR, sem separadores. */
+const IN_TEXT = /(?<![A-Z0-9])\d{6}[A-Z0-9]{12}\d{26}(?![A-Z0-9])/;
+
+/** Digito verificador mod-11 sobre os 43 primeiros caracteres. */
 function checkDigit(first43) {
   let sum = 0;
   let weight = 2;
 
   // Pesos 2..9 ciclando da direita para a esquerda.
   for (let index = first43.length - 1; index >= 0; index -= 1) {
-    sum += Number(first43[index]) * weight;
+    sum += (first43.charCodeAt(index) - 48) * weight;
     weight = weight === 9 ? 2 : weight + 1;
   }
 
@@ -51,9 +60,9 @@ function normalizeKey(input) {
     return null;
   }
 
-  const digits = input.replace(/\D/g, '');
+  const key = input.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  return digits.length === LENGTH ? digits : null;
+  return FORMAT.test(key) ? key : null;
 }
 
 function isValid(input) {
@@ -101,4 +110,11 @@ function parse(input) {
   };
 }
 
-module.exports = { parse, isValid, checkDigit, normalizeKey, LENGTH };
+module.exports = {
+  parse,
+  isValid,
+  checkDigit,
+  normalizeKey,
+  IN_TEXT,
+  LENGTH,
+};

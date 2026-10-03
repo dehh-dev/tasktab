@@ -3,6 +3,7 @@
 const generic = require('./generic');
 const nfce = require('./nfce');
 const uber = require('./uber');
+const cnpjRules = require('../../../validators/cnpj');
 
 /**
  * Registro de adaptadores por emitente.
@@ -53,7 +54,12 @@ function parse(text) {
 // `[^\S\n]*` e nao `\s*`: `\s` engole a quebra de linha, e a razao social
 // virava a linha de endereco logo abaixo do CNPJ. Mesma armadilha da ancora do
 // total em `normalize.js`.
-const CNPJ_LINE = /\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}[^\S\n]*(.{4,120})$/m;
+// O CNPJ pode ter letra (alfanumerico, 2026); `plausible` barra a palavra
+// comum que so tem o formato de um.
+const CNPJ_LINE = new RegExp(
+  `(${cnpjRules.IN_TEXT.source})[^\\S\\n]*(.{4,120})$`,
+  'gm',
+);
 
 // Quanto de uma linha precisa ser letra ou espaco para ela passar por nome. O
 // lixo tipico do OCR (": 40) 47 DL? “o") fica bem abaixo disso; um nome de
@@ -98,10 +104,12 @@ function merchantName(text) {
     return null;
   }
 
-  const fromCnpj = text.match(CNPJ_LINE);
+  const fromCnpj = [...text.matchAll(CNPJ_LINE)].find(([, cnpj]) =>
+    cnpjRules.plausible(cnpj),
+  );
 
   if (fromCnpj) {
-    const candidate = clean(fromCnpj[1]);
+    const candidate = clean(fromCnpj[2]);
 
     if (looksLikeName(candidate)) {
       return candidate.slice(0, 255);

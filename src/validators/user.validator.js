@@ -1,7 +1,7 @@
 'use strict';
 
 const { BadRequestError, ValidationError } = require('../../infra/errors');
-const { isBlank } = require('./rules');
+const { isBlank, parseId, parsePagination } = require('./rules');
 const { ROLES } = require('../services/auth/scopes');
 const { MAX_PASSWORD_BYTES } = require('../services/auth/password');
 
@@ -261,46 +261,14 @@ function validateLogin(body) {
 }
 
 function validateId(rawId) {
-  if (!/^\d+$/.test(String(rawId))) {
-    throw new BadRequestError(INVALID_ID);
-  }
-
-  const id = Number(rawId);
-
-  if (!Number.isSafeInteger(id) || id < 1) {
-    throw new BadRequestError(INVALID_ID);
-  }
-
-  return id;
+  return parseId(rawId, INVALID_ID);
 }
 
 function validateListQuery(query = {}) {
   const errors = [];
   const result = { limit: 50, offset: 0 };
 
-  if (query.limit !== undefined) {
-    const limit = Number(query.limit);
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-      errors.push({
-        field: 'limit',
-        message: 'limit deve ser um inteiro entre 1 e 100',
-      });
-    } else {
-      result.limit = limit;
-    }
-  }
-
-  if (query.offset !== undefined) {
-    const offset = Number(query.offset);
-    if (!Number.isInteger(offset) || offset < 0) {
-      errors.push({
-        field: 'offset',
-        message: 'offset deve ser um inteiro maior ou igual a 0',
-      });
-    } else {
-      result.offset = offset;
-    }
-  }
+  Object.assign(result, parsePagination(query, errors));
 
   assertValid(errors);
   return result;

@@ -153,4 +153,20 @@ describe('extractCnpj', () => {
   it('devolve null quando nao ha CNPJ', () => {
     expect(extractCnpj('sem documento')).toBeNull();
   });
+
+  it('extrai o CNPJ alfanumerico, em maiuscula e sem mascara', () => {
+    expect(extractCnpj('CNPJ 12.ABC.345/01DE-35')).toBe('12ABC34501DE35');
+  });
+
+  it('nao toma palavra com formato de CNPJ alfanumerico por um', () => {
+    expect(extractCnpj('SUPERMERCADO12 CNPJ 26.048.802/0001-65')).toBe(
+      '26048802000165',
+    );
+  });
+
+  it('nao recorta 14 digitos de dentro da chave de acesso', () => {
+    expect(
+      extractCnpj('52260626048802000165650010001631601303284889'),
+    ).toBeNull();
+  });
 });

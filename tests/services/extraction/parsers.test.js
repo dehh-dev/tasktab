@@ -116,3 +116,28 @@ describe('parse', () => {
     }
   });
 });
+
+describe('CNPJ alfanumerico', () => {
+  const CHAVE_ALFA = '35260912ABC34501DE35550010000001231123456784';
+  const CUPOM = [
+    'PADARIA ALFA LTDA',
+    'CNPJ 12.ABC.345/01DE-35 PADARIA ALFA LTDA',
+    'Documento auxiliar da Nota Fiscal de Consumidor Eletronica',
+    `Chave de acesso: ${CHAVE_ALFA.replace(/(.{4})/g, '$1 ').trim()}`,
+    'VALOR TOTAL R$ 37,60',
+  ].join('\n');
+
+  it('le a chave em grupos de quatro e tira dela o CNPJ', () => {
+    const { parser, fields } = parsers.parse(CUPOM);
+
+    expect(parser).toBe('nfce');
+    expect(fields.access_key.value).toBe(CHAVE_ALFA);
+    expect(fields.cnpj.value).toBe('12ABC34501DE35');
+  });
+
+  it('acha a razao social colada no CNPJ alfanumerico', () => {
+    expect(
+      parsers.merchantName('xx\n12.ABC.345/01DE-35 PADARIA ALFA LTDA\nrua'),
+    ).toBe('PADARIA ALFA LTDA');
+  });
+});

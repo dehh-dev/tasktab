@@ -36,12 +36,6 @@ const ROUTES = [
   { method: 'POST', path: '/api/tasks', roles: WRITERS },
   { method: 'GET', path: '/api/tasks/:id', roles: EVERYONE },
   {
-    method: 'PUT',
-    path: '/api/tasks/:id',
-    roles: WRITERS,
-    body: { title: 'Outro titulo' },
-  },
-  {
     method: 'PATCH',
     path: '/api/tasks/:id',
     roles: WRITERS,
@@ -88,6 +82,7 @@ const ROUTES = [
     roles: EVERYONE,
   },
   { method: 'POST', path: '/api/merchants', roles: WRITERS },
+  { method: 'GET', path: '/api/merchants/:id', roles: EVERYONE },
   {
     method: 'PATCH',
     path: '/api/merchants/:id',

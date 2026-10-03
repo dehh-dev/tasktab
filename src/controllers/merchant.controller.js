@@ -11,14 +11,32 @@ function merchantNotFound(id) {
   });
 }
 
-/** GET /api/merchants */
+/**
+ * GET /api/merchants
+ *
+ * Sem `limit` e `offset` na query o model cortava em 50 calado, e o `meta`
+ * nao dizia que havia mais: o 51o emitente simplesmente nao aparecia.
+ */
 async function index(req, res) {
+  const { limit, offset } = validator.validateListQuery(req.query);
   const [data, total] = await Promise.all([
-    Merchant.findAll(),
+    Merchant.findAll({ limit, offset }),
     Merchant.count(),
   ]);
 
-  res.json({ data, meta: { total } });
+  res.json({ data, meta: { total, limit, offset } });
+}
+
+/** GET /api/merchants/:id — para onde aponta o `Location` do POST. */
+async function show(req, res) {
+  const id = validator.validateId(req.params.id);
+  const merchant = await Merchant.findById(id);
+
+  if (!merchant) {
+    throw merchantNotFound(id);
+  }
+
+  res.json({ data: merchant });
 }
 
 /** GET /api/merchants/by-cnpj/:cnpj */
@@ -72,4 +90,4 @@ async function update(req, res) {
   res.json({ data: merchant });
 }
 
-module.exports = { index, showByCnpj, create, update };
+module.exports = { index, show, showByCnpj, create, update };

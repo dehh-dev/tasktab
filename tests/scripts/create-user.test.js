@@ -119,4 +119,24 @@ describe('npm run users:create -- --replace', () => {
     const response = await request('GET', `/api/users/${admin.id}`);
     expect(response.body.data.role).toBe('admin');
   });
+
+  it('sem PASSWORD_PEPPER falha alto, sem gravar ninguem', async () => {
+    // O dotenv nao sobrescreve variavel ja presente, entao a string vazia
+    // chega ate o script no lugar do valor do env.test.
+    const result = runScript(
+      'scripts/create-user.js',
+      ['--email', 'sem-pepper@tasktab.test', '--name', 'Sem Pepper'],
+      { env: { PASSWORD_PEPPER: '' } },
+    );
+    const login = await request(
+      'POST',
+      '/api/auth/login',
+      { email: 'sem-pepper@tasktab.test', password: 'qualquer-coisa-123' },
+      { token: null },
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('PASSWORD_PEPPER');
+    expect(login.status).toBe(401);
+  });
 });

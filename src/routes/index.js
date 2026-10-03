@@ -9,6 +9,7 @@ const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
 const healthController = require('../controllers/health.controller');
 const asyncHandler = require('../middlewares/async-handler');
+const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const authenticate = require('../middlewares/authenticate');
 const { batchWriteLimiter } = require('../middlewares/rate-limit');
 
@@ -33,4 +34,5 @@ router.use('/reports', batchWriteLimiter, reportRoutes);
 router.use('/receipts', batchWriteLimiter, receiptRoutes);
 router.use('/merchants', batchWriteLimiter, merchantRoutes);
 
-module.exports = router;
+// So o `/health` e rota propria daqui; os sub-routers ja cuidam dos seus.
+module.exports = rejectOtherMethods(router);

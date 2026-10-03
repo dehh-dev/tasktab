@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const controller = require('../controllers/auth.controller');
 const asyncHandler = require('../middlewares/async-handler');
+const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireAuth } = require('../middlewares/authorize');
 const { authLimiter } = require('../middlewares/rate-limit');
 
@@ -15,4 +16,4 @@ router.post('/login', authLimiter, asyncHandler(controller.login));
 router.post('/logout', requireAuth, asyncHandler(controller.logout));
 router.get('/me', requireAuth, asyncHandler(controller.me));
 
-module.exports = router;
+module.exports = rejectOtherMethods(router);

@@ -1,7 +1,13 @@
 'use strict';
 
 const { BadRequestError, ValidationError } = require('../../infra/errors');
-const { isBlank, isValidIsoDate, isoDateNotAfter } = require('./rules');
+const {
+  isBlank,
+  isValidIsoDate,
+  isoDateNotAfter,
+  parseId,
+  parsePagination,
+} = require('./rules');
 
 const BODY_NOT_OBJECT = {
   message: 'Corpo da requisicao deve ser um objeto JSON.',
@@ -193,17 +199,7 @@ function validateUpdate(body, current = {}) {
 
 /** Valida o :id da rota, que precisa ser um inteiro positivo. */
 function validateId(rawId) {
-  if (!/^\d+$/.test(String(rawId))) {
-    throw new BadRequestError(INVALID_ID);
-  }
-
-  const id = Number(rawId);
-
-  if (!Number.isSafeInteger(id) || id < 1) {
-    throw new BadRequestError(INVALID_ID);
-  }
-
-  return id;
+  return parseId(rawId, INVALID_ID);
 }
 
 /** Valida os filtros de listagem (query string). */
@@ -215,29 +211,7 @@ function validateListQuery(query = {}) {
     result.status = validateStatus(query.status, errors);
   }
 
-  if (query.limit !== undefined) {
-    const limit = Number(query.limit);
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-      errors.push({
-        field: 'limit',
-        message: 'limit deve ser um inteiro entre 1 e 100',
-      });
-    } else {
-      result.limit = limit;
-    }
-  }
-
-  if (query.offset !== undefined) {
-    const offset = Number(query.offset);
-    if (!Number.isInteger(offset) || offset < 0) {
-      errors.push({
-        field: 'offset',
-        message: 'offset deve ser um inteiro maior ou igual a 0',
-      });
-    } else {
-      result.offset = offset;
-    }
-  }
+  Object.assign(result, parsePagination(query, errors));
 
   assertValid(errors);
   return result;

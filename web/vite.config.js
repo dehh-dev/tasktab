@@ -4,7 +4,10 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    // O E2E sobe o proprio Vite em outra porta (WEB_PORT): reaproveitar o de
+    // desenvolvimento na 5173 levaria a suite ate a API e o banco de dev.
+    port: Number(process.env.WEB_PORT || 5173),
+    strictPort: true,
     // Encaminha /api para o Express. Mantem front e back na mesma origem
     // durante o desenvolvimento, dispensando CORS.
     proxy: {

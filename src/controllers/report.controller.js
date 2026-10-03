@@ -5,7 +5,7 @@ const Receipt = require('../models/receipt.model');
 const validator = require('../validators/report.validator');
 const validation = require('../services/validation');
 const ownership = require('../services/auth/ownership');
-const { loadReport } = require('../services/auth/access.service');
+const { loadReport, reportClosed } = require('../services/auth/access.service');
 const retention = require('../services/retention.service');
 const xlsxPorTipo = require('../services/export/xlsx-por-tipo.service');
 const anexoI = require('../services/export/anexo-i.service');
@@ -56,9 +56,21 @@ async function update(req, res) {
 
   // O registro atual entra na validacao: o periodo so pode ser conferido em
   // conjunto, e num update parcial metade dele vem do que ja esta gravado.
-  const current = await loadReport(req.user, id, { write: true });
+  const current = await loadReport(req.user, id, {
+    write: true,
+    allowClosed: true,
+  });
 
   const data = validator.validateUpdate(req.body, current);
+
+  // Fechado, o unico PATCH aceito e o que reabre. Mudar o titulo ou o periodo
+  // de um relatorio assinado e justamente o que o fechamento existe para barrar.
+  const reopening = Object.keys(data).length === 1 && data.status === 'open';
+
+  if (current.status === 'closed' && !reopening) {
+    throw reportClosed(id);
+  }
+
   const report = await Report.update(id, data);
 
   res.json({ data: report });

@@ -7,6 +7,13 @@ const COLUMNS = `id, report_id, merchant_id, file_path, file_hash, page_number,
                  status, extraction_source, confidence, raw_text, duplicate_of_id,
                  created_at, updated_at`;
 
+/** As colunas com o alias da tabela, para consulta com JOIN. */
+function prefixed(alias) {
+  return COLUMNS.split(',')
+    .map((column) => `${alias}.${column.trim()}`)
+    .join(', ');
+}
+
 // Colunas que a revisao pode corrigir. `report_id`, `file_hash` e
 // `page_number` ficam de fora de proposito: sao a identidade da pagina.
 const UPDATABLE_COLUMNS = [
@@ -45,10 +52,16 @@ async function findByReport(reportId, { status, category } = {}) {
     ...buildFilters({ status, category }, params),
   ];
 
+  // O emitente vem junto: a lista e o dialogo de exclusao mostram o nome, e a
+  // revisao precisa da categoria do cadastro para oferecer atualiza-la.
   const { rows } = await db.query(
-    `SELECT ${COLUMNS} FROM receipts
-     WHERE ${conditions.join(' AND ')}
-     ORDER BY issued_at, page_number, id`,
+    `SELECT ${prefixed('r')},
+            m.name AS merchant_name,
+            m.default_category AS merchant_default_category
+     FROM receipts r
+     LEFT JOIN merchants m ON m.id = r.merchant_id
+     WHERE ${conditions.map((condition) => `r.${condition}`).join(' AND ')}
+     ORDER BY r.issued_at, r.page_number, r.id`,
     params,
   );
 

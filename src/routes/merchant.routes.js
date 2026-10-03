@@ -3,6 +3,7 @@
 const { Router } = require('express');
 const controller = require('../controllers/merchant.controller');
 const asyncHandler = require('../middlewares/async-handler');
+const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireScope } = require('../middlewares/authorize');
 
 const router = Router();
@@ -24,10 +25,15 @@ router.post(
   requireScope('merchants:write'),
   asyncHandler(controller.create),
 );
+router.get(
+  '/:id',
+  requireScope('merchants:read'),
+  asyncHandler(controller.show),
+);
 router.patch(
   '/:id',
   requireScope('merchants:write'),
   asyncHandler(controller.update),
 );
 
-module.exports = router;
+module.exports = rejectOtherMethods(router);

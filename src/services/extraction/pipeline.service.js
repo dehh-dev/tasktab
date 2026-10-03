@@ -50,10 +50,18 @@ async function processFile({ buffer, receipts, log }) {
         'falha ao processar pagina',
       );
 
+      // Se nem o `failed` grava, a pagina fica em `processing` e a tela
+      // consulta para sempre. Nao ha o que fazer aqui alem de deixar rastro:
+      // o `reprocess` e a saida, e o log e o que aponta para ela.
       await Receipt.applyExtraction(receipt.id, {
         status: 'failed',
         raw_text: `Falha ao processar a pagina: ${error.message}`,
-      }).catch(() => {});
+      }).catch((writeError) => {
+        log?.error(
+          { err: writeError, cause: error, receipt_id: receipt.id },
+          'falha ao gravar o status failed; pagina presa em processing',
+        );
+      });
     }
   }
 }

@@ -137,6 +137,8 @@ ambiente (nao existe `env.production` versionado).
 | `SESSION_COOKIE_NAME`                                 | Nome do cookie (padrao `tasktab_session`) |
 | `SESSION_TTL_HOURS`                                   | Validade da sessao (padrao 168h)          |
 | `SESSION_COOKIE_SECURE`                               | Forca (ou desliga) o `Secure` do cookie   |
+| `PASSWORD_PEPPER`                                     | Pepper das senhas (obrigatorio)           |
+| `PASSWORD_SCRYPT_P`                                   | Paralelismo do scrypt (padrao 5)          |
 | `LOG_LEVEL`                                           | Nivel do `pino` (padrao `info`)           |
 
 O `.npmrc` liga `engine-strict`: sem ele o campo `engines` seria so um aviso e a
@@ -169,13 +171,13 @@ Base: `/api/users` (`users:read` / `users:write`; o proprio cadastro dispensa)
 
 Base: `/api/tasks`
 
-| Metodo        | Rota   | Descricao                   | Sucesso |
-| ------------- | ------ | --------------------------- | ------- |
-| `GET`         | `/`    | Lista (paginada, filtravel) | 200     |
-| `GET`         | `/:id` | Detalhe                     | 200     |
-| `POST`        | `/`    | Cria                        | 201     |
-| `PUT`/`PATCH` | `/:id` | Atualiza (parcial)          | 200     |
-| `DELETE`      | `/:id` | Remove                      | 204     |
+| Metodo   | Rota   | Descricao                   | Sucesso |
+| -------- | ------ | --------------------------- | ------- |
+| `GET`    | `/`    | Lista (paginada, filtravel) | 200     |
+| `GET`    | `/:id` | Detalhe                     | 200     |
+| `POST`   | `/`    | Cria                        | 201     |
+| `PATCH`  | `/:id` | Atualiza (parcial)          | 200     |
+| `DELETE` | `/:id` | Remove                      | 204     |
 
 Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
 `offset` (padrao 0).
@@ -209,6 +211,7 @@ Base: `/api/merchants` — o cadastro que da categoria ao comprovante.
 | ------- | ------------------------------ | ------------------------------- |
 | `GET`   | `/api/merchants`               | Lista os emitentes cadastrados  |
 | `POST`  | `/api/merchants`               | Cadastra um emitente            |
+| `GET`   | `/api/merchants/:id`           | Detalhe                         |
 | `PATCH` | `/api/merchants/:id`           | Atualiza (e a categoria padrao) |
 | `GET`   | `/api/merchants/by-cnpj/:cnpj` | Busca pelo CNPJ lido da chave   |
 
@@ -636,6 +639,7 @@ Em producao nao ha Vite: rode `npm run build` e o Express passa a servir
 docker build -t tasktab .
 docker run -p 3000:3000 \
   -e DB_HOST=... -e DB_USER=... -e DB_PASSWORD=... -e DB_NAME=... \
+  -e PASSWORD_PEPPER=... \
   tasktab
 ```
 
@@ -680,7 +684,7 @@ a mesma lista, `tests/api/routes.js`. Rota nova entra nela.
 
 ### E2E da interface
 
-O `npm run test:e2e` sobe a API em `:3001` (banco de teste) e o Vite em `:5173`,
+O `npm run test:e2e` sobe a API em `:3001` (banco de teste) e um Vite proprio em `:5174`,
 e roda o Playwright contra o navegador. O proxy do Vite aponta para a API de
 teste via `API_URL`, entao o E2E **nunca toca no banco de desenvolvimento**.
 

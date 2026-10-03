@@ -131,3 +131,28 @@ describe('parse', () => {
     expect(parse(quebrada)).toBeNull();
   });
 });
+
+describe('chave com CNPJ alfanumerico', () => {
+  // Exemplo da Receita: 43 caracteres com o CNPJ 12.ABC.345/01DE-35, DV 4.
+  const SEM_DV = '35260912ABC34501DE3555001000000123112345678';
+  const CHAVE = `${SEM_DV}4`;
+
+  it('fecha o DV do exemplo oficial, com as letras valendo ASCII - 48', () => {
+    expect(checkDigit(SEM_DV)).toBe(4);
+  });
+
+  it('aceita a chave e le o CNPJ das posicoes 7 a 20', () => {
+    expect(isValid(CHAVE)).toBe(true);
+    expect(parse(CHAVE).cnpj).toBe('12ABC34501DE35');
+  });
+
+  it('aceita a chave impressa em grupos de quatro', () => {
+    expect(isValid(CHAVE.replace(/(.{4})/g, '$1 ').trim())).toBe(true);
+  });
+
+  it('recusa letra fora das posicoes do CNPJ', () => {
+    const letraNoNumero = `${CHAVE.slice(0, 30)}A${CHAVE.slice(31)}`;
+
+    expect(isValid(letraNoNumero)).toBe(false);
+  });
+});

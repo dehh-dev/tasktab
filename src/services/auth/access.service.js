@@ -2,7 +2,7 @@
 
 const Report = require('../../models/report.model');
 const Receipt = require('../../models/receipt.model');
-const { NotFoundError } = require('../../../infra/errors');
+const { NotFoundError, ConflictError } = require('../../../infra/errors');
 const ownership = require('./ownership');
 
 /**
@@ -23,7 +23,34 @@ function receiptNotFound(id) {
   });
 }
 
-async function loadReport(user, id, { write = false } = {}) {
+/**
+ * Relatorio fechado e somente leitura, ate para quem e dono: e o que foi
+ * assinado. A checagem vem **depois** da posse, para quem nao alcanca o
+ * relatorio continuar recebendo o 404 de sempre, e nao um 409 que confirmaria
+ * que ele existe.
+ */
+function reportClosed(id) {
+  return new ConflictError({
+    message: `O relatorio ${id} esta fechado.`,
+    action: 'Reabra o relatorio para alterar os comprovantes dele.',
+  });
+}
+
+function assertOpen(report) {
+  if (report.status === 'closed') {
+    throw reportClosed(report.id);
+  }
+}
+
+/**
+ * `allowClosed` existe para um chamador so: o PATCH do proprio relatorio, que
+ * e por onde ele e reaberto. Quem decide o que passa ali e o controller.
+ */
+async function loadReport(
+  user,
+  id,
+  { write = false, allowClosed = false } = {},
+) {
   const report = await Report.findById(id);
 
   if (!report) {
@@ -32,6 +59,10 @@ async function loadReport(user, id, { write = false } = {}) {
 
   if (write) {
     ownership.assertCanWriteReport(user, report);
+
+    if (!allowClosed) {
+      assertOpen(report);
+    }
   } else {
     ownership.assertCanReadReport(user, report);
   }
@@ -67,9 +98,10 @@ async function loadReceipt(user, id, { write = false } = {}) {
   // comprovante dos outros e nao escreve em nenhum.
   if (write) {
     ownership.assertCanWriteReport(user, report);
+    assertOpen(report);
   }
 
   return receipt;
 }
 
-module.exports = { loadReport, loadReceipt, receiptNotFound };
+module.exports = { loadReport, loadReceipt, receiptNotFound, reportClosed };

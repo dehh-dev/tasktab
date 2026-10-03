@@ -42,7 +42,7 @@ async function create(req, res) {
   res.status(201).location(`/api/tasks/${task.id}`).json({ data: task });
 }
 
-/** PUT|PATCH /api/tasks/:id */
+/** PATCH /api/tasks/:id */
 async function update(req, res) {
   const id = validator.validateId(req.params.id);
   const data = validator.validateUpdate(req.body);

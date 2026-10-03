@@ -50,7 +50,31 @@ async function clearReports(request) {
   const data = await readData(response, 'listar relatorios');
 
   for (const report of data) {
+    // Fechado recusa o DELETE com 409: reabre antes, senao o relatorio de uma
+    // spec que o fechou sobraria para a seguinte.
+    if (report.status === 'closed') {
+      await request.patch(`/api/reports/${report.id}`, {
+        data: { status: 'open' },
+      });
+    }
+
     await request.delete(`/api/reports/${report.id}`);
+  }
+
+  // Emitente nao tem DELETE, e o E2E nao trunca o banco. Confirmar um cupom
+  // grava a categoria no emitente (caixa marcada por padrao), e sem isto a
+  // spec seguinte receberia o CNPJ ja classificado: o palpite sumia da tela.
+  const merchants = await readData(
+    await request.get('/api/merchants?limit=100'),
+    'listar emitentes',
+  );
+
+  for (const merchant of merchants) {
+    if (merchant.default_category !== 'nao_classificado') {
+      await request.patch(`/api/merchants/${merchant.id}`, {
+        data: { default_category: 'nao_classificado' },
+      });
+    }
   }
 }
 

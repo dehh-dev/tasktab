@@ -6,7 +6,11 @@ const { STORAGE_STATE } = require('./e2e/constants');
 // A API sobe em NODE_ENV=test, ou seja, na porta e no banco de env.test. O E2E
 // nunca toca no banco de desenvolvimento.
 const API_URL = 'http://localhost:3001';
-const WEB_URL = 'http://localhost:5173';
+// Porta propria, e nao a 5173: com `reuseExistingServer`, o Vite de um
+// `npm run dev` aberto seria reaproveitado — e ele faz proxy para a API de
+// desenvolvimento, nao para a de teste.
+const WEB_PORT = 5174;
+const WEB_URL = `http://localhost:${WEB_PORT}`;
 
 module.exports = defineConfig({
   testDir: './e2e',
@@ -60,7 +64,7 @@ module.exports = defineConfig({
       command: 'npm run dev:web',
       url: WEB_URL,
       // Redireciona o proxy do Vite para a API de teste.
-      env: { API_URL },
+      env: { API_URL, WEB_PORT: String(WEB_PORT) },
       reuseExistingServer: !process.env.CI,
       timeout: 60000,
     },

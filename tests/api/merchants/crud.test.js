@@ -68,6 +68,28 @@ describe('POST /api/merchants', () => {
     expect(response.status).toBe(422);
   });
 
+  it('aceita CNPJ alfanumerico e grava em maiuscula, sem mascara', async () => {
+    const response = await request('POST', '/api/merchants', {
+      cnpj: '12.abc.345/01de-35',
+      name: 'Padaria Alfa',
+    });
+    const found = await request('GET', '/api/merchants/by-cnpj/12ABC34501DE35');
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.cnpj).toBe('12ABC34501DE35');
+    expect(found.body.data.id).toBe(response.body.data.id);
+  });
+
+  it('recusa CNPJ alfanumerico com DV errado', async () => {
+    const response = await request('POST', '/api/merchants', {
+      cnpj: '12ABC34501DE36',
+      name: 'Padaria Alfa',
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details[0].field).toBe('cnpj');
+  });
+
   it('recusa CNPJ com menos de 14 digitos', async () => {
     const response = await request('POST', '/api/merchants', {
       cnpj: '2604880200016',
@@ -111,7 +133,38 @@ describe('GET /api/merchants', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(2);
-    expect(response.body.meta.total).toBe(2);
+    expect(response.body.meta).toEqual({ total: 2, limit: 50, offset: 0 });
+  });
+
+  it('pagina com limit e offset, e o meta diz que ha mais', async () => {
+    await insertMerchant({ cnpj: CNPJ, name: 'A' });
+    await insertMerchant({ cnpj: '20305961000111', name: 'B' });
+
+    const response = await request('GET', '/api/merchants?limit=1&offset=1');
+
+    expect(response.body.data.map((merchant) => merchant.name)).toEqual(['B']);
+    expect(response.body.meta).toEqual({ total: 2, limit: 1, offset: 1 });
+  });
+
+  it('recusa limit fora da faixa com 422 no campo', async () => {
+    const response = await request('GET', '/api/merchants?limit=0');
+
+    expect(response.status).toBe(422);
+    expect(response.body.details[0].field).toBe('limit');
+  });
+});
+
+describe('GET /api/merchants/:id', () => {
+  it('o Location do POST aponta para o emitente criado', async () => {
+    const created = await request('POST', '/api/merchants', {
+      cnpj: CNPJ,
+      name: 'Franguinho na Panela',
+    });
+
+    const response = await request('GET', created.headers.get('location'));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(created.body.data);
   });
 });
 

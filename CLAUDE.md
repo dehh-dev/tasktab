@@ -100,22 +100,29 @@ Toda resposta de erro nasce de uma classe em `infra/errors.js` que estende
 { "name": "...", "message": "...", "action": "...", "status_code": 000 }
 ```
 
-| Classe                 | Status | Quando                                         |
-| ---------------------- | ------ | ---------------------------------------------- |
-| `BadRequestError`      | 400    | id invalido, JSON malformado, corpo nao-objeto |
-| `NotFoundError`        | 404    | recurso ou rota inexistente                    |
-| `UnauthorizedError`    | 401    | sem sessao valida                              |
-| `ForbiddenError`       | 403    | ha sessao, mas ela nao alcanca a operacao      |
-| `ValidationError`      | 422    | falha de validacao; carrega `details`          |
-| `TooManyRequestsError` | 429    | teto de requisicoes estourado                  |
-| `ServiceError`         | 503    | dependencia fora do ar (banco)                 |
-| `InternalServerError`  | 500    | qualquer erro inesperado                       |
+| Classe                  | Status | Quando                                           |
+| ----------------------- | ------ | ------------------------------------------------ |
+| `BadRequestError`       | 400    | id invalido, JSON malformado, corpo nao-objeto   |
+| `NotFoundError`         | 404    | recurso ou rota inexistente                      |
+| `UnauthorizedError`     | 401    | sem sessao valida                                |
+| `ForbiddenError`        | 403    | ha sessao, mas ela nao alcanca a operacao        |
+| `MethodNotAllowedError` | 405    | metodo errado em caminho que existe (`Allow`)    |
+| `ConflictError`         | 409    | estado nao permite: escrita em relatorio fechado |
+| `ValidationError`       | 422    | falha de validacao; carrega `details`            |
+| `TooManyRequestsError`  | 429    | teto de requisicoes estourado                    |
+| `ServiceError`          | 503    | dependencia fora do ar (banco)                   |
+| `InternalServerError`   | 500    | qualquer erro inesperado                         |
 
 - **Erro esperado** → crie ou reutilize uma classe especifica com seu proprio
   `statusCode`, `message` e `action`. O `action` diz ao usuario **o que fazer a
   seguir** — a interface o exibe abaixo da mensagem, entao nunca deixe vazio.
 - **Erro inesperado** → deixe estourar. O `onErrorHandler` converte em
   `InternalServerError` (500) para nao vazar detalhe interno.
+- **`catch` so pega o caso que sabe nomear** e relanca o resto: `ENOENT` na
+  leitura do PDF, `InvalidPDFException` ao gerar a imagem. Um `catch` largo
+  transformava permissao de disco, hash corrompido no banco e template ausente
+  em "reenvie o arquivo" ou "senha incorreta" — erro do usuario que nenhuma
+  acao dele conserta, e sem nada no log. Ha teste de cada um.
 - Erro **nosso** com status 5xx (`ServiceError`) e repassado como esta e
   logado; a mensagem publica dele ja nasce segura.
 - **Nunca** monte um objeto de erro na mao dentro do controller.
@@ -205,7 +212,15 @@ comparando as duas respostas campo a campo.
   Nao entra `bcrypt` nem `argon2`: os dois trazem binario nativo para o que a
   biblioteca padrao ja faz. Os parametros vao **dentro** do hash
   (`scrypt$N$r$p$salt$hash`), entao endurecer o custo depois nao invalida as
-  senhas ja cadastradas.
+  senhas ja cadastradas — e o login refaz o hash de quem entra com custo
+  diferente do atual (`needsRehash`), senao o custo novo so valeria para
+  senha nova. O `p` vem de `PASSWORD_SCRYPT_P`: **5** por padrao, o minimo da
+  OWASP para N=2^14 e r=8 (~135 ms); o `env.test` usa 1.
+- **Pepper** (`PASSWORD_PEPPER`) entra como `HMAC-SHA256(pepper, senha)` antes
+  do scrypt, nunca concatenado. E lido a cada chamada e sem valor padrao:
+  ausente, o hash falha alto. Hash sem pepper (`scrypt$...`, anterior a ele)
+  ainda entra e e refeito no login como `scrypt-hmac$...`. **Trocar o pepper
+  invalida todas as senhas** — a saida e `users:create -- --replace`.
 - A comparacao e `timingSafeEqual`, e o login roda `dummyVerify` quando o
   e-mail nao existe: sem isso a resposta instantanea entregaria quais e-mails
   estao cadastrados. Pelo mesmo motivo, e-mail inexistente e senha errada
@@ -215,6 +230,9 @@ comparando as duas respostas campo a campo.
   derruba as outras sessoes. Um JWT so expira — revoga-lo antes exigiria uma
   lista de bloqueio consultada a cada requisicao, que e o custo que o JWT
   prometia evitar.
+- A sessao **renova** quando passa da metade da validade: o `authenticate`
+  estende `expires_at` e reenvia o cookie. So depois da metade, para nao virar
+  uma escrita por requisicao; o "passou da metade" e medido no Postgres.
 - **`sameSite=lax` e o que dispensa token de CSRF.** Sob Lax o cookie so
   acompanha navegacao de topo por GET, e toda escrita daqui e POST, PATCH ou
   DELETE. Trocar para `none` reintroduz o CSRF e passaria a exigir token.
@@ -286,7 +304,7 @@ testes falam **HTTP real** contra `http://localhost:3001`. Nao ha supertest e
 nao se importa `src/app` dentro de teste.
 
 Os arquivos espelham as rotas: `tests/api/tasks/get.test.js`,
-`post.test.js`, `put.test.js`, `delete.test.js`, mais `tests/api/health.test.js`
+`post.test.js`, `patch.test.js`, `delete.test.js`, mais `tests/api/health.test.js`
 e `tests/api/not-found.test.js`. Os scripts de linha de comando tem os seus em
 `tests/scripts/`, rodados de verdade por `runScript`, e as garantias do banco
 (triggers) ficam em `tests/db/`.
@@ -376,8 +394,10 @@ nova de teste cai na integracao por padrao, que e o lado seguro.
 - Locators acessiveis (`getByRole`, `getByLabel`) — de quebra, cobrem a11y.
   Escope ao formulario (`page.locator('form.form')`): "Status" tambem casa com
   o `aria-label` do grupo de filtros, e "Cancelar" existe no form e no dialogo.
-- O E2E aponta para a API de teste via `API_URL`. **Nunca** deixe a suite tocar
-  o banco de desenvolvimento.
+- O E2E aponta para a API de teste via `API_URL`, num Vite proprio na **5174**
+  (`WEB_PORT`). Na 5173 o `reuseExistingServer` pegava o Vite de um
+  `npm run dev` aberto, que faz proxy para a API de dev. **Nunca** deixe a
+  suite tocar o banco de desenvolvimento.
 - Vale a mesma regra de nao mockar. A unica excecao esta anotada em
   `form-validation.spec.js` e explicada la.
 - O `ConfirmDialog` usa a tag `<dialog>` nativa com `showModal()`. **Nao volte
@@ -490,6 +510,11 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - Confirmar exige `issued_at`, `amount_cents` e `category`, conferidos sobre o
   registro ja gravado. Duplicata continua listada e **fora do somatorio**.
 - As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
+- **Relatorio `closed` e somente leitura**, ate para o dono: upload, edicao,
+  exclusao e reprocessamento respondem `409 ConflictError`, e o unico PATCH
+  aceito e `{ "status": "open" }`. A trava mora no `loadReport`/`loadReceipt`,
+  **depois** da posse — relatorio alheio fechado continua 404. Leitura e
+  exportacao seguem liberadas: fechado e justamente o que se exporta.
 
 ### Retencao dos arquivos
 
@@ -573,6 +598,13 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   Postgres exige recriar o tipo; ha migration com `up` e `down` testados.
 - O CNPJ confiavel e o das posicoes 7 a 20 da **chave de acesso**, nao o do
   texto: o cupom traz tambem o da credenciadora do cartao.
+- **CNPJ alfanumerico** (julho de 2026): os 12 primeiros caracteres do CNPJ,
+  e as posicoes 7 a 18 da chave, aceitam `A-Z`. Nos dois DVs cada caractere
+  vale `ASCII - 48`, que deixa os digitos como eram; os exemplos oficiais da
+  Receita estao nos testes puros. **Nao volte a limpar com `\D`**: era assim
+  que a letra sumia e a chave inteira era descartada sem aviso. Achado no
+  texto, candidato com letra so vale se fechar o DV (`plausible`) —
+  "SUPERMERCADO12" tem o formato de um CNPJ.
 - Chave que nao fecha o DV mod-11 e **descartada**. Nao ha meio termo entre
   confiar e nao confiar num identificador com verificador.
 - `nao_classificado` vira `NULL` no comprovante: e ausencia de decisao, nao

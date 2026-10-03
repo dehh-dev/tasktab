@@ -1,7 +1,7 @@
 'use strict';
 
 const { BadRequestError, ValidationError } = require('../../infra/errors');
-const { isBlank } = require('./rules');
+const { isBlank, parseId, parsePagination } = require('./rules');
 const cnpjRules = require('./cnpj');
 const { EXPENSE_CATEGORIES } = require('./receipt.validator');
 
@@ -21,7 +21,10 @@ function validateCnpj(value, errors) {
   const cnpj = cnpjRules.normalize(value);
 
   if (cnpj === null) {
-    errors.push({ field: 'cnpj', message: 'cnpj deve ter 14 digitos' });
+    errors.push({
+      field: 'cnpj',
+      message: 'cnpj deve ter 14 caracteres: 12 letras ou digitos e 2 digitos',
+    });
     return undefined;
   }
 
@@ -162,17 +165,16 @@ function validateUpdate(body) {
 }
 
 function validateId(rawId) {
-  if (!/^\d+$/.test(String(rawId))) {
-    throw new BadRequestError(INVALID_ID);
-  }
+  return parseId(rawId, INVALID_ID);
+}
 
-  const id = Number(rawId);
+/** Valida `limit` e `offset` da listagem. */
+function validateListQuery(query = {}) {
+  const errors = [];
+  const result = parsePagination(query, errors);
 
-  if (!Number.isSafeInteger(id) || id < 1) {
-    throw new BadRequestError(INVALID_ID);
-  }
-
-  return id;
+  assertValid(errors);
+  return result;
 }
 
 /** Valida o CNPJ vindo da rota, devolvendo-o sem mascara. */
@@ -183,7 +185,7 @@ function validateCnpjParam(raw) {
   if (errors.length > 0) {
     throw new BadRequestError({
       message: 'cnpj invalido.',
-      action: 'Informe um CNPJ de 14 digitos com verificador valido.',
+      action: 'Informe um CNPJ de 14 caracteres com verificador valido.',
     });
   }
 
@@ -195,5 +197,6 @@ module.exports = {
   validateCreate,
   validateUpdate,
   validateId,
+  validateListQuery,
   validateCnpjParam,
 };

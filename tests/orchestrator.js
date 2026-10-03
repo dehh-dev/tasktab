@@ -88,10 +88,10 @@ function runPendingMigrations() {
  * imprimiu. O script e o de verdade, num processo proprio — o mesmo caminho
  * de quem o chama pela linha de comando, sem importar nada dele no teste.
  */
-function runScript(file, args = []) {
+function runScript(file, args = [], { env: extraEnv = {} } = {}) {
   const result = spawnSync('node', [file, ...args], {
     cwd: ROOT,
-    env: { ...process.env, NODE_ENV: 'test' },
+    env: { ...process.env, ...extraEnv, NODE_ENV: 'test' },
     encoding: 'utf8',
   });
 
@@ -185,11 +185,17 @@ async function insertUser(overrides = {}) {
 }
 
 /** Abre uma sessao direto no banco e devolve o token cru. */
-async function insertSession(userId, token = sessions.generateToken()) {
+async function insertSession(
+  userId,
+  token = sessions.generateToken(),
+  { hours = env.session.ttlHours } = {},
+) {
+  // Validade cheia por padrao: abaixo da metade, a primeira requisicao ja
+  // renovaria a sessao e cada resposta levaria um `Set-Cookie` a mais.
   await db.query(
     `INSERT INTO sessions (user_id, token_hash, expires_at)
-     VALUES ($1, $2, now() + interval '1 day')`,
-    [userId, sessions.hashToken(token)],
+     VALUES ($1, $2, now() + make_interval(hours => $3))`,
+    [userId, sessions.hashToken(token), hours],
   );
 
   return token;
@@ -401,6 +407,25 @@ async function updateColumnDirectly(table, id, column, value) {
   return rows[0];
 }
 
+/** O hash gravado de uma pessoa, para conferir o rehash do login. */
+async function findPasswordHash(userId) {
+  const { rows } = await db.query(
+    'SELECT password_hash FROM users WHERE id = $1',
+    [userId],
+  );
+  return rows[0].password_hash;
+}
+
+/** Horas ate a sessao vencer, medidas no Postgres. */
+async function sessionHoursLeft(token) {
+  const { rows } = await db.query(
+    `SELECT EXTRACT(EPOCH FROM expires_at - now()) / 3600 AS hours
+     FROM sessions WHERE token_hash = $1`,
+    [sessions.hashToken(token)],
+  );
+  return Number(rows[0].hours);
+}
+
 /** Sessoes de uma pessoa, direto do banco. */
 async function findSessions(userId) {
   const { rows } = await db.query(
@@ -525,7 +550,12 @@ async function findReceipts(reportId) {
  * unica forma de provar a retencao: a API nao expoe o diretorio de upload.
  */
 function uploadedFileExists(fileHash) {
-  return fs.existsSync(path.join(env.upload.dir, `${fileHash}.pdf`));
+  return fs.existsSync(uploadedFilePath(`${fileHash}.pdf`));
+}
+
+/** Caminho no disco de um `file_path` de comprovante, para estragar o arquivo. */
+function uploadedFilePath(filePath) {
+  return path.join(env.upload.dir, filePath);
 }
 
 /**
@@ -560,8 +590,11 @@ module.exports = {
   insertMerchant,
   updateColumnDirectly,
   findSessions,
+  sessionHoursLeft,
+  findPasswordHash,
   findReceipts,
   uploadedFileExists,
+  uploadedFilePath,
   leftoverUploads,
   waitForProcessing,
   waitForQueue,
