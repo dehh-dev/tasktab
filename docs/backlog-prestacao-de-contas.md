@@ -1972,10 +1972,22 @@ total, arredondando ao centavo. Regra nova na conferência, sem bloquear nada.
 
 **Critérios de aceite**
 
-- [ ] Os dois exemplos do procedimento fecham (39,56 × 5,70 e 18,461 × 4,97)
-- [ ] Divergência vira alerta no comprovante
-- [ ] Sem litros ou sem preço legível, a regra não dispara
-- [ ] Casos puros em `tests/services/`
+- [x] Os dois exemplos do procedimento fecham (39,56 × 5,70 e 18,461 × 4,97)
+- [x] Divergência vira alerta no comprovante
+- [x] Sem litros ou sem preço legível, a regra não dispara
+- [x] Casos puros em `tests/services/`
+
+**Como ficou**
+
+O formato saiu das duas notas reais: `39,56 L 5,70 225,49` e, na de Formosa,
+`18.461 L x R$49,97 R$ 91.75` — o OCR escreveu os litros com ponto e sujou o
+preço. Daí as duas decisões: no leitor de litros e preço o separador único é
+sempre decimal, e a regra só usa a linha que fecha a própria conta, com um
+centavo de folga. Linha que não fecha não acusa o total, que pode estar certo
+— a prova que mostrou isso foi tirar o filtro e ver o caso do total sujo
+virar alarme falso. A conta é em inteiros (milésimos de litro e de real). Só
+roda em comprovante de combustível: o supermercado tem linhas com o mesmo
+desenho.
 
 ---
 

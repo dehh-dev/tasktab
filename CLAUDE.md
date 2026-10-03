@@ -708,6 +708,15 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - Regra de conferencia so dispara com evidencia suficiente — a de itens exige
   ao menos dois itens legiveis, a de faixa exige historico minimo. Alarme falso
   destroi a confianca mais rapido que um erro nao detectado.
+- **Combustivel: litros vezes preco unitario contra o total** (issue 45,
+  `extractFuelLines` em `normalize.js`). Pega o erro de um digito — o OCR leu
+  o abastecimento de Itapipoca como R$ 2.225,49, e a linha dizia 39,56 L x
+  R$ 5,70 = R$ 225,49. So vale a linha que **fecha a propria conta** (com um
+  centavo de folga, porque a bomba arredonda ou trunca): linha com preco ou
+  total sujo de OCR nao serve de base para acusar o total do cupom. E so em
+  comprovante de combustivel — a garrafa de 1,5 L do supermercado tem o mesmo
+  desenho. No leitor de litros, o separador unico e sempre decimal: `18.461`
+  sao litros, nao milhares.
 
 ## Exportacao
 

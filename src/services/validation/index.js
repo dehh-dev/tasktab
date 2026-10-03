@@ -105,6 +105,53 @@ function checkItemSum(receipts) {
   });
 }
 
+/**
+ * Combustivel: litros vezes preco unitario contra o total (issue 45).
+ *
+ * "E a checagem que pega erro de um digito." O OCR leu o abastecimento de
+ * Itapipoca como R$ 2.225,49, e a linha do proprio cupom dizia 39,56 L x
+ * R$ 5,70 = R$ 225,49. So vale a linha que fecha a propria conta: na nota de
+ * Formosa o OCR sujou o preco (R$ 49,97 no lugar de 4,97), a linha nao
+ * fechava, e acusar o total — que estava certo — seria alarme falso.
+ *
+ * So em comprovante de combustivel: num supermercado, a garrafa de 1,5 L com
+ * preco e total na mesma linha passaria pelo mesmo desenho.
+ */
+function checkFuelArithmetic(receipts) {
+  return receipts.flatMap((receipt) => {
+    if (
+      receipt.category !== 'combustivel' ||
+      !receipt.raw_text ||
+      receipt.amount_cents === null
+    ) {
+      return [];
+    }
+
+    const lines = normalize
+      .extractFuelLines(receipt.raw_text)
+      .filter((line) => line.closes);
+
+    if (lines.length === 0) {
+      return [];
+    }
+
+    const fuel = lines.reduce((sum, line) => sum + line.totalCents, 0);
+
+    if (fuel === receipt.amount_cents) {
+      return [];
+    }
+
+    return [
+      alert(
+        'combustivel',
+        'erro',
+        `Litros vezes preco unitario dao ${fuel} centavos, e o total do comprovante e ${receipt.amount_cents} centavos.`,
+        { receipt_id: receipt.id },
+      ),
+    ];
+  });
+}
+
 /** Valor muito fora do que aquele emitente costuma cobrar. */
 async function checkMerchantRange(receipts) {
   const alerts = [];
@@ -254,6 +301,7 @@ async function validateReport(reportId) {
     ...checkPeriod(report, receipts),
     ...checkAccessKeys(receipts),
     ...checkItemSum(receipts),
+    ...checkFuelArithmetic(receipts),
     ...(await checkMerchantRange(receipts)),
     ...(await checkDuplicates(receipts)),
     ...checkIncomplete(receipts),

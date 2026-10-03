@@ -299,10 +299,10 @@ trabalho ja e "uma pagina, um registro", a migracao e local.
 `aviso`). **Alerta nao bloqueia nada** — quem assina a prestacao de contas
 decide; a ferramenta aponta, nao veta.
 
-Regras: soma dos itens contra o total impresso, digito verificador da chave,
-data dentro do periodo, valor fora da faixa historica do emitente,
-comprovante incompleto, despesas acima do adiantamento e suspeita de
-duplicata.
+Regras: soma dos itens contra o total impresso, litros vezes preco unitario
+no combustivel, digito verificador da chave, data dentro do periodo, valor
+fora da faixa historica do emitente, comprovante incompleto, despesas acima do
+adiantamento e suspeita de duplicata.
 
 Fora de escopo hoje, registrado para nao parecer esquecimento: **coerencia
 geografica e horaria** (jantar numa cidade e corrida em outra no mesmo

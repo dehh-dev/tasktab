@@ -331,3 +331,51 @@ describe('regra: adiantamento', () => {
     expect(porRegra(await validar(report.id), 'adiantamento')).toHaveLength(0);
   });
 });
+
+describe('regra: combustivel', () => {
+  // As duas notas de combustivel da prestacao de Itapipoca, como sairam do
+  // OCR: na primeira a linha fecha e o total foi lido com um digito a mais;
+  // na segunda o preco saiu sujo e a linha nao fecha.
+  const ITAPIPOCA = '39,56 L 5,70 225,49\n.. VALOR TOTAL Ri 2... 2.225,49';
+  const FORMOSA = '18.461 L x R$49,97 R$ 91.75\nVALOR TOTAL R$ R$ 91,75';
+
+  async function combustivel(rawText, amountCents, category = 'combustivel') {
+    const report = await insertReport();
+    await insertReceipt(report.id, {
+      status: 'needs_review',
+      issued_at: '2026-06-10',
+      amount_cents: amountCents,
+      category,
+      raw_text: rawText,
+    });
+    return porRegra(await validar(report.id), 'combustivel');
+  }
+
+  it('acusa o total lido com um digito a mais', async () => {
+    const alertas = await combustivel(ITAPIPOCA, 222549);
+
+    expect(alertas).toHaveLength(1);
+    expect(alertas[0].severity).toBe('erro');
+    expect(alertas[0].message).toMatch(/22549 centavos/);
+  });
+
+  it('cala quando o total bate com litros vezes preco', async () => {
+    expect(await combustivel(ITAPIPOCA, 22549)).toHaveLength(0);
+  });
+
+  it('linha que nao fecha a propria conta nao acusa o total', async () => {
+    // Em Formosa o preco saiu sujo e o total estava certo.
+    expect(await combustivel(FORMOSA, 9175)).toHaveLength(0);
+
+    // Quando e o total da linha que sai sujo, ela tambem nao fecha — e nao
+    // serve de base para acusar o total do cupom, que estava certo.
+    const totalDaLinhaSujo = '18,461 L x R$ 4,97 R$ 81.75\nVALOR TOTAL 91,75';
+    expect(await combustivel(totalDaLinhaSujo, 9175)).toHaveLength(0);
+  });
+
+  it('so vale em comprovante de combustivel', async () => {
+    const mercado = 'AGUA MINERAL 1,500 L 2,49 3,74\nVALOR TOTAL R$ 45,90';
+
+    expect(await combustivel(mercado, 4590, 'alimentacao')).toHaveLength(0);
+  });
+});
