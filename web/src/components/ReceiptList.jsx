@@ -5,11 +5,11 @@ import {
   receiptStatusLabel,
 } from '../constants';
 
-// Onde reprocessar faz sentido: a pagina que falhou, e a que ficou presa na
+// Onde reprocessar faz sentido: a pagina que falhou, a que ficou presa na
 // fila — a fila vive na memoria do processo, e um reinicio no meio do lote
-// deixa linhas em `pending`/`processing` para sempre. Sem este botao a unica
-// saida era `curl`.
-const REPROCESSABLE = new Set(['failed', 'pending', 'processing']);
+// deixa linhas em `pending`/`processing` para sempre — e a ja confirmada,
+// atras de um dialogo, porque reprocessa-la descarta a conferencia.
+const REPROCESSABLE = new Set(['failed', 'pending', 'processing', 'confirmed']);
 
 function ReceiptRow({ receipt, onOpen, onDelete, onReprocess, busy }) {
   const issuedAt = formatDate(receipt.issued_at);

@@ -5,6 +5,7 @@ const {
   request,
   insertReport,
   waitForProcessing,
+  updateColumnDirectly,
 } = require('../../orchestrator');
 const { makeScannedReceiptPdf, makeReceiptPdf } = require('../../fixtures/pdf');
 
@@ -125,9 +126,11 @@ describe('processamento assincrono', () => {
 
     // Simula o que sobra de um reinicio no meio do lote: a fila vive na
     // memoria do processo, entao ha registros que ficam presos em processing.
-    await request('PATCH', `/api/receipts/${receipt.id}`, {
-      amount_cents: null,
-    });
+    // Escrito direto no banco porque a API nao produz esse estado — e um
+    // PATCH marcaria a linha como corrigida a mao, que reprocessar so aceita
+    // com a confirmacao do descarte.
+    await updateColumnDirectly('receipts', receipt.id, 'amount_cents', null);
+    await updateColumnDirectly('receipts', receipt.id, 'status', 'processing');
 
     const response = await request(
       'POST',

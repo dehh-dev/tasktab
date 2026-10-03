@@ -228,11 +228,14 @@ async function destroy(req, res) {
  * Reenfileira uma pagina. Serve para o comprovante que ficou preso em
  * `processing` — a fila vive na memoria do processo, entao um reinicio no meio
  * do lote deixa registros nesse estado — e para tentar de novo depois de
- * ajustar o cadastro do emitente.
+ * ajustar o cadastro do emitente. O que uma pessoa ja conferiu so e
+ * reprocessado com `discard_review: true` — ver `validateReprocess`.
  */
 async function reprocess(req, res) {
   const id = receiptValidator.validateId(req.params.id);
   const receipt = await loadReceipt(req.user, id, { write: true });
+
+  receiptValidator.validateReprocess(req.body, receipt);
 
   const buffer = await readOriginal(
     receipt,

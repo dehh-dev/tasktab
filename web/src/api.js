@@ -231,8 +231,15 @@ export function deleteReceipt(id) {
   return request(`${RECEIPTS_URL}/${id}`, { method: 'DELETE' });
 }
 
-export function reprocessReceipt(id) {
-  return request(`${RECEIPTS_URL}/${id}/reprocess`, { method: 'POST' });
+/**
+ * Reenfileira a pagina. O que uma pessoa ja conferiu so e reprocessado com
+ * `discardReview`: a extracao regrava data, valor e categoria por cima.
+ */
+export function reprocessReceipt(id, { discardReview = false } = {}) {
+  return request(`${RECEIPTS_URL}/${id}/reprocess`, {
+    method: 'POST',
+    body: JSON.stringify(discardReview ? { discard_review: true } : {}),
+  });
 }
 
 /** Categoria padrao do emitente: vale para os proximos cupons daquele CNPJ. */

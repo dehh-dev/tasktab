@@ -1,6 +1,10 @@
 'use strict';
 
-const { BadRequestError, ValidationError } = require('../../infra/errors');
+const {
+  BadRequestError,
+  ConflictError,
+  ValidationError,
+} = require('../../infra/errors');
 const { isValidIsoDate, parseId } = require('./rules');
 
 const BODY_NOT_OBJECT = {
@@ -166,6 +170,46 @@ function validateUpdate(body, current = {}) {
   return data;
 }
 
+/**
+ * Reprocessar regrava data, valor e categoria com o que a extracao ler. Sobre
+ * o que uma pessoa ja conferiu — confirmou, ou corrigiu a mao — isso apaga
+ * trabalho de revisao. A API aceitava sem perguntar; agora pede a confirmacao
+ * explicita em `discard_review`, decidida com quem usa.
+ */
+function validateReprocess(body, current) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new BadRequestError({
+      message: 'Corpo da requisicao deve ser um objeto JSON.',
+      action: 'Envie um objeto vazio, ou { "discard_review": true }.',
+    });
+  }
+
+  if (
+    body.discard_review !== undefined &&
+    typeof body.discard_review !== 'boolean'
+  ) {
+    throw new ValidationError({
+      details: [
+        {
+          field: 'discard_review',
+          message: 'discard_review deve ser booleano',
+        },
+      ],
+    });
+  }
+
+  const reviewed =
+    current.status === 'confirmed' || current.extraction_source === 'manual';
+
+  if (reviewed && body.discard_review !== true) {
+    throw new ConflictError({
+      message: 'Este comprovante ja foi conferido por uma pessoa.',
+      action:
+        'Reprocessar substitui a data, o valor e a categoria conferidos pelo que a extracao ler. Para seguir mesmo assim, confirme o descarte da conferencia.',
+    });
+  }
+}
+
 function validateId(rawId) {
   return parseId(rawId, INVALID_ID);
 }
@@ -190,6 +234,7 @@ module.exports = {
   EXPENSE_CATEGORIES,
   RECEIPT_STATUSES,
   validateUpdate,
+  validateReprocess,
   validateId,
   validateListQuery,
 };

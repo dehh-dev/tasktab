@@ -69,6 +69,8 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
 
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [pendingReprocess, setPendingReprocess] = useState(null);
+  const [reprocessing, setReprocessing] = useState(false);
   const [pollError, setPollError] = useState(null);
   const [pollFailures, setPollFailures] = useState(0);
   const [changingStatus, setChangingStatus] = useState(false);
@@ -208,13 +210,36 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
    * Reenfileira a pagina. O status volta para `pending`, e o poll ja existente
    * retoma sozinho ate a extracao terminar.
    */
-  async function handleReprocess(receipt) {
+  async function handleReprocess(receipt, { discardReview = false } = {}) {
+    setReprocessing(true);
+
     try {
-      await api.reprocessReceipt(receipt.id);
+      await api.reprocessReceipt(receipt.id, { discardReview });
+      setPendingReprocess(null);
       await load();
     } catch (caught) {
       setError({ message: caught.message, action: caught.action });
+      setPendingReprocess(null);
+    } finally {
+      setReprocessing(false);
     }
+  }
+
+  /**
+   * O que uma pessoa ja conferiu — confirmou, ou corrigiu a mao — so e
+   * reprocessado depois do dialogo: a extracao regrava data, valor e
+   * categoria por cima. A API confere de novo e recusa sem a confirmacao.
+   */
+  function requestReprocess(receipt) {
+    const reviewed =
+      receipt.status === 'confirmed' || receipt.extraction_source === 'manual';
+
+    if (reviewed) {
+      setPendingReprocess(receipt);
+      return;
+    }
+
+    handleReprocess(receipt);
   }
 
   /**
@@ -272,6 +297,21 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
       onConfirm={handleDelete}
       onCancel={() => setPendingDelete(null)}
       busy={deleting}
+    />
+  );
+
+  const reprocessDialog = pendingReprocess && (
+    <ConfirmDialog
+      title="Reprocessar comprovante conferido?"
+      target={receiptLabel(pendingReprocess)}
+      message="A data, o valor e a categoria conferidos serao substituidos pelo que a extracao ler, e o comprovante volta para a revisao."
+      confirmLabel="Reprocessar"
+      busyLabel="Reprocessando..."
+      onConfirm={() =>
+        handleReprocess(pendingReprocess, { discardReview: true })
+      }
+      onCancel={() => setPendingReprocess(null)}
+      busy={reprocessing}
     />
   );
 
@@ -428,11 +468,12 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
         receipts={receipts}
         onOpen={setReviewingId}
         onDelete={editable ? setPendingDelete : undefined}
-        onReprocess={editable ? handleReprocess : undefined}
-        busy={deleting}
+        onReprocess={editable ? requestReprocess : undefined}
+        busy={deleting || reprocessing}
       />
 
       {deleteDialog}
+      {reprocessDialog}
     </>
   );
 }

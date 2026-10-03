@@ -520,6 +520,10 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   deixe um arquivo ruim derrubar o lote.
 - Confirmar exige `issued_at`, `amount_cents` e `category`, conferidos sobre o
   registro ja gravado. Duplicata continua listada e **fora do somatorio**.
+- **Reprocessar o que uma pessoa ja conferiu** — confirmado, ou corrigido a mao
+  (`extraction_source = 'manual'`) — exige `{ "discard_review": true }`; sem
+  isso, `409`. Decisao de quem usa: permitido, com confirmacao explicita, e a
+  tela pergunta antes. A extracao regrava data, valor e categoria por cima.
 - As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
 - **Relatorio `closed` e somente leitura**, ate para o dono: upload, edicao,
   exclusao e reprocessamento respondem `409 ConflictError`, e o unico PATCH

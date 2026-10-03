@@ -259,7 +259,10 @@ O upload responde **202**: as linhas ja existem, o conteudo delas ainda esta
 sendo lido por uma fila em processo. O `status` progride
 `pending → processing → needs_review | failed`, e `GET /api/health` informa
 quantas tarefas ainda faltam. Um comprovante preso pode ser reenviado para a
-fila com `POST /api/receipts/:id/reprocess`.
+fila com `POST /api/receipts/:id/reprocess`. O que uma pessoa ja conferiu —
+confirmado, ou corrigido a mao — so volta para a fila com
+`{ "discard_review": true }` no corpo, porque a extracao regrava data, valor e
+categoria por cima; sem isso, a resposta e `409`.
 
 A fila e **em processo** de proposito: sem servico novo, sem Redis. O gatilho
 para trocar por BullMQ e **uso concorrente** — hoje um segundo processo nao ve
