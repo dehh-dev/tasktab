@@ -1,6 +1,7 @@
 'use strict';
 
 const ExcelJS = require('exceljs');
+const JSZip = require('jszip');
 const {
   requestBinary,
   insertReport,
@@ -125,6 +126,7 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     expect(summary.getCell(`B${alimentacao}`).value).toBe(2);
     expect(summary.getCell(`C${alimentacao}`).value).toEqual({
       formula: "SUM('Alimentação'!D2:D3)",
+      result: 89.6,
     });
     // A formula e resolvida contra as celulas de verdade: se o intervalo
     // apontar para a aba errada ou para linhas de menos, isto quebra.
@@ -168,6 +170,64 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     expect(
       evaluateSum(workbook, 'Alimentação', `D${findRow(alimentacao, 'TOTAL')}`),
     ).toBe(37.6);
+  });
+
+  it('toda formula leva o valor guardado, e ele bate com a conta', async () => {
+    const report = await insertReport();
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 1,
+        issued_at: '2026-08-02',
+        amount_cents: 16500,
+      }),
+    );
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 2,
+        issued_at: '2026-08-03',
+        amount_cents: 2850,
+      }),
+    );
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 3,
+        category: 'combustivel',
+        issued_at: '2026-08-08',
+        amount_cents: 22549,
+      }),
+    );
+
+    const { response, workbook } = await loadWorkbook(report.id);
+
+    // Sem o valor guardado, a pre-visualizacao do WhatsApp e do Drive abria
+    // a planilha com os totais em branco.
+    const formulas = [];
+    workbook.eachSheet((sheet) => {
+      sheet.eachRow((row) => {
+        row.eachCell((cell) => {
+          if (cell.value && typeof cell.value.formula === 'string') {
+            formulas.push({ sheet: sheet.name, cell });
+          }
+        });
+      });
+    });
+
+    // O TOTAL de cada uma das duas abas de tipo; no resumo, o valor de cada
+    // tipo e o TOTAL geral em quantidade e em valor.
+    expect(formulas).toHaveLength(6);
+
+    for (const { sheet, cell } of formulas) {
+      expect(cell.value.result).toBe(
+        evaluateSum(workbook, sheet, cell.address),
+      );
+    }
+
+    const zip = await JSZip.loadAsync(response.buffer);
+    const workbookXml = await zip.file('xl/workbook.xml').async('string');
+    expect(workbookXml).toMatch(/<calcPr[^>]*fullCalcOnLoad="1"/);
   });
 
   it('traz a cidade do emitente na coluna Cidade', async () => {

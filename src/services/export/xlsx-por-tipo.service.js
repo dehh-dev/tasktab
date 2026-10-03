@@ -118,6 +118,19 @@ function sumCents(receipts) {
 }
 
 /**
+ * Formula com o resultado ja guardado.
+ *
+ * O exceljs grava a formula sem valor, e o Excel recalcula ao abrir — mas a
+ * pre-visualizacao do WhatsApp, do Gmail e do Drive, e qualquer leitor que use
+ * o valor guardado, mostravam os totais em branco. O resultado sai dos
+ * centavos inteiros, a mesma conta da formula, e o `fullCalcOnLoad` do
+ * workbook faz quem recalcula refazer a conta de qualquer jeito.
+ */
+function formulaWithResult(formula, result) {
+  return { formula, result };
+}
+
+/**
  * Agrupa os confirmados por tipo, na ordem do enum, descartando os tipos sem
  * nenhum lancamento — oito abas vazias so escondem as tres que importam.
  */
@@ -174,9 +187,10 @@ function addCategorySheet(workbook, group) {
 
   sheet.mergeCells(`A${totalRow}:C${totalRow}`);
   sheet.getCell(`A${totalRow}`).value = 'TOTAL';
-  sheet.getCell(`${VALUE_COLUMN}${totalRow}`).value = {
-    formula: `SUM(${dataRange})`,
-  };
+  sheet.getCell(`${VALUE_COLUMN}${totalRow}`).value = formulaWithResult(
+    `SUM(${dataRange})`,
+    sumCents(group.receipts) / 100,
+  );
   sheet.getCell(`${VALUE_COLUMN}${totalRow}`).numFmt = CURRENCY_FORMAT;
 
   sheet.getRow(totalRow).eachCell({ includeEmpty: true }, (cell) => {
@@ -229,9 +243,10 @@ function fillSummarySheet(sheet, report, groups, excluded) {
 
     row.getCell(1).value = group.label;
     row.getCell(2).value = group.receipts.length;
-    row.getCell(3).value = {
-      formula: `SUM(${sheetRange(group.sheet.name, group.sheet.dataRange)})`,
-    };
+    row.getCell(3).value = formulaWithResult(
+      `SUM(${sheetRange(group.sheet.name, group.sheet.dataRange)})`,
+      sumCents(group.receipts) / 100,
+    );
     row.getCell(3).numFmt = CURRENCY_FORMAT;
 
     row.eachCell({ includeEmpty: true }, (cell, column) => {
@@ -255,11 +270,15 @@ function fillSummarySheet(sheet, report, groups, excluded) {
   // Sem nenhum tipo, nao ha intervalo para somar: uma formula sobre um
   // intervalo vazio abriria com #REF! na cara de quem so quer ver o zero.
   const hasGroups = groups.length > 0;
+  const all = groups.flatMap((group) => group.receipts);
   sheet.getCell(`B${totalRow}`).value = hasGroups
-    ? { formula: `SUM(B${firstDataRow}:B${lastDataRow})` }
+    ? formulaWithResult(`SUM(B${firstDataRow}:B${lastDataRow})`, all.length)
     : 0;
   sheet.getCell(`C${totalRow}`).value = hasGroups
-    ? { formula: `SUM(C${firstDataRow}:C${lastDataRow})` }
+    ? formulaWithResult(
+        `SUM(C${firstDataRow}:C${lastDataRow})`,
+        sumCents(all) / 100,
+      )
     : 0;
   sheet.getCell(`C${totalRow}`).numFmt = CURRENCY_FORMAT;
 
@@ -319,6 +338,7 @@ function fillSummarySheet(sheet, report, groups, excluded) {
  */
 async function buildWorkbook(report, receipts) {
   const workbook = new ExcelJS.Workbook();
+  workbook.calcProperties.fullCalcOnLoad = true;
   const summary = workbook.addWorksheet(SUMMARY_SHEET);
 
   const confirmed = receipts.filter(

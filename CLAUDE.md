@@ -709,6 +709,10 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - Valor de cada tipo no `Resumo` e **formula cruzando abas**
   (`SUM('Alimentação'!D2:D9)`), nao numero repetido: dois numeros para a mesma
   conta e uma contradicao esperando um deles ser editado.
+- **Toda formula leva o resultado guardado** (`formulaWithResult`), calculado
+  dos centavos, e o workbook marca `fullCalcOnLoad`. O exceljs grava formula
+  sem valor: a pre-visualizacao do WhatsApp e do Drive abria os totais em
+  branco. O valor guardado nao e um segundo numero — quem recalcula o refaz.
 - **Nome de aba em formula precisa de aspas simples** e o Excel recusa
   `: \ / ? * [ ]` e nomes acima de 31 caracteres. `sheetName`/`sheetRange`
   cuidam disso — uma categoria nova com acento ou barra derrubaria a planilha
