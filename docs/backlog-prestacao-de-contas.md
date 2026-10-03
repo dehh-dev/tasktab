@@ -1443,6 +1443,8 @@ distribuição do próprio procedimento concorda com a planilha.
 | Reprocessar o que já foi conferido | permitido, com confirmação explícita (#35)                |
 | Procedimento × planilha × papel    | vale o comprovante                                        |
 | Valor em revisão na tela           | soma no total, sem categoria e sem bloco à parte (#39)    |
+| Abas por tipo na planilha nova     | ficam, ao lado da planilha do procedimento (#53)          |
+| Anexo I oficial (#55 e #56)        | deixadas de lado por ora, sem o arquivo                   |
 
 ## O que a prestação de Itapipoca mostrou
 
@@ -2168,7 +2170,7 @@ Tipo, Valor — 41 linhas e o TOTAL GERAL) e `Resumo` (`COUNTIF`/`SUMIF` sobre
 `Despesas`). O procedimento acrescenta o resumo por cidade, o bloco de
 conferência, o saldo e a aba de Observações.
 
-**Em aberto:** as abas por tipo da #29 ficam ao lado ou saem.
+**Decidido:** as abas por tipo da #29 ficam, ao lado da planilha nova.
 
 **Critérios de aceite**
 
@@ -2202,7 +2204,7 @@ A duplicata vai junto, como comprovação.
 
 ## Issue 55 — Anexo I oficial (versão 19)
 
-`area:export` · `bloqueada`
+`area:export` · `bloqueada` · deixada de lado por ora
 
 O template continua sintético. O mapa da versão 19 já está no serviço desde a
 #38; falta o arquivo.
@@ -2217,7 +2219,7 @@ O template continua sintético. O mapa da versão 19 já está no serviço desde
 
 ## Issue 56 — Anexo já preenchido: comparar antes de sobrescrever
 
-`area:api` · `area:web` · depende de #55
+`area:api` · `area:web` · depende de #55 · deixada de lado por ora
 
 "O arquivo pode já vir preenchido por outra pessoa." Os erros já achados
 nesse formulário: duas linhas duplicadas desalinhando as seguintes, valor na
