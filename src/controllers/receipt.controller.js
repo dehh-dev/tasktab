@@ -10,6 +10,7 @@ const pipeline = require('../services/extraction/pipeline.service');
 const queue = require('../services/extraction/queue');
 const retention = require('../services/retention.service');
 const receiptImage = require('../services/receipt-image.service');
+const typedAccessKey = require('../services/typed-access-key.service');
 const {
   loadReport,
   loadReceipt,
@@ -198,7 +199,14 @@ async function update(req, res) {
   const current = await loadReceipt(req.user, id, { write: true });
 
   const data = receiptValidator.validateUpdate(req.body, current);
-  const receipt = await Receipt.update(id, data);
+
+  // A chave digitada carrega o CNPJ e identifica o documento fiscal: vincula
+  // o emitente e acusa a duplicata exata, como a extracao faria.
+  const fromKey = data.access_key
+    ? await typedAccessKey.applyTypedAccessKey(current, data)
+    : {};
+
+  const receipt = await Receipt.update(id, { ...data, ...fromKey });
 
   res.json({ data: receipt });
 }

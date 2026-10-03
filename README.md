@@ -246,6 +246,10 @@ Cupom com QR Code tem a **chave de acesso** lida do codigo — o dado mais
 confiavel que a extracao produz, porque o QR tem correcao de erro e a chave
 ainda passa pelo digito verificador mod-11. Sem QR legivel, a chave e buscada
 no texto impresso; em qualquer caso, chave que nao fecha o DV e descartada.
+Quando nem o QR nem o texto a dao, ela pode ser **digitada na revisao**
+(`access_key` no `PATCH /api/receipts/:id`, com ou sem espacos): o DV confere
+a digitacao, o CNPJ dela vincula o emitente, e a mesma chave em outro
+comprovante do relatorio faz deste a duplicata.
 
 A **categoria vem do CNPJ do emitente**, nunca do nome. Emitente conhecido
 aplica a sua categoria padrao; desconhecido e cadastrado como

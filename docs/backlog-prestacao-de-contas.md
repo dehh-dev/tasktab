@@ -1821,10 +1821,22 @@ aparece quando o comprovante não tem chave.
 
 **Critérios de aceite**
 
-- [ ] Chave que não fecha o DV: `422` no campo `access_key`
-- [ ] Chave válida vincula o emitente pelo CNPJ das posições 7 a 20
-- [ ] Mesma chave de outro comprovante do relatório: vira duplicata
-- [ ] Campo na revisão só quando falta a chave; spec E2E
+- [x] Chave que não fecha o DV: `422` no campo `access_key`
+- [x] Chave válida vincula o emitente pelo CNPJ das posições 7 a 20
+- [x] Mesma chave de outro comprovante do relatório: vira duplicata
+- [x] Campo na revisão só quando falta a chave; spec E2E
+
+**Como ficou**
+
+A chave digitada aceita os separadores da impressão e vale o mesmo que a lida
+do QR (`typed-access-key.service.js`): o emitente sai do CNPJ dela pelo
+`classify` da extração, e a categoria do cadastro só substitui um palpite —
+nunca a escolha de uma pessoa, nem a que veio no mesmo `PATCH`. Chave repetida
+no relatório vira duplicata mesmo num "confirmar", porque é o mesmo documento
+fiscal; em outro relatório, não. Digitar a chave marca a origem como manual,
+então reprocessar depois pede a confirmação da #35. A regra `chave_acesso` da
+conferência fica como rede para o que entra por fora da API. Sem o serviço,
+caem os três testes de emitente, categoria e duplicata.
 
 ---
 

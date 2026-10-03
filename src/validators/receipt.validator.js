@@ -6,6 +6,7 @@ const {
   ValidationError,
 } = require('../../infra/errors');
 const { isValidIsoDate, parseId } = require('./rules');
+const accessKey = require('../services/extraction/access-key');
 
 const BODY_NOT_OBJECT = {
   message: 'Corpo da requisicao deve ser um objeto JSON.',
@@ -35,9 +36,13 @@ const RECEIPT_STATUSES = [
   'failed',
 ];
 
-// Campos que a revisao humana preenche. Corrigir qualquer um deles marca a
-// origem como manual — e o que permite a tela destacar o que veio de OCR.
+// Campos que a revisao humana preenche, e sem os quais nao se confirma.
 const REVIEWED_FIELDS = ['issued_at', 'amount_cents', 'category'];
+
+// Corrigir qualquer um destes marca a origem como manual — e o que permite a
+// tela destacar o que veio de OCR. A chave entra aqui e nao na lista de cima:
+// recibo manuscrito e comanda nao tem chave, e se confirmam do mesmo jeito.
+const MANUAL_FIELDS = [...REVIEWED_FIELDS, 'access_key'];
 
 function fromEnum(field, allowed) {
   return (value, errors) => {
@@ -88,6 +93,41 @@ function validateAmountCents(value, errors) {
   return value;
 }
 
+/**
+ * Chave de acesso digitada na revisao, quando o QR e o texto nao a deram.
+ *
+ * Aceita os separadores com que a chave e impressa e devolve so os 44
+ * caracteres. O DV decide: o procedimento conta o cupom em que o mes da
+ * emissao saia borrado e parecia 2606 — so 2608 fechava o verificador, e era
+ * a data certa. Chave que nao fecha e recusada, nunca gravada pela metade.
+ */
+function validateAccessKey(value, errors) {
+  if (value === null) {
+    return null;
+  }
+
+  const key = accessKey.normalizeKey(value);
+
+  if (key === null) {
+    errors.push({
+      field: 'access_key',
+      message:
+        'access_key deve ter 44 caracteres: 6 digitos, 12 letras ou digitos e 26 digitos',
+    });
+    return undefined;
+  }
+
+  if (!accessKey.isValid(key)) {
+    errors.push({
+      field: 'access_key',
+      message: 'access_key nao fecha o digito verificador',
+    });
+    return undefined;
+  }
+
+  return key;
+}
+
 function assertValid(errors) {
   if (errors.length > 0) {
     throw new ValidationError({ details: errors });
@@ -134,6 +174,10 @@ function validateUpdate(body, current = {}) {
     data.status = validateStatus(body.status, errors);
   }
 
+  if (body.access_key !== undefined) {
+    data.access_key = validateAccessKey(body.access_key, errors);
+  }
+
   assertValid(errors);
 
   if (Object.keys(data).length === 0) {
@@ -142,7 +186,8 @@ function validateUpdate(body, current = {}) {
       details: [
         {
           field: 'body',
-          message: 'campos aceitos: issued_at, amount_cents, category, status',
+          message:
+            'campos aceitos: issued_at, amount_cents, category, status, access_key',
         },
       ],
     });
@@ -156,7 +201,7 @@ function validateUpdate(body, current = {}) {
   }
 
   // Correcao humana marca a origem, para a revisao saber o que ja foi olhado.
-  if (REVIEWED_FIELDS.some((field) => field in data)) {
+  if (MANUAL_FIELDS.some((field) => field in data)) {
     data.extraction_source = 'manual';
   }
 

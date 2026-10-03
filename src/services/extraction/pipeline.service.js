@@ -281,4 +281,4 @@ function lowestConfidence(fields) {
   return values.length > 0 ? Math.min(...values) : null;
 }
 
-module.exports = { processFile };
+module.exports = { processFile, classify };

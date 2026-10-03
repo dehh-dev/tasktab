@@ -639,6 +639,14 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   "SUPERMERCADO12" tem o formato de um CNPJ.
 - Chave que nao fecha o DV mod-11 e **descartada**. Nao ha meio termo entre
   confiar e nao confiar num identificador com verificador.
+- **A chave que a extracao nao achou se digita na revisao** (issue 41): o
+  `PATCH` aceita `access_key` com os separadores da impressao e recusa com
+  `422` a que nao fecha o DV. Digitada, ela vale o mesmo que a lida do QR
+  (`typed-access-key.service.js`): o CNPJ dela vincula o emitente pelo
+  `classify` da extracao, a categoria do cadastro substitui um palpite (nunca
+  uma escolha de pessoa), e a mesma chave em outro comprovante do relatorio
+  faz deste a duplicata, por cima de um "confirmar". O campo so aparece na
+  revisao quando falta a chave.
 - `nao_classificado` vira `NULL` no comprovante: e ausencia de decisao, nao
   categoria. Gravar o enum faria a linha parecer classificada nos subtotais.
 - Cascata: **texto → QR → OCR**. Pagina sem camada de texto util desce para o

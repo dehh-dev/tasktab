@@ -49,8 +49,9 @@ function checkPeriod(report, receipts) {
 /**
  * Chave de acesso que nao fecha o digito verificador.
  *
- * A extracao ja descarta chave invalida, entao esta regra existe para o que
- * foi digitado ou corrigido a mao na revisao.
+ * A extracao descarta chave invalida, e a digitada na revisao e recusada no
+ * `PATCH` (issue 41). Esta regra fica como rede para o que entra por fora da
+ * API — seed, psql, migration.
  */
 function checkAccessKeys(receipts) {
   return receipts

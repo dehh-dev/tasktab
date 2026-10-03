@@ -64,7 +64,13 @@ export default function ReceiptReview({
     issued_at: receipt.issued_at ?? '',
     amount_cents: centsToInputValue(receipt.amount_cents),
     category: receipt.category ?? '',
+    access_key: '',
   });
+
+  // A chave so e pedida quando a extracao nao a achou. Com ela no comprovante
+  // nao ha o que digitar: sao 44 caracteres que ninguem confere a olho, e o DV
+  // ja os conferiu quando ela foi lida.
+  const askForKey = !receipt.access_key;
   const [localErrors, setLocalErrors] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -180,11 +186,16 @@ export default function ReceiptReview({
         await api.setMerchantCategory(receipt.merchant_id, values.category);
       }
 
+      // A chave digitada vai junto: se ela nao fechar o DV, o 422 volta no
+      // campo e nada e confirmado — o que a pessoa digitou fica na tela.
+      const typedKey = askForKey ? values.access_key.trim() : '';
+
       await api.updateReceipt(receipt.id, {
         issued_at: values.issued_at,
         amount_cents: amountCents,
         category: values.category,
         status: 'confirmed',
+        ...(typedKey ? { access_key: typedKey } : {}),
       });
       await onAction();
     } catch (caught) {
@@ -494,7 +505,7 @@ export default function ReceiptReview({
             <ConfidenceBadge receipt={receipt} />
           </div>
 
-          {/* Um fieldset desabilitado trava os tres campos de uma vez, com a
+          {/* Um fieldset desabilitado trava os campos de uma vez, com a
               semantica nativa: o leitor de tela anuncia os campos como
               indisponiveis, e nenhum Enter confirma por acidente. */}
           <fieldset className="review__fieldset" disabled={!canWrite}>
@@ -593,6 +604,37 @@ export default function ReceiptReview({
                 </span>
               )}
             </div>
+
+            {askForKey && (
+              <div className="field">
+                <label className="field__label" htmlFor="review-access-key">
+                  Chave de acesso
+                </label>
+                <input
+                  id="review-access-key"
+                  className="field__input"
+                  type="text"
+                  inputMode="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={values.access_key}
+                  aria-invalid={Boolean(errors.access_key)}
+                  aria-describedby="review-access-key-hint"
+                  onChange={(event) =>
+                    setField('access_key', event.target.value)
+                  }
+                />
+                <span className="field__hint" id="review-access-key-hint">
+                  Opcional. Os 44 caracteres do cupom, com ou sem espacos — o
+                  digito verificador confere a digitacao.
+                </span>
+                {errors.access_key && (
+                  <span className="field__error" role="alert">
+                    {errors.access_key}
+                  </span>
+                )}
+              </div>
+            )}
 
             {offerMerchantUpdate && (
               <label className="field field--checkbox">

@@ -1,6 +1,12 @@
 'use strict';
 
-const { request, insertReport, insertReceipt } = require('../../orchestrator');
+const {
+  request,
+  insertReport,
+  insertReceipt,
+  insertMerchant,
+  updateColumnDirectly,
+} = require('../../orchestrator');
 
 const COMPLETO = {
   issued_at: '2026-06-19',
@@ -118,5 +124,143 @@ describe('PATCH /api/receipts/:id', () => {
     });
 
     expect(response.status).toBe(422);
+  });
+});
+
+// Quando o QR e o texto falham, a chave some — e e ela que o procedimento
+// chama de fonte da verdade para emitente e data. Digitada na revisao, o DV
+// decide se ela vale.
+describe('PATCH /api/receipts/:id com a chave de acesso digitada', () => {
+  const CHAVE = '52260626048802000165650010001631601303284889';
+  const CNPJ_DA_CHAVE = '26048802000165';
+
+  function patch(receipt, body) {
+    return request('PATCH', `/api/receipts/${receipt.id}`, body);
+  }
+
+  it('chave que nao fecha o DV e 422 no campo, e nada e gravado', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+    const quebrada = `${CHAVE.slice(0, 43)}${(Number(CHAVE[43]) + 1) % 10}`;
+
+    const response = await patch(receipt, { access_key: quebrada });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      {
+        field: 'access_key',
+        message: 'access_key nao fecha o digito verificador',
+      },
+    ]);
+    const lido = await request('GET', `/api/receipts/${receipt.id}`);
+    expect(lido.body.data.access_key).toBeNull();
+  });
+
+  it('chave fora do formato e 422 no campo', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+
+    const response = await patch(receipt, { access_key: '5226 0626' });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details[0].field).toBe('access_key');
+  });
+
+  it('aceita a chave como e impressa, em grupos, e grava os 44 caracteres', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+    const impressa = CHAVE.match(/.{1,4}/g).join(' ');
+
+    const response = await patch(receipt, { access_key: impressa });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.access_key).toBe(CHAVE);
+    expect(response.body.data.extraction_source).toBe('manual');
+  });
+
+  it('vincula o emitente pelo CNPJ da chave, cadastrando o desconhecido', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+
+    const response = await patch(receipt, { access_key: CHAVE });
+    const emitente = await request(
+      'GET',
+      `/api/merchants/${response.body.data.merchant_id}`,
+    );
+
+    expect(emitente.body.data.cnpj).toBe(CNPJ_DA_CHAVE);
+  });
+
+  it('a categoria do cadastro substitui o palpite', async () => {
+    const merchant = await insertMerchant({
+      cnpj: CNPJ_DA_CHAVE,
+      default_category: 'alimentacao',
+    });
+    const receipt = await insertReceipt((await insertReport()).id, {
+      category: 'outros',
+    });
+    await updateColumnDirectly(
+      'receipts',
+      receipt.id,
+      'category_guessed',
+      true,
+    );
+
+    const response = await patch(receipt, { access_key: CHAVE });
+
+    expect(response.body.data).toMatchObject({
+      merchant_id: merchant.id,
+      category: 'alimentacao',
+      category_guessed: false,
+    });
+  });
+
+  it('a categoria escolhida por uma pessoa fica, mesmo com cadastro', async () => {
+    await insertMerchant({
+      cnpj: CNPJ_DA_CHAVE,
+      default_category: 'alimentacao',
+    });
+    const receipt = await insertReceipt((await insertReport()).id, {
+      category: 'combustivel',
+    });
+
+    const response = await patch(receipt, { access_key: CHAVE });
+
+    expect(response.body.data.category).toBe('combustivel');
+  });
+
+  it('a mesma chave de outro comprovante do relatorio faz deste a duplicata', async () => {
+    const report = await insertReport();
+    const original = await insertReceipt(report.id, {
+      page_number: 1,
+      status: 'needs_review',
+      access_key: CHAVE,
+    });
+    const repetido = await insertReceipt(report.id, { page_number: 2 });
+
+    // Mesmo pedindo para confirmar: e o mesmo documento fiscal, e somar os
+    // dois e o erro que a ferramenta existe para evitar.
+    const response = await patch(repetido, {
+      ...COMPLETO,
+      status: 'confirmed',
+      access_key: CHAVE,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      status: 'duplicate',
+      duplicate_of_id: original.id,
+    });
+  });
+
+  it('a mesma chave em outro relatorio nao e duplicata', async () => {
+    await insertReceipt((await insertReport()).id, { access_key: CHAVE });
+    const receipt = await insertReceipt(
+      (await insertReport({ title: 'Outra viagem' })).id,
+    );
+
+    const response = await patch(receipt, {
+      ...COMPLETO,
+      status: 'confirmed',
+      access_key: CHAVE,
+    });
+
+    expect(response.body.data.status).toBe('confirmed');
   });
 });
