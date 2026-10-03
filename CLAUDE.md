@@ -643,11 +643,19 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - **A chave que a extracao nao achou se digita na revisao** (issue 41): o
   `PATCH` aceita `access_key` com os separadores da impressao e recusa com
   `422` a que nao fecha o DV. Digitada, ela vale o mesmo que a lida do QR
-  (`typed-access-key.service.js`): o CNPJ dela vincula o emitente pelo
+  (`typed-issuer.service.js`): o CNPJ dela vincula o emitente pelo
   `classify` da extracao, a categoria do cadastro substitui um palpite (nunca
   uma escolha de pessoa), e a mesma chave em outro comprovante do relatorio
   faz deste a duplicata, por cima de um "confirmar". O campo so aparece na
   revisao quando falta a chave.
+- **Nome e cidade do papel ficam no proprio comprovante** (issue 42,
+  `issuer_name` e `issuer_city`). A extracao grava o que o texto traz, com ou
+  sem CNPJ, e a revisao os corrige quando nao ha emitente cadastrado — o
+  recibo manuscrito. Lista e saidas usam o cadastro quando ha e o papel quando
+  nao ha, num lugar so (`ISSUER_NAME`/`ISSUER_CITY` em `receipt.model.js`).
+  Sem chave, o `PATCH` aceita `cnpj` e vincula o emitente pelo mesmo
+  `classify`; `cnpj: null` desvincula, porque o CNPJ do texto pode ser o da
+  credenciadora do cartao. Com chave, o CNPJ vem dela, e um digitado e `422`.
 - `nao_classificado` vira `NULL` no comprovante: e ausencia de decisao, nao
   categoria. Gravar o enum faria a linha parecer classificada nos subtotais.
 - Cascata: **texto → QR → OCR**. Pagina sem camada de texto util desce para o

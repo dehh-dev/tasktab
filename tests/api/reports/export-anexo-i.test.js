@@ -4,6 +4,7 @@ const ExcelJS = require('exceljs');
 const JSZip = require('jszip');
 const fs = require('fs/promises');
 const {
+  request,
   requestBinary,
   insertReport,
   insertReceipt,
@@ -101,6 +102,26 @@ describe('GET /api/reports/:id/export/anexo-i.xlsx', () => {
     expect(actual).toEqual(
       expected.map(([category, column]) => [category, column, true]),
     );
+  });
+
+  it('sem emitente cadastrado, cidade e descricao saem do comprovante', async () => {
+    const report = await insertReport();
+    const receipt = await insertReceipt(report.id, {
+      issued_at: '2026-08-03',
+      amount_cents: 2850,
+      category: 'alimentacao',
+      status: 'confirmed',
+    });
+    await request('PATCH', `/api/receipts/${receipt.id}`, {
+      issuer_name: 'Espetinho do Raimundinho',
+      issuer_city: 'Itapipoca/CE',
+    });
+
+    const { workbook } = await loadAnexo(report.id);
+    const sheet = workbook.getWorksheet('Anexo I');
+
+    expect(sheet.getCell('C32').value).toBe('Itapipoca/CE');
+    expect(sheet.getCell('G32').value).toMatch(/Espetinho do Raimundinho/);
   });
 
   it('so inclui comprovantes confirmados', async () => {

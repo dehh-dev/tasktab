@@ -1,6 +1,7 @@
 'use strict';
 
 const { BadRequestError } = require('../../infra/errors');
+const cnpjRules = require('./cnpj');
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -89,10 +90,38 @@ function parsePagination(query, errors) {
   return result;
 }
 
+/**
+ * CNPJ com ou sem mascara, devolvido nos 14 caracteres, ou o erro no campo
+ * `cnpj`. Vale para o cadastro de emitente e para o CNPJ digitado na revisao
+ * de um comprovante — a mesma regra, inclusive a do CNPJ alfanumerico.
+ */
+function validateCnpj(value, errors) {
+  const cnpj = cnpjRules.normalize(value);
+
+  if (cnpj === null) {
+    errors.push({
+      field: 'cnpj',
+      message: 'cnpj deve ter 14 caracteres: 12 letras ou digitos e 2 digitos',
+    });
+    return undefined;
+  }
+
+  if (!cnpjRules.isValid(cnpj)) {
+    errors.push({
+      field: 'cnpj',
+      message: 'cnpj tem digito verificador invalido',
+    });
+    return undefined;
+  }
+
+  return cnpj;
+}
+
 module.exports = {
   isBlank,
   isValidIsoDate,
   isoDateNotAfter,
   parseId,
   parsePagination,
+  validateCnpj,
 };

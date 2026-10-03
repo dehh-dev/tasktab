@@ -264,3 +264,98 @@ describe('PATCH /api/receipts/:id com a chave de acesso digitada', () => {
     expect(response.body.data.status).toBe('confirmed');
   });
 });
+
+// Recibo sem CNPJ legivel saia na planilha sem nome e sem cidade. Decisao de
+// quem usa: procurar no proprio comprovante — e a cidade e a do documento,
+// nunca a do destino da viagem.
+describe('PATCH /api/receipts/:id com o emitente lido do proprio comprovante', () => {
+  const CHAVE = '52260626048802000165650010001631601303284889';
+
+  function patch(receipt, body) {
+    return request('PATCH', `/api/receipts/${receipt.id}`, body);
+  }
+
+  it('grava nome e cidade como estao no papel', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+
+    const response = await patch(receipt, {
+      issuer_name: '  Restaurante da Dona Maria ',
+      issuer_city: 'Itapipoca/CE',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      issuer_name: 'Restaurante da Dona Maria',
+      issuer_city: 'Itapipoca/CE',
+      extraction_source: 'manual',
+    });
+  });
+
+  it('nome vazio vira nulo, e longo demais e 422 no campo', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+
+    const vazio = await patch(receipt, { issuer_name: '   ' });
+    const longo = await patch(receipt, { issuer_name: 'x'.repeat(256) });
+
+    expect(vazio.body.data.issuer_name).toBeNull();
+    expect(longo.status).toBe(422);
+    expect(longo.body.details[0].field).toBe('issuer_name');
+  });
+
+  it('cnpj vincula o emitente, cadastrado com o nome do papel', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+
+    const response = await patch(receipt, {
+      cnpj: '26.048.802/0001-65',
+      issuer_name: 'Padaria Imperial',
+    });
+    const emitente = await request(
+      'GET',
+      `/api/merchants/${response.body.data.merchant_id}`,
+    );
+
+    expect(emitente.body.data).toMatchObject({
+      cnpj: '26048802000165',
+      name: 'Padaria Imperial',
+    });
+  });
+
+  it('cnpj que nao fecha o verificador e 422 no campo', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+
+    const response = await patch(receipt, { cnpj: '26.048.802/0001-66' });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      { field: 'cnpj', message: 'cnpj tem digito verificador invalido' },
+    ]);
+  });
+
+  it('com chave de acesso no comprovante, o cnpj vem dela', async () => {
+    const receipt = await insertReceipt((await insertReport()).id, {
+      access_key: CHAVE,
+    });
+
+    const response = await patch(receipt, { cnpj: '58.080.015/0001-97' });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      {
+        field: 'cnpj',
+        message: 'cnpj vem da chave de acesso deste comprovante',
+      },
+    ]);
+  });
+
+  it('cnpj nulo desvincula o emitente', async () => {
+    // O CNPJ lido do texto pode ser o da credenciadora do cartao.
+    const merchant = await insertMerchant();
+    const receipt = await insertReceipt((await insertReport()).id, {
+      merchant_id: merchant.id,
+    });
+
+    const response = await patch(receipt, { cnpj: null });
+
+    expect(response.body.data.merchant_id).toBeNull();
+  });
+});

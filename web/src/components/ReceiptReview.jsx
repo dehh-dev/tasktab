@@ -65,12 +65,20 @@ export default function ReceiptReview({
     amount_cents: centsToInputValue(receipt.amount_cents),
     category: receipt.category ?? '',
     access_key: '',
+    issuer_name: receipt.issuer_name ?? '',
+    issuer_city: receipt.issuer_city ?? '',
+    cnpj: '',
   });
 
   // A chave so e pedida quando a extracao nao a achou. Com ela no comprovante
   // nao ha o que digitar: sao 44 caracteres que ninguem confere a olho, e o DV
   // ja os conferiu quando ela foi lida.
   const askForKey = !receipt.access_key;
+
+  // Sem emitente cadastrado — o recibo manuscrito, sem CNPJ legivel —, nome e
+  // cidade vem do proprio papel e se corrigem aqui. Com emitente, quem fala e
+  // o cadastro, e a planilha usa o dele.
+  const askForIssuer = !receipt.merchant_id;
   const [localErrors, setLocalErrors] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -189,6 +197,9 @@ export default function ReceiptReview({
       // A chave digitada vai junto: se ela nao fechar o DV, o 422 volta no
       // campo e nada e confirmado — o que a pessoa digitou fica na tela.
       const typedKey = askForKey ? values.access_key.trim() : '';
+      // Com a chave digitada, o CNPJ vem dela: mandar os dois seria pedir ao
+      // servidor que escolhesse entre eles.
+      const typedCnpj = askForIssuer && !typedKey ? values.cnpj.trim() : '';
 
       await api.updateReceipt(receipt.id, {
         issued_at: values.issued_at,
@@ -196,6 +207,10 @@ export default function ReceiptReview({
         category: values.category,
         status: 'confirmed',
         ...(typedKey ? { access_key: typedKey } : {}),
+        ...(askForIssuer
+          ? { issuer_name: values.issuer_name, issuer_city: values.issuer_city }
+          : {}),
+        ...(typedCnpj ? { cnpj: typedCnpj } : {}),
       });
       await onAction();
     } catch (caught) {
@@ -605,6 +620,56 @@ export default function ReceiptReview({
               )}
             </div>
 
+            {askForIssuer && (
+              <>
+                <div className="field">
+                  <label className="field__label" htmlFor="review-issuer-name">
+                    Estabelecimento
+                  </label>
+                  <input
+                    id="review-issuer-name"
+                    className="field__input"
+                    type="text"
+                    value={values.issuer_name}
+                    aria-invalid={Boolean(errors.issuer_name)}
+                    onChange={(event) =>
+                      setField('issuer_name', event.target.value)
+                    }
+                  />
+                  {errors.issuer_name && (
+                    <span className="field__error" role="alert">
+                      {errors.issuer_name}
+                    </span>
+                  )}
+                </div>
+
+                <div className="field">
+                  <label className="field__label" htmlFor="review-issuer-city">
+                    Cidade
+                  </label>
+                  <input
+                    id="review-issuer-city"
+                    className="field__input"
+                    type="text"
+                    value={values.issuer_city}
+                    aria-invalid={Boolean(errors.issuer_city)}
+                    aria-describedby="review-issuer-city-hint"
+                    onChange={(event) =>
+                      setField('issuer_city', event.target.value)
+                    }
+                  />
+                  <span className="field__hint" id="review-issuer-city-hint">
+                    Como esta no comprovante, nunca a do destino da viagem.
+                  </span>
+                  {errors.issuer_city && (
+                    <span className="field__error" role="alert">
+                      {errors.issuer_city}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+
             {askForKey && (
               <div className="field">
                 <label className="field__label" htmlFor="review-access-key">
@@ -631,6 +696,34 @@ export default function ReceiptReview({
                 {errors.access_key && (
                   <span className="field__error" role="alert">
                     {errors.access_key}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {askForIssuer && askForKey && (
+              <div className="field">
+                <label className="field__label" htmlFor="review-cnpj">
+                  CNPJ
+                </label>
+                <input
+                  id="review-cnpj"
+                  className="field__input"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={values.cnpj}
+                  aria-invalid={Boolean(errors.cnpj)}
+                  aria-describedby="review-cnpj-hint"
+                  onChange={(event) => setField('cnpj', event.target.value)}
+                />
+                <span className="field__hint" id="review-cnpj-hint">
+                  Opcional, sem chave de acesso: o do carimbo ou do cabecalho.
+                  Vincula o emitente e a categoria do cadastro dele.
+                </span>
+                {errors.cnpj && (
+                  <span className="field__error" role="alert">
+                    {errors.cnpj}
                   </span>
                 )}
               </div>

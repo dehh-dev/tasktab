@@ -146,10 +146,13 @@ async function processPage(receipt, page, { buffer, log }) {
     };
   }
 
+  const issuerName = parsers.merchantName(text ?? '');
+  const issuerCity = fields.city?.value ?? null;
+
   const { merchant_id, category, category_guessed } = await classify(
     fields.cnpj?.value,
-    parsers.merchantName(text ?? ''),
-    fields.city?.value ?? null,
+    issuerName,
+    issuerCity,
   );
 
   // So o que e provadamente o mesmo documento colapsa sozinho; suspeita vira
@@ -181,6 +184,10 @@ async function processPage(receipt, page, { buffer, log }) {
     issued_at: fields.issued_at?.value ?? null,
     amount_cents: fields.amount_cents?.value ?? null,
     access_key: key?.value ?? null,
+    // O que o papel diz sobre quem emitiu, com ou sem CNPJ: e o que as saidas
+    // usam quando o comprovante nao tem emitente cadastrado (issue 42).
+    issuer_name: issuerName,
+    issuer_city: issuerCity,
     merchant_id,
     category,
     category_guessed,

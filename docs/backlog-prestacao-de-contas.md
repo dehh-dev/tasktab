@@ -1829,7 +1829,7 @@ aparece quando o comprovante não tem chave.
 **Como ficou**
 
 A chave digitada aceita os separadores da impressão e vale o mesmo que a lida
-do QR (`typed-access-key.service.js`): o emitente sai do CNPJ dela pelo
+do QR (`typed-issuer.service.js`): o emitente sai do CNPJ dela pelo
 `classify` da extração, e a categoria do cadastro só substitui um palpite —
 nunca a escolha de uma pessoa, nem a que veio no mesmo `PATCH`. Chave repetida
 no relatório vira duplicata mesmo num "confirmar", porque é o mesmo documento
@@ -1862,11 +1862,26 @@ que o comprovante traz quando não há.
 
 **Critérios de aceite**
 
-- [ ] `cnpj` válido no `PATCH` vincula o emitente; inválido, `422`
-- [ ] Nome e cidade próprios do comprovante, quando não há emitente
-- [ ] Extração preenche os dois mesmo sem CNPJ, quando o texto os traz
-- [ ] Planilha e Anexo I usam o emitente, ou o que o comprovante traz
-- [ ] Spec E2E de um manuscrito revisado à mão
+- [x] `cnpj` válido no `PATCH` vincula o emitente; inválido, `422`
+- [x] Nome e cidade próprios do comprovante, quando não há emitente
+- [x] Extração preenche os dois mesmo sem CNPJ, quando o texto os traz
+- [x] Planilha e Anexo I usam o emitente, ou o que o comprovante traz
+- [x] Spec E2E de um manuscrito revisado à mão
+
+**Como ficou**
+
+Duas colunas no comprovante, `issuer_name` e `issuer_city`: a extração grava o
+que o texto traz sempre, com ou sem CNPJ, e a revisão mostra os dois campos
+quando não há emitente cadastrado. Lista, planilha, Anexo I e o carimbo do PDF
+leem do mesmo lugar (`COALESCE` do cadastro com o papel, em
+`receipt.model.js`). Sem chave, o `cnpj` digitado vincula o emitente pelo
+`classify` — o serviço da #41 virou `typed-issuer.service.js`, para a chave e
+o CNPJ —, e `cnpj: null` desvincula, porque o CNPJ do texto pode ser o da
+credenciadora. Com chave no comprovante, o CNPJ vem dela e um digitado é
+recusado. A validação do CNPJ, que era cópia no validador de emitente, mora
+agora em `validators/rules.js`. O E2E usa um cupom com texto e sem CNPJ: um
+manuscrito de verdade passaria pelo OCR, a parte mais cara da suíte, para
+provar o mesmo caminho.
 
 ---
 

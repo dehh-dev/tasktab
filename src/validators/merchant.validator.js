@@ -1,8 +1,7 @@
 'use strict';
 
 const { BadRequestError, ValidationError } = require('../../infra/errors');
-const { isBlank, parseId, parsePagination } = require('./rules');
-const cnpjRules = require('./cnpj');
+const { isBlank, parseId, parsePagination, validateCnpj } = require('./rules');
 const { EXPENSE_CATEGORIES } = require('./receipt.validator');
 
 const BODY_NOT_OBJECT = {
@@ -16,28 +15,6 @@ const INVALID_ID = {
 };
 
 const NAME_MAX_LENGTH = 255;
-
-function validateCnpj(value, errors) {
-  const cnpj = cnpjRules.normalize(value);
-
-  if (cnpj === null) {
-    errors.push({
-      field: 'cnpj',
-      message: 'cnpj deve ter 14 caracteres: 12 letras ou digitos e 2 digitos',
-    });
-    return undefined;
-  }
-
-  if (!cnpjRules.isValid(cnpj)) {
-    errors.push({
-      field: 'cnpj',
-      message: 'cnpj tem digito verificador invalido',
-    });
-    return undefined;
-  }
-
-  return cnpj;
-}
 
 function validateName(value, errors) {
   if (typeof value !== 'string') {

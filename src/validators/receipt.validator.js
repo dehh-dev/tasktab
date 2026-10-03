@@ -5,7 +5,7 @@ const {
   ConflictError,
   ValidationError,
 } = require('../../infra/errors');
-const { isValidIsoDate, parseId } = require('./rules');
+const { isValidIsoDate, parseId, validateCnpj } = require('./rules');
 const accessKey = require('../services/extraction/access-key');
 
 const BODY_NOT_OBJECT = {
@@ -40,9 +40,18 @@ const RECEIPT_STATUSES = [
 const REVIEWED_FIELDS = ['issued_at', 'amount_cents', 'category'];
 
 // Corrigir qualquer um destes marca a origem como manual — e o que permite a
-// tela destacar o que veio de OCR. A chave entra aqui e nao na lista de cima:
-// recibo manuscrito e comanda nao tem chave, e se confirmam do mesmo jeito.
-const MANUAL_FIELDS = [...REVIEWED_FIELDS, 'access_key'];
+// tela destacar o que veio de OCR. Chave, CNPJ e emitente entram aqui e nao na
+// lista de cima: recibo manuscrito e comanda nao tem chave, e se confirmam do
+// mesmo jeito.
+const MANUAL_FIELDS = [
+  ...REVIEWED_FIELDS,
+  'access_key',
+  'cnpj',
+  'issuer_name',
+  'issuer_city',
+];
+
+const ISSUER_MAX_LENGTH = 255;
 
 function fromEnum(field, allowed) {
   return (value, errors) => {
@@ -128,6 +137,39 @@ function validateAccessKey(value, errors) {
   return key;
 }
 
+/**
+ * Nome ou cidade de quem emitiu, como estao no papel (issue 42). Texto livre:
+ * a cidade e a do documento, nunca a do destino da viagem, e nenhuma lista de
+ * municipios acertaria o que o recibo manuscrito traz. Vazio vira nulo.
+ */
+function issuerText(field) {
+  return (value, errors) => {
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      errors.push({ field, message: `${field} deve ser uma string ou null` });
+      return undefined;
+    }
+
+    const text = value.trim();
+
+    if (text.length > ISSUER_MAX_LENGTH) {
+      errors.push({
+        field,
+        message: `${field} deve ter no maximo ${ISSUER_MAX_LENGTH} caracteres`,
+      });
+      return undefined;
+    }
+
+    return text === '' ? null : text;
+  };
+}
+
+const validateIssuerName = issuerText('issuer_name');
+const validateIssuerCity = issuerText('issuer_city');
+
 function assertValid(errors) {
   if (errors.length > 0) {
     throw new ValidationError({ details: errors });
@@ -178,6 +220,20 @@ function validateUpdate(body, current = {}) {
     data.access_key = validateAccessKey(body.access_key, errors);
   }
 
+  if (body.issuer_name !== undefined) {
+    data.issuer_name = validateIssuerName(body.issuer_name, errors);
+  }
+
+  if (body.issuer_city !== undefined) {
+    data.issuer_city = validateIssuerCity(body.issuer_city, errors);
+  }
+
+  // Nulo desvincula o emitente — o CNPJ do texto pode ser o da credenciadora
+  // do cartao, e nao o de quem vendeu.
+  if (body.cnpj !== undefined) {
+    data.cnpj = body.cnpj === null ? null : validateCnpj(body.cnpj, errors);
+  }
+
   assertValid(errors);
 
   if (Object.keys(data).length === 0) {
@@ -187,7 +243,20 @@ function validateUpdate(body, current = {}) {
         {
           field: 'body',
           message:
-            'campos aceitos: issued_at, amount_cents, category, status, access_key',
+            'campos aceitos: issued_at, amount_cents, category, status, access_key, cnpj, issuer_name, issuer_city',
+        },
+      ],
+    });
+  }
+
+  // O CNPJ confiavel e o das posicoes 7 a 20 da chave. Com ela no comprovante,
+  // um CNPJ digitado so poderia contradize-la.
+  if ('cnpj' in data && (current.access_key || data.access_key)) {
+    throw new ValidationError({
+      details: [
+        {
+          field: 'cnpj',
+          message: 'cnpj vem da chave de acesso deste comprovante',
         },
       ],
     });

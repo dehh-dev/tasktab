@@ -4,8 +4,8 @@ const db = require('../config/database');
 
 const COLUMNS = `id, report_id, merchant_id, file_path, file_hash, page_number,
                  issued_at, amount_cents, category, category_guessed, access_key,
-                 status, extraction_source, confidence, raw_text, duplicate_of_id,
-                 created_at, updated_at`;
+                 issuer_name, issuer_city, status, extraction_source, confidence,
+                 raw_text, duplicate_of_id, created_at, updated_at`;
 
 /** As colunas com o alias da tabela, para consulta com JOIN. */
 function prefixed(alias) {
@@ -23,11 +23,19 @@ const UPDATABLE_COLUMNS = [
   'category',
   'category_guessed',
   'access_key',
+  'issuer_name',
+  'issuer_city',
   'status',
   'extraction_source',
   'confidence',
   'duplicate_of_id',
 ];
+
+// Nome e cidade de quem emitiu: os do cadastro, quando o comprovante tem
+// emitente, e os do proprio papel quando nao tem — o recibo manuscrito sem
+// CNPJ. Um lugar so, para a lista, a revisao e as tres saidas nao divergirem.
+const ISSUER_NAME = 'COALESCE(m.name, r.issuer_name)';
+const ISSUER_CITY = 'COALESCE(m.city, r.issuer_city)';
 
 function buildFilters({ status, category }, params) {
   const conditions = [];
@@ -56,7 +64,7 @@ async function findByReport(reportId, { status, category } = {}) {
   // revisao precisa da categoria do cadastro para oferecer atualiza-la.
   const { rows } = await db.query(
     `SELECT ${prefixed('r')},
-            m.name AS merchant_name,
+            ${ISSUER_NAME} AS merchant_name,
             m.default_category AS merchant_default_category
      FROM receipts r
      LEFT JOIN merchants m ON m.id = r.merchant_id
@@ -134,7 +142,7 @@ async function findForExport(reportId) {
   const { rows } = await db.query(
     `SELECT r.id, r.issued_at, r.amount_cents, r.category, r.status,
             r.duplicate_of_id, r.access_key, r.file_path, r.page_number,
-            m.name AS merchant_name, m.city AS merchant_city
+            ${ISSUER_NAME} AS merchant_name, ${ISSUER_CITY} AS merchant_city
      FROM receipts r
      LEFT JOIN merchants m ON m.id = r.merchant_id
      WHERE r.report_id = $1
@@ -195,6 +203,8 @@ const EXTRACTION_COLUMNS = [
   'category',
   'category_guessed',
   'access_key',
+  'issuer_name',
+  'issuer_city',
   'confidence',
   'merchant_id',
   'duplicate_of_id',

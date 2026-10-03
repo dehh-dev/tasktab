@@ -308,6 +308,26 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     expect(workbook.getWorksheet('Alimentação').getCell('C2').value).toBe('');
   });
 
+  it('sem emitente cadastrado, Local e Cidade saem do proprio comprovante', async () => {
+    const report = await insertReport();
+    const receipt = await insertReceipt(
+      report.id,
+      confirmed({ issued_at: '2026-08-03', amount_cents: 2850 }),
+    );
+    // O recibo manuscrito revisado a mao: sem CNPJ, nome e cidade como estao
+    // no papel.
+    await request('PATCH', `/api/receipts/${receipt.id}`, {
+      issuer_name: 'Espetinho do Raimundinho',
+      issuer_city: 'Itapipoca/CE',
+    });
+
+    const { workbook } = await loadWorkbook(report.id);
+    const sheet = workbook.getWorksheet('Alimentação');
+
+    expect(sheet.getCell('B2').value).toBe('Espetinho do Raimundinho');
+    expect(sheet.getCell('C2').value).toBe('Itapipoca/CE');
+  });
+
   it('a planilha sai formatada, nao so preenchida', async () => {
     const report = await insertReport();
     await insertReceipt(

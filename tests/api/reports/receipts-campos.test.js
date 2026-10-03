@@ -31,6 +31,22 @@ describe('cidade do emitente na extracao', () => {
       name: 'MERCEARIA FRANGUINHO NA PANELA LTDA',
     });
   });
+
+  it('sem CNPJ, guarda no comprovante o nome e a cidade do papel', async () => {
+    const report = await insertReport();
+
+    // Sem CNPJ nao ha emitente para cadastrar, e antes o nome e a cidade
+    // lidos se perdiam: a planilha saia sem as duas colunas.
+    const receipt = await uploadAndRead(report.id, { cnpj: '' });
+
+    expect(receipt).toMatchObject({
+      merchant_id: null,
+      issuer_name: 'MERCEARIA FRANGUINHO NA PANELA LTDA',
+      issuer_city: 'Abadiania/GO',
+      // A lista mostra o nome do papel quando nao ha cadastro.
+      merchant_name: 'MERCEARIA FRANGUINHO NA PANELA LTDA',
+    });
+  });
 });
 
 describe('marca de categoria adivinhada', () => {

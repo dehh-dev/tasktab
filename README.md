@@ -251,6 +251,12 @@ Quando nem o QR nem o texto a dao, ela pode ser **digitada na revisao**
 a digitacao, o CNPJ dela vincula o emitente, e a mesma chave em outro
 comprovante do relatorio faz deste a duplicata.
 
+Comprovante sem CNPJ legivel — o recibo manuscrito — guarda **nome e cidade
+como estao no papel** (`issuer_name` e `issuer_city`), lidos do texto quando ha
+e corrigidos na revisao. E com eles que a lista, a planilha e o Anexo I saem
+quando nao ha emitente cadastrado; sem chave, o `cnpj` digitado na revisao
+vincula o emitente.
+
 A **categoria vem do CNPJ do emitente**, nunca do nome. Emitente conhecido
 aplica a sua categoria padrao; desconhecido e cadastrado como
 `nao_classificado` e o comprovante vai para revisao. Classificado o emitente
