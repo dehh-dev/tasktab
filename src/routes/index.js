@@ -11,9 +11,19 @@ const healthController = require('../controllers/health.controller');
 const asyncHandler = require('../middlewares/async-handler');
 const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const authenticate = require('../middlewares/authenticate');
-const { batchWriteLimiter } = require('../middlewares/rate-limit');
+const {
+  writeLimiter,
+  batchWriteLimiter,
+} = require('../middlewares/rate-limit');
 
 const router = Router();
+
+// Um teto de escrita por familia de rota, e um so. Prestacao de contas
+// trabalha em lote e tem o seu: revisar 30 cupons sao dezenas de PATCH
+// seguidos de uma pessoa so. Antes do `authenticate`, para que o excesso seja
+// recusado sem consultar sessao no banco.
+router.use(['/auth', '/users', '/tasks'], writeLimiter);
+router.use(['/reports', '/receipts', '/merchants'], batchWriteLimiter);
 
 // Resolve a sessao para toda a API, sem barrar ninguem: quem exige credencial
 // e o `requireScope` de cada rota. A ordem importa — montado aqui em cima,
@@ -28,11 +38,9 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/tasks', taskRoutes);
 
-// Prestacao de contas trabalha em lote e tem teto proprio de escrita: revisar
-// 30 cupons sao dezenas de PATCH seguidos de uma pessoa so.
-router.use('/reports', batchWriteLimiter, reportRoutes);
-router.use('/receipts', batchWriteLimiter, receiptRoutes);
-router.use('/merchants', batchWriteLimiter, merchantRoutes);
+router.use('/reports', reportRoutes);
+router.use('/receipts', receiptRoutes);
+router.use('/merchants', merchantRoutes);
 
 // So o `/health` e rota propria daqui; os sub-routers ja cuidam dos seus.
 module.exports = rejectOtherMethods(router);

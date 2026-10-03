@@ -336,6 +336,7 @@ Tudo que e infraestrutura de teste vive em **`tests/orchestrator.js`**:
 | `seedDefaultUser()`                 | recria o admin padrao e a sessao dele                      |
 | `updateColumnDirectly(t, id, c, v)` | escrita crua; diz se o `updated_at` andou, medido no banco |
 | `leftoverUploads()`                 | temporarios do multer que sobraram no disco                |
+| `startApiInstance(env)`             | outra API, porta propria (`request` com `baseUrl`)         |
 | `request(m, path, body, { token })` | HTTP; `body` string vai cru, `token: null` = sem sessao    |
 
 **Um arquivo de teste novo nao precisa de preambulo nenhum** — so `require` do
@@ -451,8 +452,9 @@ funcionam com `--ignore-scripts` — todas trazem binario musl pre-compilado.
 
 ## Protecoes HTTP
 
-`helmet()` com a politica padrao e dois limitadores em `/api`
-(`src/middlewares/rate-limit.js`): um geral e um so para escrita.
+`helmet()` com a politica padrao e os limitadores de
+`src/middlewares/rate-limit.js`: um teto para toda requisicao de `/api`
+(`app.js`) e **um teto de escrita por familia de rota** (`routes/index.js`).
 
 - **Nao afrouxe a CSP.** Front e back estao sempre na mesma origem; se algo
   quebrou sob `'self'`, o problema e o recurso externo, nao a politica.
@@ -469,11 +471,15 @@ funcionam com `--ignore-scripts` — todas trazem binario musl pre-compilado.
   volte a por `max-age` em resposta da API.** O 304 leva os mesmos headers do
   200: sem eles herda o `no-store` e o navegador descarta a copia.
 - O limitador e desligado em teste de proposito — a suite trombaria em
-  qualquer teto realista. Mudou algo nele? Confira manualmente com
-  `RATE_LIMIT_WRITE_MAX=5 npm start`.
-- As rotas de prestacao de contas usam o `batchWriteLimiter`, com teto proprio:
-  revisar um lote de 30 cupons sao dezenas de escritas seguidas de uma pessoa
-  so, e o teto geral cortaria no meio do trabalho.
+  qualquer teto realista. `RATE_LIMIT_ENABLED=true` o religa, e e assim que
+  `tests/api/rate-limit.test.js` sobe uma instancia propria
+  (`startApiInstance`) com tetos baixos. Mexeu nos tetos? E la que se confere.
+- As rotas de prestacao de contas usam o `batchWriteLimiter` **no lugar** do
+  teto geral, nunca somado a ele: revisar um lote de 30 cupons sao dezenas de
+  escritas seguidas de uma pessoa so. Quando o geral ficava no `app.js` e o de
+  lote vinha depois, o geral cortava na centesima escrita e o de lote nunca
+  chegava a valer. Os dois rodam antes do `authenticate`, para recusar sem
+  consultar sessao.
 - `POST /api/auth/login` usa o `authLimiter`, o teto mais apertado dos quatro.
   E a unica rota onde repetir a requisicao com outro valor serve a quem nao
   deveria estar aqui.

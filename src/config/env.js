@@ -26,6 +26,12 @@ module.exports = {
   isTest: nodeEnv === 'test',
   port: Number(process.env.PORT || 3000),
   rateLimit: {
+    // Desligado em teste: a suite trombaria em qualquer teto realista. A
+    // variavel religa numa instancia propria da API, que e como o teste dos
+    // tetos o exercita sem mudar nada para o resto da suite.
+    enabled: process.env.RATE_LIMIT_ENABLED
+      ? process.env.RATE_LIMIT_ENABLED === 'true'
+      : nodeEnv !== 'test',
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * MINUTE),
     // Leitura e generosa: a interface recarrega a lista a cada mutacao.
     max: Number(process.env.RATE_LIMIT_MAX || 600),

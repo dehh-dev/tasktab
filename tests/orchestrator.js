@@ -1,6 +1,6 @@
 'use strict';
 
-const { execSync, spawnSync } = require('child_process');
+const { execSync, spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const db = require('../src/config/database');
@@ -25,12 +25,19 @@ function apiUrl(pathname) {
  * Espera o servidor responder no /api/health. O `npm test` sobe a API em
  * paralelo ao Jest, entao a suite nao pode assumir que ela ja esta no ar.
  */
-async function waitForWebServer() {
+async function waitForWebServer(
+  baseUrl = BASE_URL,
+  { attempts = MAX_ATTEMPTS, isAlive = () => true } = {},
+) {
   let lastError;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (!isAlive()) {
+      throw new Error(`A API em ${baseUrl} encerrou antes de responder.`);
+    }
+
     try {
-      const response = await fetch(apiUrl('/api/health'));
+      const response = await fetch(`${baseUrl}/api/health`);
 
       if (response.status === 200) {
         return;
@@ -45,13 +52,68 @@ async function waitForWebServer() {
   }
 
   throw new Error(
-    `A API nao respondeu em ${BASE_URL} apos ${MAX_ATTEMPTS} tentativas.\n` +
+    `A API nao respondeu em ${baseUrl} apos ${attempts} tentativas.\n` +
       `Ultimo erro: ${lastError && lastError.message}`,
   );
 }
 
 async function waitForAllServices() {
   await waitForWebServer();
+}
+
+/**
+ * Sobe uma segunda instancia da API, em processo e porta proprios, com
+ * variaveis a mais. Serve ao que a instancia principal deixa desligado de
+ * proposito em teste — o limitador de requisicoes, que trombaria na suite.
+ *
+ * Fala com o mesmo banco de teste, entao a sessao do usuario padrao vale nela
+ * tambem: o `request()` com `baseUrl` chega autenticado como sempre.
+ *
+ * A espera e mais longa que a da API principal, que ja esta de pe quando a
+ * suite comeca: um processo novo le centenas de arquivos de `node_modules`, e
+ * com o disco disputado por outro programa a partida ja levou 38 s — contra
+ * os 0,4 s de costume. Se ele morrer no caminho, a falha sai na hora, com o
+ * que ele escreveu no stderr.
+ */
+const INSTANCE_ATTEMPTS = 240;
+
+async function startApiInstance(extraEnv = {}, { port = 3002 } = {}) {
+  const child = spawn('node', ['src/server.js'], {
+    cwd: ROOT,
+    env: { ...process.env, ...extraEnv, NODE_ENV: 'test', PORT: String(port) },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  const baseUrl = `http://localhost:${port}`;
+
+  let stderr = '';
+  child.stderr.on('data', (chunk) => {
+    stderr = `${stderr}${chunk}`.slice(-2000);
+  });
+
+  const exited = () => child.exitCode !== null || child.signalCode !== null;
+
+  function stop() {
+    return new Promise((resolve) => {
+      if (exited()) {
+        resolve();
+        return;
+      }
+      child.once('exit', () => resolve());
+      child.kill('SIGTERM');
+    });
+  }
+
+  try {
+    await waitForWebServer(baseUrl, {
+      attempts: INSTANCE_ATTEMPTS,
+      isAlive: () => !exited(),
+    });
+  } catch (error) {
+    await stop();
+    throw new Error(`${error.message}\n${stderr}`.trim());
+  }
+
+  return { baseUrl, stop };
 }
 
 /**
@@ -439,10 +501,16 @@ async function findSessions(userId) {
 
 /**
  * Requisicao HTTP real contra a API. Um `body` string e enviado cru, o que
- * permite testar payload malformado.
+ * permite testar payload malformado. `baseUrl` aponta para outra instancia
+ * (`startApiInstance`).
  */
-async function request(method, pathname, body, { token } = {}) {
-  const response = await fetch(apiUrl(pathname), {
+async function request(
+  method,
+  pathname,
+  body,
+  { token, baseUrl = BASE_URL } = {},
+) {
+  const response = await fetch(`${baseUrl}${pathname}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body:
@@ -580,6 +648,7 @@ module.exports = {
   insertSession,
   createUserWithSession,
   waitForAllServices,
+  startApiInstance,
   runPendingMigrations,
   runScript,
   clearDatabase,

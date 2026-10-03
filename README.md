@@ -126,6 +126,7 @@ ambiente (nao existe `env.production` versionado).
 | `RATE_LIMIT_MAX`                                      | Teto de leitura (padrao 600)              |
 | `RATE_LIMIT_WRITE_MAX`                                | Teto de escrita (padrao 100)              |
 | `RATE_LIMIT_BATCH_WRITE_MAX`                          | Teto das rotas em lote (padrao 600)       |
+| `RATE_LIMIT_ENABLED`                                  | `true` liga em teste, `false` desliga     |
 | `UPLOAD_DIR`                                          | Onde os PDFs sao gravados                 |
 | `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo                |
 | `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao                   |
@@ -469,15 +470,19 @@ nele sobreviveria ao logout. A imagem do comprovante e a unica excecao,
 pergunta passa pela sessao e pela posse. Com o ETag certo a resposta e um `304`,
 sem renderizar a imagem de novo.
 
-O limitador tem tetos sobrepostos: um geral, generoso porque a interface
-recarrega a lista a cada mutacao; um mais apertado so para escrita; um proprio
-para as rotas em lote da prestacao de contas; e o mais apertado de todos no
-`POST /api/auth/login`, que e a unica rota onde repetir a requisicao com outro
-valor serve a quem nao deveria estar aqui. Todos respondem `429` no mesmo
-formato dos demais erros.
+O limitador tem um teto para toda requisicao, generoso porque a interface
+recarrega a lista a cada mutacao, e **um teto de escrita por familia de
+rota**: o geral para `/auth`, `/users` e `/tasks`, e um proprio para
+`/reports`, `/receipts` e `/merchants`, que trabalham em lote. Os dois nao se
+somam — cada escrita passa por um so. O mais apertado de todos fica no
+`POST /api/auth/login`, a unica rota onde repetir a requisicao com outro valor
+serve a quem nao deveria estar aqui. Todos respondem `429` no mesmo formato
+dos demais erros.
 
 O limitador **fica desligado em `NODE_ENV=test`**: a suite dispara dezenas de
-requisicoes em segundos e trombaria em qualquer teto realista. Para conferir
+requisicoes em segundos e trombaria em qualquer teto realista.
+`tests/api/rate-limit.test.js` sobe uma instancia propria da API com
+`RATE_LIMIT_ENABLED=true` e tetos baixos, e confere cada familia. Para conferir
 manualmente, suba com um teto baixo e repita uma escrita:
 
 ```bash
