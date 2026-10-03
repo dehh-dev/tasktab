@@ -170,6 +170,27 @@ function issuerText(field) {
 const validateIssuerName = issuerText('issuer_name');
 const validateIssuerCity = issuerText('issuer_city');
 
+// Quarto de volta, no sentido horario, como o `/Rotate` do PDF.
+const ROTATIONS = [0, 90, 180, 270];
+
+/**
+ * Giro da pagina escolhido na revisao (issue 43). Nao marca a origem como
+ * manual: girar nao muda nenhum valor lido, e e justamente o passo antes de
+ * reprocessar — com a marca, o reprocessamento pediria para descartar uma
+ * conferencia que ninguem fez.
+ */
+function validateRotation(value, errors) {
+  if (!ROTATIONS.includes(value)) {
+    errors.push({
+      field: 'rotation',
+      message: 'rotation deve ser 0, 90, 180 ou 270',
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
 function assertValid(errors) {
   if (errors.length > 0) {
     throw new ValidationError({ details: errors });
@@ -228,6 +249,10 @@ function validateUpdate(body, current = {}) {
     data.issuer_city = validateIssuerCity(body.issuer_city, errors);
   }
 
+  if (body.rotation !== undefined) {
+    data.rotation = validateRotation(body.rotation, errors);
+  }
+
   // Nulo desvincula o emitente — o CNPJ do texto pode ser o da credenciadora
   // do cartao, e nao o de quem vendeu.
   if (body.cnpj !== undefined) {
@@ -243,7 +268,7 @@ function validateUpdate(body, current = {}) {
         {
           field: 'body',
           message:
-            'campos aceitos: issued_at, amount_cents, category, status, access_key, cnpj, issuer_name, issuer_city',
+            'campos aceitos: issued_at, amount_cents, category, status, access_key, cnpj, issuer_name, issuer_city, rotation',
         },
       ],
     });

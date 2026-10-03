@@ -1901,10 +1901,22 @@ imagem da revisão, para o reprocessamento e para o PDF consolidado, somada ao
 
 **Critérios de aceite**
 
-- [ ] Coluna com check de múltiplo de 90; migration reversível
-- [ ] Girar na revisão atualiza a imagem e não perde zoom nem posição
-- [ ] Reprocessar lê a página girada
-- [ ] Consolidado sai girado, sem mexer no arquivo original
+- [x] Coluna com check de múltiplo de 90; migration reversível
+- [x] Girar na revisão atualiza a imagem e não perde zoom nem posição
+- [x] Reprocessar lê a página girada
+- [x] Consolidado sai girado, sem mexer no arquivo original
+
+**Como ficou**
+
+O giro não marca a origem como manual: girar não muda valor lido, e é o passo
+antes de reprocessar — com a marca, o reprocessamento da #35 pediria para
+descartar uma conferência que ninguém fez. A imagem gira no `sharp` depois do
+pdf.js, que já aplica o `/Rotate` da origem; o ETag inclui o giro, e a URL leva
+`?rotacao=` para o navegador não reaproveitar a cópia de antes. O OCR gira a
+imagem antes do Tesseract; o QR dispensa, porque o zxing acha o código em
+qualquer orientação. O teste do reprocessamento usa um escaneado de cabeça para
+baixo — o único a mais na suíte, porque prova um pedaço que o da cascata não
+prova. Sem o giro nos três lugares, os três testes caem.
 
 ---
 

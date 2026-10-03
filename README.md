@@ -279,7 +279,10 @@ quantas tarefas ainda faltam. Um comprovante preso pode ser reenviado para a
 fila com `POST /api/receipts/:id/reprocess`. O que uma pessoa ja conferiu —
 confirmado, ou corrigido a mao — so volta para a fila com
 `{ "discard_review": true }` no corpo, porque a extracao regrava data, valor e
-categoria por cima; sem isso, a resposta e `409`.
+categoria por cima; sem isso, a resposta e `409`. Pagina de cabeca para baixo se
+endireita na revisao: `rotation` no `PATCH`, em quarto de volta, vale para a
+imagem, para o OCR do reprocessamento e para o PDF consolidado — o arquivo
+original nunca e regravado.
 
 A fila e **em processo** de proposito: sem servico novo, sem Redis. O gatilho
 para trocar por BullMQ e **uso concorrente** — hoje um segundo processo nao ve

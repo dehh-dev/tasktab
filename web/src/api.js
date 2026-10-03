@@ -250,9 +250,14 @@ export function setMerchantCategory(id, category) {
   });
 }
 
-/** URL da imagem renderizada do comprovante — usada direto num <img src>. */
-export function receiptImageUrl(id) {
-  return `${RECEIPTS_URL}/${id}/image`;
+/**
+ * URL da imagem renderizada do comprovante — usada direto num <img src>. O
+ * giro vai na URL so para o navegador nao reaproveitar a imagem de antes de
+ * girar; quem decide a rotacao e o servidor, pelo que esta gravado.
+ */
+export function receiptImageUrl(id, rotation = 0) {
+  const base = `${RECEIPTS_URL}/${id}/image`;
+  return rotation ? `${base}?rotacao=${rotation}` : base;
 }
 
 /**

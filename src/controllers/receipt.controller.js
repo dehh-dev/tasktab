@@ -266,9 +266,9 @@ async function reprocess(req, res) {
  * por conveniencia — decisao ja registrada desde a Issue 0.
  *
  * O navegador guarda a imagem, mas pergunta antes de cada uso (`no-cache`): a
- * pergunta passa pela sessao e pela posse, e como o ETag e o par (hash do
- * arquivo, pagina), que nunca muda depois de gravado, a resposta e um 304 sem
- * renderizar nada. Com `max-age` a copia era servida sem pergunta nenhuma por
+ * pergunta passa pela sessao e pela posse, e como o ETag e o trio (hash do
+ * arquivo, pagina, rotacao), que so muda quando a revisao gira a pagina, a
+ * resposta e um 304 sem renderizar nada. Com `max-age` a copia era servida sem pergunta nenhuma por
  * um dia — depois do logout, e ate para outra conta no mesmo navegador.
  */
 async function image(req, res) {
@@ -277,9 +277,11 @@ async function image(req, res) {
 
   // Vai tambem no 304: sem isto ele herdaria o `no-store` da API, e o
   // navegador descartaria a copia — cada exibicao voltaria a renderizar.
+  // A rotacao entra no ETag: girada a pagina na revisao, a copia guardada com
+  // o giro antigo nao pode voltar como 304.
   const cache = {
     'Cache-Control': 'private, no-cache',
-    ETag: `"${receipt.file_hash}-${receipt.page_number}"`,
+    ETag: `"${receipt.file_hash}-${receipt.page_number}-${receipt.rotation}"`,
   };
 
   if (req.headers['if-none-match'] === cache.ETag) {
@@ -295,7 +297,7 @@ async function image(req, res) {
   // (sharp, canvas, memoria) e do servidor, e responder "reenvie o arquivo"
   // mandaria a pessoa repetir um upload que nao resolve nada.
   const image = await receiptImage
-    .render(buffer, receipt.page_number)
+    .render(buffer, receipt.page_number, receipt.rotation)
     .catch((error) => {
       if (error?.name !== 'InvalidPDFException') {
         throw error;

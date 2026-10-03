@@ -84,6 +84,12 @@ export default function ReceiptReview({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [zoom, setZoom] = useState(1);
+  // O giro e gravado na hora e vale para a imagem, o reprocessamento e o PDF
+  // consolidado. Fica no estado local para a imagem trocar sem remontar a
+  // revisao: zoom e rolagem continuam onde estavam.
+  const [rotation, setRotation] = useState(receipt.rotation ?? 0);
+  const [rotating, setRotating] = useState(false);
+  const [loadedRotation, setLoadedRotation] = useState(null);
 
   // Emitente ainda sem categoria: a escolha desta revisao vira o cadastro dele
   // por padrao, que e o caso de uso (7 dos 28 cupons do caso-base eram do
@@ -280,7 +286,25 @@ export default function ReceiptReview({
     setPannable(
       box.scrollWidth > box.clientWidth || box.scrollHeight > box.clientHeight,
     );
-  }, [zoom, imageLoaded]);
+    // Girada, a imagem troca de proporcao: mede de novo quando a nova chega.
+  }, [zoom, imageLoaded, loadedRotation]);
+
+  /** Quarto de volta: +90 no sentido horario, -90 no anti-horario. */
+  async function rotate(delta) {
+    const next = (rotation + delta + 360) % 360;
+
+    setRotating(true);
+    setError(null);
+
+    try {
+      await api.updateReceipt(receipt.id, { rotation: next });
+      setRotation(next);
+    } catch (caught) {
+      setError({ message: caught.message, action: caught.action });
+    } finally {
+      setRotating(false);
+    }
+  }
 
   /**
    * Arrastar para navegar pelo cupom ampliado. Mexe no `scrollLeft`/`scrollTop`
@@ -460,6 +484,28 @@ export default function ReceiptReview({
                 Redefinir
               </button>
             )}
+            {canWrite && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => rotate(-90)}
+                  disabled={rotating}
+                  aria-label="Girar para a esquerda"
+                >
+                  ↺
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => rotate(90)}
+                  disabled={rotating}
+                  aria-label="Girar para a direita"
+                >
+                  ↻
+                </button>
+              </>
+            )}
           </div>
 
           {/* Focavel de proposito: com o cupom ampliado, quem navega por
@@ -496,14 +542,19 @@ export default function ReceiptReview({
                 )}
                 <img
                   className="review__image"
-                  src={api.receiptImageUrl(receipt.id)}
+                  // A URL muda com o giro: o navegador guarda a imagem para
+                  // revalidar, e sem isso mostraria a copia sem perguntar.
+                  src={api.receiptImageUrl(receipt.id, rotation)}
                   alt={`Comprovante #${receipt.id}`}
                   // Sem isso o navegador trata o gesto como "arrastar imagem"
                   // e o cupom sai voando atras do cursor como fantasma.
                   draggable={false}
                   hidden={!imageLoaded}
                   style={{ transform: `scale(${zoom})` }}
-                  onLoad={() => setImageLoaded(true)}
+                  onLoad={() => {
+                    setImageLoaded(true);
+                    setLoadedRotation(rotation);
+                  }}
                   onError={() => setImageFailed(true)}
                 />
               </>

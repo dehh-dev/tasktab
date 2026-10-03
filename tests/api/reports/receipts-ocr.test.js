@@ -115,6 +115,39 @@ describe('processamento assincrono', () => {
     expect(receipt.status).toBe('needs_review');
   });
 
+  it('reprocessar le a pagina girada na revisao', async () => {
+    const report = await insertReport();
+
+    // O cupom fotografado de cabeca para baixo: o Tesseract nao endireita a
+    // pagina sozinho. E o unico escaneado a mais da suite, porque prova um
+    // pedaco que o teste da cascata nao prova — o giro chegar ao OCR.
+    await upload(report.id, [
+      {
+        buffer: await makeScannedReceiptPdf({
+          total: '37,60',
+          date: '19/06/2026',
+          upsideDown: true,
+        }),
+        filename: 'invertido.pdf',
+      },
+    ]);
+    const [receipt] = await listReceipts(report.id);
+
+    await request('PATCH', `/api/receipts/${receipt.id}`, { rotation: 180 });
+    const response = await request(
+      'POST',
+      `/api/receipts/${receipt.id}/reprocess`,
+    );
+    expect(response.status).toBe(202);
+
+    const [reprocessado] = await listReceipts(report.id);
+    expect(reprocessado).toMatchObject({
+      extraction_source: 'ocr',
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
+    });
+  }, 60000);
+
   it('reprocessa um comprovante pela rota', async () => {
     const report = await insertReport();
 

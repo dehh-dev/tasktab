@@ -299,6 +299,28 @@ describe('GET /api/reports/:id/export.pdf com pagina girada', () => {
     },
   );
 
+  it('o giro escolhido na revisao soma ao /Rotate da origem', async () => {
+    const report = await insertReport();
+    const receipt = await insertConfirmedWithFile(
+      report.id,
+      await makeRotatedPdf(90),
+    );
+    // 90 da origem mais 90 da revisao: a pagina sai a 180, sem que o arquivo
+    // original seja regravado.
+    await request('PATCH', `/api/receipts/${receipt.id}`, { rotation: 90 });
+
+    const response = await requestBinary(
+      'GET',
+      `/api/reports/${report.id}/export.pdf`,
+    );
+
+    const esperado = renderPdfPage(await makeRotatedPdf(180), 1);
+    const exported = renderPdfPage(response.buffer, 2);
+
+    expect(exported.width).toBe(esperado.width);
+    expect(maxPixelDifference(esperado, exported, esperado.height)).toBe(0);
+  });
+
   it('o carimbo continua no rodape, na horizontal', async () => {
     const report = await insertReport();
     await insertConfirmedWithFile(report.id, await makeRotatedPdf(90));

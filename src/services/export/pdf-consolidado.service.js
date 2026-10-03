@@ -248,7 +248,11 @@ async function buildConsolidatedPdf(report, receipts) {
     const index = receipt.page_number - 1;
     const [embedded] = await doc.embedPdf(source, [index]);
 
-    const rotation = pageRotation(source.getPage(index));
+    // O `/Rotate` da origem mais o giro escolhido na revisao (issue 43): o
+    // arquivo original nao e regravado, e o consolidado sai como a revisao
+    // mostra a pagina.
+    const rotation =
+      (pageRotation(source.getPage(index)) + (receipt.rotation ?? 0)) % 360;
     const shown = placement(embedded.width, embedded.height, rotation);
 
     const page = doc.addPage([shown.width, shown.height + STAMP_HEIGHT]);

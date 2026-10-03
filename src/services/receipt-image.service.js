@@ -31,7 +31,12 @@ const MAX_EDGE = 4200;
 // comprovante: as exibicoes seguintes revalidam pelo ETag e voltam com 304.
 const WEBP_QUALITY = 92;
 
-async function render(buffer, pageNumber) {
+/**
+ * A pagina como a revisao a mostra: o `/Rotate` da origem ja vem aplicado pelo
+ * pdf.js, e `rotation` e o giro a mais escolhido na revisao (issue 43), em
+ * quarto de volta no sentido horario — o mesmo do `sharp`, sem reamostrar.
+ */
+async function render(buffer, pageNumber, rotation = 0) {
   const sharp = require('sharp');
 
   const png = await qrService.renderPageToPng(
@@ -41,6 +46,7 @@ async function render(buffer, pageNumber) {
   );
 
   const data = await sharp(png)
+    .rotate(rotation)
     .resize({
       width: MAX_EDGE,
       height: MAX_EDGE,

@@ -109,7 +109,7 @@ async function processPage(receipt, page, { buffer, log }) {
   // Ultimo degrau da cascata: sem camada de texto, tenta ler a imagem.
   if (!text) {
     const scanned = await ocrService
-      .readPage(buffer, receipt.page_number)
+      .readPage(buffer, receipt.page_number, { rotation: receipt.rotation })
       .catch((error) => {
         log?.warn(
           { err: error, receipt_id: receipt.id },

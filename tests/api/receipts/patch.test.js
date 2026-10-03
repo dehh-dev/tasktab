@@ -359,3 +359,37 @@ describe('PATCH /api/receipts/:id com o emitente lido do proprio comprovante', (
     expect(response.body.data.merchant_id).toBeNull();
   });
 });
+
+// "Pagina de cabeca para baixo. Acontece." O giro fica no comprovante, e nao
+// no arquivo, que e evidencia e nao se regrava.
+describe('PATCH /api/receipts/:id com o giro da pagina', () => {
+  it('grava o quarto de volta sem marcar a origem como manual', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+
+    const response = await request('PATCH', `/api/receipts/${receipt.id}`, {
+      rotation: 90,
+    });
+
+    // Girar nao muda valor lido, e e o passo antes de reprocessar: com a
+    // marca, o reprocessamento pediria para descartar uma conferencia que
+    // ninguem fez.
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      rotation: 90,
+      extraction_source: null,
+    });
+  });
+
+  it('giro que nao e quarto de volta e 422 no campo', async () => {
+    const receipt = await insertReceipt((await insertReport()).id);
+
+    const response = await request('PATCH', `/api/receipts/${receipt.id}`, {
+      rotation: 45,
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      { field: 'rotation', message: 'rotation deve ser 0, 90, 180 ou 270' },
+    ]);
+  });
+});

@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs/promises');
+const sharp = require('sharp');
 
 const {
   requestBinary,
@@ -42,6 +43,32 @@ describe('GET /api/receipts/:id/image', () => {
     expect(response.buffer.subarray(8, 12).toString('ascii')).toBe('WEBP');
   });
 
+  it('girada na revisao, a pagina sai girada e com outro ETag', async () => {
+    const report = await insertReport();
+    // Cupom em pe: 300 x 400 pontos.
+    const receipt = await uploadOne(report.id, await makeReceiptPdf());
+
+    const antes = await requestBinary(
+      'GET',
+      `/api/receipts/${receipt.id}/image`,
+    );
+    await request('PATCH', `/api/receipts/${receipt.id}`, { rotation: 90 });
+    // O navegador revalida com o ETag de antes do giro: ele nao pode servir.
+    const depois = await requestBinary(
+      'GET',
+      `/api/receipts/${receipt.id}/image`,
+      { headers: { 'If-None-Match': antes.headers.get('etag') } },
+    );
+
+    const de = await sharp(antes.buffer).metadata();
+    const para = await sharp(depois.buffer).metadata();
+
+    expect(depois.status).toBe(200);
+    expect(depois.headers.get('etag')).toMatch(/-1-90"$/);
+    expect(de.width).toBeLessThan(de.height);
+    expect([para.width, para.height]).toEqual([de.height, de.width]);
+  });
+
   it('guarda so para revalidar: 304 quando o ETag bate, com a mesma politica', async () => {
     const report = await insertReport();
     const receipt = await uploadOne(report.id, await makeReceiptPdf());
@@ -59,7 +86,8 @@ describe('GET /api/receipts/:id/image', () => {
     const policy = (response) =>
       `${response.status} ${response.headers.get('cache-control')} ${response.headers.get('etag')}`;
 
-    expect(etag).toMatch(/^".+-1"$/);
+    // Hash do arquivo, pagina e rotacao: o ETag so muda quando a revisao gira.
+    expect(etag).toMatch(/^".+-1-0"$/);
     expect([policy(first), policy(again)]).toEqual([
       `200 private, no-cache ${etag}`,
       `304 private, no-cache ${etag}`,

@@ -72,7 +72,13 @@ function withTimeout(promise, ms, onTimeout) {
  * dos demais campos — comparar 87 com 0.9 na tela de revisao nao ajudaria
  * ninguem.
  */
-async function readPage(buffer, pageNumber) {
+/**
+ * Texto da pagina pelo OCR. `rotation` e o giro escolhido na revisao (issue
+ * 43): o Tesseract nao endireita a pagina sozinho, e um cupom de cabeca para
+ * baixo sai como ruido. O QR nao precisa disso — o zxing acha o codigo em
+ * qualquer orientacao.
+ */
+async function readPage(buffer, pageNumber, { rotation = 0 } = {}) {
   if (!env.ocr.enabled) {
     return null;
   }
@@ -81,7 +87,11 @@ async function readPage(buffer, pageNumber) {
 
   // Cinza e normalizacao: e no pre-processamento que o OCR ganha ou perde.
   const sharp = require('sharp');
-  const prepared = await sharp(png).greyscale().normalise().toBuffer();
+  const prepared = await sharp(png)
+    .rotate(rotation)
+    .greyscale()
+    .normalise()
+    .toBuffer();
 
   const worker = await getWorker();
 

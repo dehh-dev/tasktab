@@ -108,7 +108,11 @@ const SCAN_FONTS = ['DejaVu Sans', 'Liberation Sans', 'Noto Sans', 'Arial'];
  * de pagina que muitos escaneados trazem: texto que existe mas nao e util, e
  * nao pode impedir a pagina de descer para o OCR.
  */
-async function makeScannedReceiptPdf({ residualText, ...options } = {}) {
+async function makeScannedReceiptPdf({
+  residualText,
+  upsideDown = false,
+  ...options
+} = {}) {
   const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
   const sharp = require('sharp');
 
@@ -133,7 +137,13 @@ async function makeScannedReceiptPdf({ residualText, ...options } = {}) {
     context.fillText(String(line), 40, 90 + row * 70);
   });
 
-  const png = canvas.toBuffer('image/png');
+  // `upsideDown` fotografa o cupom de cabeca para baixo, como chegou o do
+  // combustivel de Itapipoca: o conteudo invertido numa pagina sem `/Rotate`,
+  // que so o giro escolhido na revisao endireita.
+  const drawn = canvas.toBuffer('image/png');
+  const png = upsideDown
+    ? await sharp(drawn).rotate(180).png().toBuffer()
+    : drawn;
 
   const { data } = await sharp(png)
     .greyscale()

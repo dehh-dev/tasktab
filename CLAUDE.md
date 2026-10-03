@@ -826,6 +826,15 @@ React 19 + Vite, sem router e sem biblioteca de estado — tela unica, estado no
   haveria interpolacao, porque o dado nao existe no PDF.
 - A escala do **QR** (`qr.service.js`) continua 3x e e outra coisa: la o alvo e
   o zxing, aqui e o olho humano. Nao amarre as duas.
+- **O giro da pagina e do comprovante, nao do arquivo** (issue 43,
+  `receipts.rotation`, quarto de volta com check no banco). Vale para a imagem
+  da revisao, para o OCR do reprocessamento e para o PDF consolidado, somado
+  ao `/Rotate` da origem. O ETag da imagem inclui o giro, e a URL leva
+  `?rotacao=` para o navegador nao reaproveitar a copia de antes de girar.
+  Girar **nao** marca a origem como manual: e o passo antes de reprocessar, e
+  com a marca o reprocessamento pediria para descartar uma conferencia que
+  ninguem fez. O QR dispensa o giro — o zxing acha o codigo em qualquer
+  orientacao.
 - `.review__image-scroll` e um container flex, e `align-items` **precisa** ser
   `flex-start`. Com o `stretch` padrao a imagem, como item flex, era esticada
   ate os 70vh do painel e a proporcao do documento ia junto — o cupom aparecia
