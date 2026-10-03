@@ -2152,12 +2152,35 @@ O que o procedimento manda sinalizar e depende do relatório inteiro:
 
 **Critérios de aceite**
 
-- [ ] Categoria Outros: DECISÃO — finalidade a confirmar
-- [ ] Despesa fora da cidade principal: INFORMATIVO
-- [ ] Duas cidades no mesmo dia: INFORMATIVO, lembrando que conexão de voo
+- [x] Categoria Outros: DECISÃO — finalidade a confirmar
+- [x] Despesa fora da cidade principal: INFORMATIVO
+- [x] Duas cidades no mesmo dia: INFORMATIVO, lembrando que conexão de voo
       explica a maioria
-- [ ] Valor muito acima do padrão da categoria na viagem, com amostra mínima
-- [ ] Adiantamento não informado: PENDENTE
+- [x] Valor muito acima do padrão da categoria na viagem, com amostra mínima
+- [x] Adiantamento não informado: PENDENTE
+
+**Como ficou**
+
+Cinco regras: `categoria_outros` (decisão), `fora_da_cidade` e `duas_cidades`
+(informativo), `acima_do_padrao` (decisão) e `adiantamento_nao_informado`
+(pendente).
+
+**Decidido:** "muito acima do padrão" é a partir de **3× a mediana dos outros
+comprovantes da categoria**, com ao menos 3 deles, e pede **decisão**, não
+atenção: um jantar caro pode estar certo. O número foi medido na planilha final
+de Itapipoca. Ali ele marca 3 dos 35 comprovantes de alimentação: R$ 165,00,
+R$ 173,00 e a caixa de chocolate de R$ 205,59, a mesma que o procedimento
+discute. Nenhum valor ficou entre 2,3× e 4,1× a mediana, então o corte não está
+no fio. A regra só usa o confirmado, dos dois lados, porque a categoria do que
+está em revisão é palpite. Outros fica de fora: não tem padrão, e cada
+comprovante dela já pede decisão.
+
+As cidades são comparadas sem acento nem caixa, e a UF só conta quando as duas
+a trazem: o cupom imprime "CONCEICAO" e a cidade principal é digitada à mão. A
+regra de duas cidades dá um alerta por dia, não por comprovante. Em Itapipoca,
+9 das 41 despesas foram fora da cidade principal, em 3 dos 14 dias, todos de ida
+e volta por Fortaleza, Goiânia e Salvador. A coerência de horário continua de
+fora, porque nenhum parser lê a hora.
 
 ---
 

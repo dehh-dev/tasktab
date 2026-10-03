@@ -39,6 +39,17 @@ que assina. **Alerta nao bloqueia nada.**
   `summarizeByReport`: em revisao entra, duplicata e comprovante sem valor
   nao. Se uma mudar, mude a outra: o numero e uma parte do total da tela, e ha
   teste comparando os dois.
+- **Padrao da categoria** (issue 51, `acima_do_padrao`, decisao): 3x a mediana
+  dos **outros** da categoria, com ao menos 3 deles. So o confirmado, dos dois
+  lados — a categoria em revisao e palpite, com piso em alimentacao, e um
+  combustivel nao revisado pareceria o almoco mais caro. Outros fica de fora:
+  nao tem padrao, e cada comprovante dela ja pede decisao. O fator foi medido
+  em Itapipoca: marca 3 de 35, e nada ficou entre 2,3x e 4,1x.
+- **Cidades** (issue 51): compare por `cityOf`/`sameCity` — sem acento, sem
+  caixa, e a UF so quando as duas a trazem. O cupom imprime "CONCEICAO" ou
+  "Conceição", e a cidade principal e digitada a mao. `duas_cidades` e um
+  alerta por dia, nao por comprovante, e fora da cidade e informativo: viagem
+  tem trecho, e conexao de voo explica a maioria.
 - **O que a chave ja diz** (issue 47, `checkAccessKeyFields`): mes da chave
   diferente da data lida e atencao (o OCR trocou agosto por junho num cupom
   real), tipo de emissao diferente de 1 e contingencia, e UF da chave

@@ -25,9 +25,9 @@
   `409` — a extracao regrava data, valor e categoria por cima. A tela pergunta
   antes.
 - **Adiantamento nulo e "nao informado"; zero e "nao houve"** (issue 44): sem
-  saber qual dos dois nao ha saldo. Os relatorios anteriores a migration
-  ficaram com o zero que tinham. O relatorio tem tambem `main_city`, base das
-  regras da viagem (issue 51).
+  saber qual dos dois nao ha saldo, e a conferencia pede o nulo como pendente.
+  Os relatorios anteriores a migration ficaram com o zero que tinham. O
+  relatorio tem tambem `main_city`, base das regras da viagem (issue 51).
 - **Relatorio `closed` e somente leitura**, ate para o dono: escrita responde
   `409`, e o unico PATCH aceito e `{ "status": "open" }`. A trava fica no
   `loadReport`/`loadReceipt`, **depois** da posse: o fechado alheio continua

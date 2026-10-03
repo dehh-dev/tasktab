@@ -133,10 +133,26 @@ a do total da tela: o que esta em revisao entra, e a duplicata e o comprovante
 sem valor ficam de fora. A NFC-e cuja chave nao foi lida tambem entra, ate
 alguem digitar a chave na revisao.
 
+As **regras da viagem** olham o relatorio inteiro:
+
+| Regra                        | Classe      | Quando                                                                         |
+| ---------------------------- | ----------- | ------------------------------------------------------------------------------ |
+| `categoria_outros`           | decisao     | despesa em Outros: a finalidade precisa ser confirmada                         |
+| `acima_do_padrao`            | decisao     | confirmado com 3x ou mais a mediana dos outros da categoria (ao menos 3 deles) |
+| `fora_da_cidade`             | informativo | cidade do emitente diferente da cidade principal do relatorio                  |
+| `duas_cidades`               | informativo | despesas em duas cidades no mesmo dia, um alerta por dia                       |
+| `adiantamento_nao_informado` | pendente    | adiantamento nulo; zero e "nao houve" e nao pede nada                          |
+
+O padrao da categoria so usa o que esta confirmado, porque a categoria do que
+esta em revisao e palpite; Outros nao tem padrao. As cidades sao comparadas sem
+acento nem caixa, e a UF so pesa quando as duas a trazem. Na prestacao de
+Itapipoca, o padrao marcaria 3 dos 35 comprovantes de alimentacao, e as
+cidades, 9 das 41 despesas e 3 dos 14 dias, todos de ida e volta.
+
 Fora de escopo hoje, registrado para nao parecer esquecimento: a **coerencia
 horaria** (jantar numa cidade e corrida em outra no mesmo horario) depende de
-ler a hora do comprovante, que nenhum parser faz; a de cidade entra com as
-regras da viagem (issue 51).
+ler a hora do comprovante, que nenhum parser faz. A cidade e conferida so no
+dia.
 
 ## Duplicatas
 

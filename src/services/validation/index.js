@@ -24,6 +24,17 @@ const normalize = require('../extraction/normalize');
 // qualquer valor parece fora da faixa, e o alerta vira ruido.
 const MIN_HISTORY = 3;
 
+// O mesmo para o "padrao da categoria" na viagem: com menos de tres outros
+// comprovantes, a mediana e de um ou dois valores, e qualquer jantar parece
+// fora do padrao.
+const MIN_CATEGORY_SAMPLE = 3;
+
+// "Muito acima do padrao" e a partir de tres vezes a mediana. Na prestacao de
+// Itapipoca isso marca 3 dos 35 comprovantes de alimentacao — R$ 165,00,
+// R$ 173,00 e a caixa de chocolate de R$ 205,59 — e nenhum valor ficou entre
+// 2,3 e 4,1 vezes a mediana.
+const PATTERN_FACTOR = 3;
+
 /**
  * A classe de cada regra, na classificacao do procedimento de prestacao de
  * contas (issue 48) — a mesma da aba de Observacoes da planilha:
@@ -41,8 +52,11 @@ const LEVELS = ['pendente', 'decisao', 'atencao', 'verificado', 'informativo'];
 
 const RULE_LEVEL = {
   incompleto: 'pendente',
+  adiantamento_nao_informado: 'pendente',
   possivel_duplicata: 'decisao',
   contingencia: 'decisao',
+  categoria_outros: 'decisao',
+  acima_do_padrao: 'decisao',
   periodo: 'atencao',
   chave_acesso: 'atencao',
   chave_mes: 'atencao',
@@ -54,6 +68,8 @@ const RULE_LEVEL = {
   adiantamento: 'informativo',
   valor_repetido: 'informativo',
   nao_fiscal: 'informativo',
+  fora_da_cidade: 'informativo',
+  duas_cidades: 'informativo',
 };
 
 function alert(rule, message, extra = {}) {
@@ -99,10 +115,38 @@ function checkAccessKeys(receipts) {
     );
 }
 
+/**
+ * Cidade comparavel: sem acento, sem caixa e com a UF a parte, ou `null`. O
+ * cupom imprime "CONCEICAO" ou "Conceição", e a cidade principal e digitada a
+ * mao, com ou sem a UF.
+ */
+function cityOf(text) {
+  const plain = (text ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!plain) {
+    return null;
+  }
+
+  const match = /^(.+?)\s*[/-]\s*([a-z]{2})$/.exec(plain);
+
+  return match
+    ? { name: match[1], state: match[2].toUpperCase() }
+    : { name: plain, state: null };
+}
+
 /** A UF de uma cidade no formato "Cidade/UF", ou `null`. */
 function stateOf(city) {
-  const match = /\/\s*([A-Za-z]{2})\s*$/.exec(city ?? '');
-  return match ? match[1].toUpperCase() : null;
+  return cityOf(city)?.state ?? null;
+}
+
+/** Mesmo nome, e a mesma UF quando as duas cidades a trazem. */
+function sameCity(a, b) {
+  return a.name === b.name && (!a.state || !b.state || a.state === b.state);
 }
 
 /**
@@ -294,6 +338,144 @@ async function checkMerchantRange(receipts) {
   return alerts;
 }
 
+function median(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+
+  return sorted.length % 2 === 1
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+/**
+ * Valor muito acima do padrao da categoria na viagem (issue 51): a partir de
+ * `PATTERN_FACTOR` vezes a mediana dos outros comprovantes da categoria. E
+ * decisao, e nao atencao: um jantar caro pode estar certo, e quem assina
+ * decide se cabe. A mediana e a dos outros, para o valor julgado nao puxar o
+ * proprio padrao.
+ *
+ * So o confirmado, dos dois lados: a categoria do que esta em revisao e
+ * palpite, com piso em alimentacao, e um combustivel ainda nao revisado
+ * pareceria o almoco mais caro da viagem. Outros fica de fora — nao tem
+ * padrao, e cada comprovante dela ja pede decisao.
+ */
+function checkCategoryPattern(receipts) {
+  const confirmed = receipts.filter(
+    (receipt) =>
+      receipt.status === 'confirmed' &&
+      receipt.amount_cents !== null &&
+      receipt.category !== 'outros',
+  );
+
+  return confirmed.flatMap((receipt) => {
+    const others = confirmed
+      .filter(
+        (other) =>
+          other.id !== receipt.id && other.category === receipt.category,
+      )
+      .map((other) => other.amount_cents);
+
+    if (others.length < MIN_CATEGORY_SAMPLE) {
+      return [];
+    }
+
+    const pattern = median(others);
+
+    if (receipt.amount_cents < PATTERN_FACTOR * pattern) {
+      return [];
+    }
+
+    return [
+      alert(
+        'acima_do_padrao',
+        `Valor de ${receipt.amount_cents} centavos, ${PATTERN_FACTOR} vezes ou mais a mediana desta categoria na viagem (${Math.round(pattern)} centavos): confirme se a despesa cabe na prestacao.`,
+        { receipt_id: receipt.id },
+      ),
+    ];
+  });
+}
+
+/**
+ * Categoria Outros (issue 51): o procedimento manda confirmar a finalidade.
+ * E onde cai o que nao tem categoria propria, e julgar se cabe na prestacao e
+ * de quem assina, nao da ferramenta.
+ */
+function checkOtherCategory(receipts) {
+  return receipts
+    .filter(
+      (receipt) =>
+        receipt.status !== 'duplicate' && receipt.category === 'outros',
+    )
+    .map((receipt) =>
+      alert(
+        'categoria_outros',
+        'Despesa em Outros: confirme a finalidade antes de assinar.',
+        { receipt_id: receipt.id },
+      ),
+    );
+}
+
+/**
+ * Despesa fora da cidade principal (issue 51). E informativo porque viagem
+ * tem trecho: em Itapipoca, 9 das 41 despesas foram em Fortaleza, Goiania e
+ * Salvador, nos dias de ida e volta. Sem a cidade principal ou sem a do
+ * emitente nao ha o que comparar.
+ */
+function checkOutsideMainCity(report, receipts) {
+  const main = cityOf(report.main_city);
+
+  if (!main) {
+    return [];
+  }
+
+  return receipts
+    .filter((receipt) => {
+      const city = cityOf(receipt.merchant_city);
+      return receipt.status !== 'duplicate' && city && !sameCity(city, main);
+    })
+    .map((receipt) =>
+      alert(
+        'fora_da_cidade',
+        `Despesa em ${receipt.merchant_city}, fora da cidade principal da viagem (${report.main_city}).`,
+        { receipt_id: receipt.id },
+      ),
+    );
+}
+
+/**
+ * Duas cidades no mesmo dia (issue 51): um alerta por dia, informativo,
+ * porque conexao de voo explica a maioria — em Itapipoca foram 3 dos 14 dias,
+ * todos de ida ou volta. Sem a hora do comprovante nao da para ir alem do dia.
+ */
+function checkCitiesPerDay(receipts) {
+  const days = new Map();
+
+  for (const receipt of receipts) {
+    const city = cityOf(receipt.merchant_city);
+
+    if (receipt.status === 'duplicate' || !receipt.issued_at || !city) {
+      continue;
+    }
+
+    const cities = days.get(receipt.issued_at) ?? [];
+
+    if (!cities.some((seen) => sameCity(seen.city, city))) {
+      cities.push({ city, label: receipt.merchant_city });
+    }
+
+    days.set(receipt.issued_at, cities);
+  }
+
+  return [...days]
+    .filter(([, cities]) => cities.length > 1)
+    .map(([day, cities]) =>
+      alert(
+        'duas_cidades',
+        `Em ${day} ha despesas em ${joinList(cities.map((seen) => seen.label))}: conexao de voo explica a maioria dos casos.`,
+      ),
+    );
+}
+
 /**
  * Duplicata exata consolidada sozinha: mesma chave de acesso, o mesmo
  * documento fiscal. O procedimento manda manter os dois documentos e contar o
@@ -316,13 +498,20 @@ function checkExactDuplicates(receipts) {
     );
 }
 
-/** "do comprovante 2", "dos comprovantes 2, 3 e 4". */
-function receiptList(ids) {
-  if (ids.length === 1) {
-    return `do comprovante ${ids[0]}`;
+/** "a", "a e b", "a, b e c". */
+function joinList(items) {
+  if (items.length === 1) {
+    return String(items[0]);
   }
 
-  return `dos comprovantes ${ids.slice(0, -1).join(', ')} e ${ids.at(-1)}`;
+  return `${items.slice(0, -1).join(', ')} e ${items.at(-1)}`;
+}
+
+/** "do comprovante 2", "dos comprovantes 2, 3 e 4". */
+function receiptList(ids) {
+  return ids.length === 1
+    ? `do comprovante ${ids[0]}`
+    : `dos comprovantes ${joinList(ids)}`;
 }
 
 /**
@@ -434,10 +623,27 @@ function checkIncomplete(receipts) {
     );
 }
 
+/**
+ * Adiantamento nao informado (issue 51): falta para a prestacao ficar
+ * completa, porque sem ele nao ha saldo. Zero e "nao houve", e nao pede nada.
+ */
+function checkAdvanceInformed(report) {
+  if (report.advance_cents !== null) {
+    return [];
+  }
+
+  return [
+    alert(
+      'adiantamento_nao_informado',
+      'Adiantamento nao informado: sem ele nao da para calcular o saldo da viagem.',
+    ),
+  ];
+}
+
 /** Soma dos comprovantes confrontada com o adiantamento recebido. */
 function checkAdvance(report, totals) {
   // Sem adiantamento a comparar: zero e "nao houve", e nulo e "nao informado"
-  // — este ganha regra propria na issue 51, e nao um alerta de excesso.
+  // — este tem regra propria, e nao um alerta de excesso.
   if (!report.advance_cents) {
     return [];
   }
@@ -504,9 +710,9 @@ function checkNonFiscal(receipts) {
 /**
  * Fora de escopo hoje, e registrado para nao parecer esquecimento:
  *
- * - **coerencia geografica e horaria** (jantar numa cidade e corrida em outra
- *   no mesmo horario) depende de extrair cidade e hora, que nenhum parser faz
- *   ainda;
+ * - **coerencia horaria** (jantar numa cidade e corrida em outra no mesmo
+ *   horario) depende de ler a hora, que nenhum parser faz; a cidade e
+ *   conferida so no dia (`duas_cidades`);
  * - **total declarado do relatorio** nao existe como campo: o que ha e o
  *   adiantamento, conferido acima.
  */
@@ -529,10 +735,15 @@ async function validateReport(reportId) {
     ...checkItemSum(receipts),
     ...checkFuelArithmetic(receipts),
     ...(await checkMerchantRange(receipts)),
+    ...checkCategoryPattern(receipts),
+    ...checkOtherCategory(receipts),
+    ...checkOutsideMainCity(report, receipts),
+    ...checkCitiesPerDay(receipts),
     ...checkExactDuplicates(receipts),
     ...checkRepeatedValues(receipts),
     ...(await checkDuplicates(receipts)),
     ...checkIncomplete(receipts),
+    ...checkAdvanceInformed(report),
     ...checkAdvance(report, totals),
     ...checkNonFiscal(receipts),
   ];

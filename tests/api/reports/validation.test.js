@@ -627,6 +627,265 @@ describe('regra: documentos nao fiscais', () => {
   });
 });
 
+describe('regras da viagem', () => {
+  // Viagem a Itapipoca com almocos confirmados de R$ 40,00 no mesmo dia: cada
+  // teste muda so o que importa a ele. As duas cidades vieram depois da
+  // migration que criou as tabelas, e entram por fora dos `insert*`.
+  async function viagem(report, receipts) {
+    const { main_city = 'Itapipoca/CE', ...columns } = report;
+    const { id } = await insertReport(columns);
+    const inserted = [];
+
+    await updateColumnDirectly('reports', id, 'main_city', main_city);
+
+    for (const [index, { issuer_city, ...overrides }] of receipts.entries()) {
+      const receipt = await insertReceipt(id, {
+        page_number: index + 1,
+        status: 'confirmed',
+        issued_at: '2026-06-19',
+        amount_cents: 4000,
+        category: 'alimentacao',
+        ...overrides,
+      });
+
+      if (issuer_city) {
+        await updateColumnDirectly(
+          'receipts',
+          receipt.id,
+          'issuer_city',
+          issuer_city,
+        );
+      }
+
+      inserted.push(receipt);
+    }
+
+    return { reportId: id, receipts: inserted };
+  }
+
+  describe('categoria Outros', () => {
+    it('pede decisao sobre a finalidade, sem repetir na duplicata', async () => {
+      const {
+        reportId,
+        receipts: [outros],
+      } = await viagem({}, [
+        { category: 'outros' },
+        { category: 'alimentacao' },
+        { category: 'outros', status: 'duplicate' },
+      ]);
+
+      expect(porRegra(await validar(reportId), 'categoria_outros')).toEqual([
+        expect.objectContaining({
+          level: 'decisao',
+          receipt_id: outros.id,
+          message: expect.stringContaining('confirme a finalidade'),
+        }),
+      ]);
+    });
+  });
+
+  describe('fora da cidade principal', () => {
+    it('informa a despesa feita em outra cidade', async () => {
+      const {
+        reportId,
+        receipts: [, , fortaleza],
+      } = await viagem({}, [
+        { issuer_city: 'Itapipoca/CE' },
+        { issuer_city: null },
+        { issuer_city: 'Fortaleza/CE' },
+        { issuer_city: 'Fortaleza/CE', status: 'duplicate' },
+      ]);
+
+      expect(porRegra(await validar(reportId), 'fora_da_cidade')).toEqual([
+        expect.objectContaining({
+          level: 'informativo',
+          receipt_id: fortaleza.id,
+          message: expect.stringContaining(
+            'Despesa em Fortaleza/CE, fora da cidade principal da viagem (Itapipoca/CE)',
+          ),
+        }),
+      ]);
+    });
+
+    it('a mesma cidade escrita de outro jeito nao e outra cidade', async () => {
+      // O cupom imprime em caixa alta e sem acento; a cidade principal e
+      // digitada a mao, com ou sem a UF.
+      const { reportId } = await viagem({ main_city: 'Viamão/RS' }, [
+        { issuer_city: 'VIAMAO/RS' },
+        { issuer_city: 'Viamao' },
+        { issuer_city: 'viamão - rs' },
+      ]);
+
+      expect(porRegra(await validar(reportId), 'fora_da_cidade')).toHaveLength(
+        0,
+      );
+    });
+
+    it('mesmo nome em outra UF e outra cidade', async () => {
+      const { reportId } = await viagem({ main_city: 'Bom Jesus/PI' }, [
+        { issuer_city: 'Bom Jesus/RS' },
+      ]);
+
+      expect(porRegra(await validar(reportId), 'fora_da_cidade')).toHaveLength(
+        1,
+      );
+    });
+
+    it('sem cidade principal nao ha o que comparar', async () => {
+      const { reportId } = await viagem({ main_city: null }, [
+        { issuer_city: 'Fortaleza/CE' },
+      ]);
+
+      expect(porRegra(await validar(reportId), 'fora_da_cidade')).toHaveLength(
+        0,
+      );
+    });
+  });
+
+  describe('duas cidades no mesmo dia', () => {
+    it('um aviso por dia, com as cidades dele', async () => {
+      const { reportId } = await viagem({}, [
+        { issued_at: '2026-06-14', issuer_city: 'Itapipoca/CE' },
+        { issued_at: '2026-06-14', issuer_city: 'Fortaleza/CE' },
+        { issued_at: '2026-06-14', issuer_city: 'FORTALEZA/CE' },
+        // A mesma cidade escrita de dois jeitos, a duplicata e o comprovante
+        // sem cidade nao fazem do dia 15 um dia de duas cidades.
+        { issued_at: '2026-06-15', issuer_city: 'Itapipoca/CE' },
+        { issued_at: '2026-06-15', issuer_city: 'Itapipoca' },
+        {
+          issued_at: '2026-06-15',
+          issuer_city: 'Salvador/BA',
+          status: 'duplicate',
+        },
+        { issued_at: '2026-06-15', issuer_city: null },
+      ]);
+
+      expect(porRegra(await validar(reportId), 'duas_cidades')).toEqual([
+        {
+          rule: 'duas_cidades',
+          level: 'informativo',
+          message: expect.stringContaining(
+            'Em 2026-06-14 ha despesas em Itapipoca/CE e Fortaleza/CE',
+          ),
+        },
+      ]);
+    });
+  });
+
+  describe('acima do padrao da categoria', () => {
+    function acimaDoPadrao(body) {
+      return porRegra(body, 'acima_do_padrao');
+    }
+
+    it('pede decisao a partir de tres vezes a mediana dos outros', async () => {
+      const {
+        reportId,
+        receipts: [, , , , caro],
+      } = await viagem({}, [
+        { amount_cents: 3000 },
+        { amount_cents: 4000 },
+        { amount_cents: 4000 },
+        { amount_cents: 5000 },
+        { amount_cents: 12000 },
+      ]);
+
+      expect(acimaDoPadrao(await validar(reportId))).toEqual([
+        expect.objectContaining({
+          level: 'decisao',
+          receipt_id: caro.id,
+          message: expect.stringContaining(
+            'mediana desta categoria na viagem (4000 centavos)',
+          ),
+        }),
+      ]);
+    });
+
+    it('abaixo de tres vezes nao avisa', async () => {
+      const { reportId } = await viagem({}, [
+        { amount_cents: 3000 },
+        { amount_cents: 4000 },
+        { amount_cents: 4000 },
+        { amount_cents: 5000 },
+        { amount_cents: 11999 },
+      ]);
+
+      expect(acimaDoPadrao(await validar(reportId))).toHaveLength(0);
+    });
+
+    it('compara so com a mesma categoria', async () => {
+      // O tanque cheio nao e um almoco caro.
+      const { reportId } = await viagem({}, [
+        { amount_cents: 3000 },
+        { amount_cents: 4000 },
+        { amount_cents: 4000 },
+        { amount_cents: 5000 },
+        { amount_cents: 22549, category: 'combustivel' },
+      ]);
+
+      expect(acimaDoPadrao(await validar(reportId))).toHaveLength(0);
+    });
+
+    it('sem amostra minima da categoria nao avisa', async () => {
+      const { reportId } = await viagem({}, [
+        { amount_cents: 4000 },
+        { amount_cents: 4000 },
+        { amount_cents: 50000 },
+      ]);
+
+      expect(acimaDoPadrao(await validar(reportId))).toHaveLength(0);
+    });
+
+    it('o que esta em revisao nao e julgado nem entra no padrao', async () => {
+      // A categoria do que esta em revisao e palpite.
+      const { reportId } = await viagem({}, [
+        { amount_cents: 4000 },
+        { amount_cents: 4000 },
+        { amount_cents: 12000 },
+        { amount_cents: 4000, status: 'needs_review' },
+        { amount_cents: 50000, status: 'needs_review' },
+      ]);
+
+      expect(acimaDoPadrao(await validar(reportId))).toHaveLength(0);
+    });
+
+    it('Outros nao tem padrao', async () => {
+      const { reportId } = await viagem(
+        {},
+        [3000, 4000, 4000, 5000, 12000].map((amount_cents) => ({
+          amount_cents,
+          category: 'outros',
+        })),
+      );
+
+      expect(acimaDoPadrao(await validar(reportId))).toHaveLength(0);
+    });
+  });
+
+  describe('adiantamento nao informado', () => {
+    it('nulo e pendente: sem ele nao ha saldo', async () => {
+      const { reportId } = await viagem({ advance_cents: null }, []);
+
+      expect(
+        porRegra(await validar(reportId), 'adiantamento_nao_informado'),
+      ).toEqual([
+        {
+          rule: 'adiantamento_nao_informado',
+          level: 'pendente',
+          message: expect.stringContaining('Adiantamento nao informado'),
+        },
+      ]);
+    });
+
+    it('zero e "nao houve", e nao pede nada', async () => {
+      const { reportId } = await viagem({ advance_cents: 0 }, []);
+
+      expect(
+        porRegra(await validar(reportId), 'adiantamento_nao_informado'),
+      ).toHaveLength(0);
+    });
+  });
+});
+
 describe('regra: combustivel', () => {
   // As duas notas de combustivel da prestacao de Itapipoca, como sairam do
   // OCR: na primeira a linha fecha e o total foi lido com um digito a mais;

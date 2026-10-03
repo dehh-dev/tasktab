@@ -61,6 +61,10 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   o mesmo token.
 - O padrao e admin para o arranjo antigo valer: `insertReport()` cria
   relatorio sem dono, que so `reports:read:any` enxerga.
+- Os `insert*` nao citam as colunas mais novas (giro, emitente, cidade
+  principal): `tests/db/expense-category.test.js` volta o banco para antes
+  delas e arranja com os mesmos `insert*`. Coluna nova entra por
+  `updateColumnDirectly`.
 
 ## Regras
 
