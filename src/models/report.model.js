@@ -2,8 +2,8 @@
 
 const db = require('../config/database');
 
-const COLUMNS = `id, title, period_start, period_end, advance_cents, status,
-                 owner_id, created_at, updated_at`;
+const COLUMNS = `id, title, period_start, period_end, advance_cents, main_city,
+                 status, owner_id, created_at, updated_at`;
 
 // Colunas que o cliente pode alterar via update parcial. `owner_id` fica de
 // fora: transferir a posse de um relatorio nao pode acontecer por um PATCH que
@@ -13,6 +13,7 @@ const UPDATABLE_COLUMNS = [
   'period_start',
   'period_end',
   'advance_cents',
+  'main_city',
   'status',
 ];
 
@@ -90,19 +91,24 @@ async function create({
   period_start,
   period_end,
   advance_cents,
+  main_city,
   status,
   owner_id,
 }) {
+  // Adiantamento que nao veio fica nulo: e "nao informado", e o zero ficou
+  // para "nao houve adiantamento" (issue 44).
   const { rows } = await db.query(
     `INSERT INTO reports
-       (title, period_start, period_end, advance_cents, status, owner_id)
+       (title, period_start, period_end, advance_cents, main_city, status,
+        owner_id)
      VALUES (
        $1,
        $2::date,
        $3::date,
-       COALESCE($4, 0),
-       COALESCE($5::report_status, 'open'::report_status),
-       $6
+       $4,
+       $5,
+       COALESCE($6::report_status, 'open'::report_status),
+       $7
      )
      RETURNING ${COLUMNS}`,
     [
@@ -110,6 +116,7 @@ async function create({
       period_start,
       period_end,
       advance_cents ?? null,
+      main_city ?? null,
       status || null,
       owner_id ?? null,
     ],

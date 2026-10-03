@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
+import { ApiError } from '../api';
 import ReceiptUpload from './ReceiptUpload';
 import ReceiptSummary from './ReceiptSummary';
 import ReceiptList from './ReceiptList';
 import ReceiptReview from './ReceiptReview';
 import ConfirmDialog from './ConfirmDialog';
+import ReportForm from './ReportForm';
 import { formatDate, formatMoney, reportStatusLabel } from '../constants';
 
 const POLL_INTERVAL_MS = 1500;
@@ -74,6 +76,9 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
   const [pollError, setPollError] = useState(null);
   const [pollFailures, setPollFailures] = useState(0);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [editingReport, setEditingReport] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [reportErrors, setReportErrors] = useState({});
 
   /**
    * Devolve os comprovantes recem-buscados, e nao so os grava no estado.
@@ -261,6 +266,31 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
     }
   }
 
+  /**
+   * Titulo, periodo, adiantamento e cidade principal (issue 44). O erro de
+   * campo volta no formulario, preservando o que foi digitado.
+   */
+  async function handleSaveReport(values) {
+    setSavingReport(true);
+    setReportErrors({});
+
+    try {
+      await api.updateReport(reportId, values);
+      setEditingReport(false);
+      await load();
+    } catch (caught) {
+      const byField = caught instanceof ApiError ? caught.fieldErrors() : {};
+
+      if (Object.keys(byField).length > 0) {
+        setReportErrors(byField);
+      } else {
+        setError({ message: caught.message, action: caught.action });
+      }
+    } finally {
+      setSavingReport(false);
+    }
+  }
+
   /** Prev/anterior dentro da fila, sem mutar nada — usa o estado atual. */
   function handleNavigate(direction) {
     const queue = needsReviewQueue(receipts);
@@ -402,6 +432,16 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
             PDF consolidado
           </ExportLink>
 
+          {editable && !editingReport && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setEditingReport(true)}
+            >
+              Editar relatorio
+            </button>
+          )}
+
           {canWrite && (
             <button
               type="button"
@@ -433,7 +473,20 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
         </div>
       )}
 
-      {report && (
+      {editingReport && report && (
+        <ReportForm
+          report={report}
+          onSubmit={handleSaveReport}
+          onCancel={() => {
+            setEditingReport(false);
+            setReportErrors({});
+          }}
+          submitting={savingReport}
+          serverErrors={reportErrors}
+        />
+      )}
+
+      {report && !editingReport && (
         <div className="form" aria-label="Dados do relatorio">
           <h2 className="form__title">{report.title}</h2>
           <div className="task__meta">
@@ -444,8 +497,19 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
               {formatDate(report.period_start)} a{' '}
               {formatDate(report.period_end)}
             </span>
-            {report.advance_cents > 0 && (
-              <span>Adiantamento: {formatMoney(report.advance_cents)}</span>
+            {
+              // Nulo e "nao informado", zero e "nao houve" (issue 44): sem
+              // adiantamento nao ha saldo, e a tela diz qual dos dois e.
+            }
+            <span>
+              {report.advance_cents === null
+                ? 'Adiantamento nao informado'
+                : report.advance_cents === 0
+                  ? 'Sem adiantamento'
+                  : `Adiantamento: ${formatMoney(report.advance_cents)}`}
+            </span>
+            {report.main_city && (
+              <span>Cidade principal: {report.main_city}</span>
             )}
           </div>
         </div>

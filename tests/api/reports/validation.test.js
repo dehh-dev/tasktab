@@ -295,6 +295,21 @@ describe('regra: adiantamento', () => {
     expect(alertas[0].message).toMatch(/1000 centavos/);
   });
 
+  it('adiantamento nao informado nao vira alerta de excesso', async () => {
+    // Nulo e "nao informado": a regra dele e outra (PENDENTE), e compara-lo
+    // como zero acusaria toda despesa.
+    const report = await insertReport({ advance_cents: null });
+
+    await insertReceipt(report.id, {
+      status: 'confirmed',
+      issued_at: '2026-06-10',
+      amount_cents: 8000,
+      category: 'alimentacao',
+    });
+
+    expect(porRegra(await validar(report.id), 'adiantamento')).toHaveLength(0);
+  });
+
   it('duplicata nao conta no total comparado ao adiantamento', async () => {
     const report = await insertReport({ advance_cents: 10000 });
 

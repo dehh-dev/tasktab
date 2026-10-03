@@ -208,7 +208,9 @@ function checkIncomplete(receipts) {
 
 /** Soma dos comprovantes confrontada com o adiantamento recebido. */
 function checkAdvance(report, totals) {
-  if (report.advance_cents === 0) {
+  // Sem adiantamento a comparar: zero e "nao houve", e nulo e "nao informado"
+  // — este ganha regra propria na issue 51, e nao um alerta de excesso.
+  if (!report.advance_cents) {
     return [];
   }
 

@@ -32,11 +32,45 @@ describe('POST /api/reports', () => {
   it('aplica os padroes quando so o obrigatorio e enviado', async () => {
     const response = await request('POST', '/api/reports', VALID);
 
+    // Adiantamento que nao veio e "nao informado", e nao zero: zero e "nao
+    // houve adiantamento", e sem saber qual dos dois nao ha saldo.
     expect(response.status).toBe(201);
     expect(response.body.data).toMatchObject({
-      advance_cents: 0,
+      advance_cents: null,
+      main_city: null,
       status: 'open',
     });
+  });
+
+  it('adiantamento zero e "nao houve", e fica zero', async () => {
+    const response = await request('POST', '/api/reports', {
+      ...VALID,
+      advance_cents: 0,
+    });
+
+    expect(response.body.data.advance_cents).toBe(0);
+  });
+
+  it('grava a cidade principal da viagem, aparada', async () => {
+    const response = await request('POST', '/api/reports', {
+      ...VALID,
+      main_city: '  Itapipoca/CE ',
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.main_city).toBe('Itapipoca/CE');
+  });
+
+  it('cidade principal que nao e texto e 422 no campo', async () => {
+    const response = await request('POST', '/api/reports', {
+      ...VALID,
+      main_city: 123,
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toContainEqual(
+      expect.objectContaining({ field: 'main_city' }),
+    );
   });
 
   it('aceita periodo de um unico dia', async () => {

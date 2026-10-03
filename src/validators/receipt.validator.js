@@ -5,7 +5,12 @@ const {
   ConflictError,
   ValidationError,
 } = require('../../infra/errors');
-const { isValidIsoDate, parseId, validateCnpj } = require('./rules');
+const {
+  isValidIsoDate,
+  parseId,
+  validateCnpj,
+  optionalText,
+} = require('./rules');
 const accessKey = require('../services/extraction/access-key');
 
 const BODY_NOT_OBJECT = {
@@ -137,38 +142,9 @@ function validateAccessKey(value, errors) {
   return key;
 }
 
-/**
- * Nome ou cidade de quem emitiu, como estao no papel (issue 42). Texto livre:
- * a cidade e a do documento, nunca a do destino da viagem, e nenhuma lista de
- * municipios acertaria o que o recibo manuscrito traz. Vazio vira nulo.
- */
-function issuerText(field) {
-  return (value, errors) => {
-    if (value === null) {
-      return null;
-    }
-
-    if (typeof value !== 'string') {
-      errors.push({ field, message: `${field} deve ser uma string ou null` });
-      return undefined;
-    }
-
-    const text = value.trim();
-
-    if (text.length > ISSUER_MAX_LENGTH) {
-      errors.push({
-        field,
-        message: `${field} deve ter no maximo ${ISSUER_MAX_LENGTH} caracteres`,
-      });
-      return undefined;
-    }
-
-    return text === '' ? null : text;
-  };
-}
-
-const validateIssuerName = issuerText('issuer_name');
-const validateIssuerCity = issuerText('issuer_city');
+// Nome e cidade de quem emitiu, como estao no papel (issue 42).
+const validateIssuerName = optionalText('issuer_name', ISSUER_MAX_LENGTH);
+const validateIssuerCity = optionalText('issuer_city', ISSUER_MAX_LENGTH);
 
 // Quarto de volta, no sentido horario, como o `/Rotate` do PDF.
 const ROTATIONS = [0, 90, 180, 270];

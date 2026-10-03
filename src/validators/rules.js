@@ -117,6 +117,37 @@ function validateCnpj(value, errors) {
   return cnpj;
 }
 
+/**
+ * Texto livre opcional: aparado, vazio vira nulo, e acima de `max` e erro no
+ * campo. E o nome e a cidade como estao no papel (issue 42) e a cidade
+ * principal da viagem (issue 44) — nenhuma lista de municipios acertaria o
+ * que um recibo manuscrito traz.
+ */
+function optionalText(field, max = 255) {
+  return (value, errors) => {
+    if (value === null) {
+      return null;
+    }
+
+    if (typeof value !== 'string') {
+      errors.push({ field, message: `${field} deve ser uma string ou null` });
+      return undefined;
+    }
+
+    const text = value.trim();
+
+    if (text.length > max) {
+      errors.push({
+        field,
+        message: `${field} deve ter no maximo ${max} caracteres`,
+      });
+      return undefined;
+    }
+
+    return text === '' ? null : text;
+  };
+}
+
 module.exports = {
   isBlank,
   isValidIsoDate,
@@ -124,4 +155,5 @@ module.exports = {
   parseId,
   parsePagination,
   validateCnpj,
+  optionalText,
 };

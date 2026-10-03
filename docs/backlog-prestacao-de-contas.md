@@ -1937,10 +1937,22 @@ viagem, base das regras de #51.
 
 **Critérios de aceite**
 
-- [ ] Editar título, período, adiantamento e cidade principal pela tela
-- [ ] Adiantamento nulo é "não informado"; zero é "não houve"
-- [ ] Migration reversível para as duas colunas
-- [ ] Relatório fechado continua aceitando só a reabertura
+- [x] Editar título, período, adiantamento e cidade principal pela tela
+- [x] Adiantamento nulo é "não informado"; zero é "não houve"
+- [x] Migration reversível para as duas colunas
+- [x] Relatório fechado continua aceitando só a reabertura
+
+**Como ficou**
+
+Adiantamento que não vem é nulo; o formulário manda nulo para o campo em
+branco e zero para "0", e o cabeçalho diz "Adiantamento não informado", "Sem
+adiantamento" ou o valor. Os relatórios anteriores ficaram com o zero que
+tinham — não há como saber, de um zero gravado, qual dos dois ele era. A
+conferência de excesso pula os dois casos: o não informado ganha regra própria
+na #51. O formulário de criação passou a editar também, e o auditor e o
+relatório fechado não veem o botão. A regra de texto livre da #42 foi para
+`validators/rules.js` (`optionalText`), que a cidade principal também usa. O
+teste de migration da #40 passou a desfazer e reaplicar também esta.
 
 ---
 

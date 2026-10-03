@@ -535,6 +535,13 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   isso, `409`. Decisao de quem usa: permitido, com confirmacao explicita, e a
   tela pergunta antes. A extracao regrava data, valor e categoria por cima.
 - As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
+- **Adiantamento nulo e "nao informado"; zero e "nao houve"** (issue 44). Com
+  `NOT NULL DEFAULT 0` os dois eram o mesmo zero, e o procedimento manda
+  sinalizar o nao informado, porque sem ele nao ha saldo. A tela distingue os
+  dois no formulario (em branco e nulo) e no cabecalho. Os relatorios
+  anteriores ficaram com o zero que tinham. O relatorio tem tambem a
+  **cidade principal** da viagem, base das regras da issue 51, e se edita
+  pela tela com o mesmo `PATCH`.
 - **Relatorio `closed` e somente leitura**, ate para o dono: upload, edicao,
   exclusao e reprocessamento respondem `409 ConflictError`, e o unico PATCH
   aceito e `{ "status": "open" }`. A trava mora no `loadReport`/`loadReceipt`,

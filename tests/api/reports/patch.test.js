@@ -19,6 +19,26 @@ describe('PATCH /api/reports/:id', () => {
     });
   });
 
+  it('corrige adiantamento e cidade principal; nulo volta a nao informado', async () => {
+    const created = await insertReport();
+    const path = `/api/reports/${created.id}`;
+
+    const informado = await request('PATCH', path, {
+      advance_cents: 150000,
+      main_city: 'Itapipoca/CE',
+    });
+    const desfeito = await request('PATCH', path, { advance_cents: null });
+
+    expect(informado.body.data).toMatchObject({
+      advance_cents: 150000,
+      main_city: 'Itapipoca/CE',
+    });
+    expect(desfeito.body.data).toMatchObject({
+      advance_cents: null,
+      main_city: 'Itapipoca/CE',
+    });
+  });
+
   it('faz atualizacao parcial preservando os demais campos', async () => {
     const created = await insertReport({
       title: 'Original',

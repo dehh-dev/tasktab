@@ -183,6 +183,14 @@ export function getReport(id) {
   return request(`${REPORTS_URL}/${id}`);
 }
 
+/** Titulo, periodo, adiantamento e cidade principal (issue 44). */
+export function updateReport(id, data) {
+  return request(`${REPORTS_URL}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
 /** Fechar (`closed`) trava a escrita; reabrir (`open`) e o unico PATCH aceito ali. */
 export function setReportStatus(id, status) {
   return request(`${REPORTS_URL}/${id}`, {

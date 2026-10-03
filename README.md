@@ -225,6 +225,10 @@ disco; reenviar responde `200` com o que ja existe, e nao erro.
 `219.98000000000002` na conferencia manual que originou este projeto, e a
 conversao para reais so acontece na exportacao.
 
+No relatorio, `advance_cents` nulo e **adiantamento nao informado**, e zero e
+**nao houve adiantamento** — sem saber qual dos dois, nao ha saldo a calcular.
+`main_city` guarda a cidade principal da viagem.
+
 A listagem de comprovantes devolve em `meta` o `total_cents` com tudo o que ja
 tem valor, **menos duplicata** — inclusive o que ainda esta em revisao, para
 quem revisa ver para onde a prestacao vai — e o `by_category` so com o
