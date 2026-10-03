@@ -151,6 +151,28 @@ function runMigration(direction, count = 1) {
   );
 }
 
+/**
+ * Quantas migrations ha do arquivo `name` (inclusive) ate a ultima: o que um
+ * `down` precisa desfazer para chegar a antes dele.
+ *
+ * Desfazer so a do meio nao serve. O node-pg-migrate confere a ordem do que ja
+ * rodou, e reaplicada ela ficaria registrada depois das seguintes — a proxima
+ * execucao da suite recusaria o `up` por ordem trocada.
+ */
+function migrationsFrom(name) {
+  const files = fs
+    .readdirSync(path.join(ROOT, 'migrations'))
+    .filter((file) => file.endsWith('.js'))
+    .sort();
+  const index = files.findIndex((file) => file.startsWith(`${name}`));
+
+  if (index === -1) {
+    throw new Error(`migration inexistente: ${name}`);
+  }
+
+  return files.length - index;
+}
+
 function migrate(args, failure) {
   try {
     execSync(`npx node-pg-migrate --envPath env.test ${args}`, {
@@ -687,6 +709,7 @@ module.exports = {
   startApiInstance,
   runPendingMigrations,
   runMigration,
+  migrationsFrom,
   runScript,
   clearDatabase,
   closeDatabase,

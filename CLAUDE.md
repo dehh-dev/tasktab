@@ -330,6 +330,7 @@ Tudo que e infraestrutura de teste vive em **`tests/orchestrator.js`**:
 | `runPendingMigrations()`            | aplica as migrations no banco de teste                     |
 | `runScript(file, args)`             | roda um script de `scripts/` contra o banco de teste       |
 | `runMigration(direcao, n)`          | anda n migrations; o teste volta ao topo num `finally`     |
+| `migrationsFrom(nome)`              | quantas o `down` desfaz para chegar a antes dela           |
 | `enumLabels(tipo)`                  | valores de um enum do banco, na ordem declarada            |
 | `clearDatabase()`                   | trunca todas as tabelas reiniciando a identidade           |
 | `insertTask(overrides)`             | arranjo direto no banco, sem passar pela API               |

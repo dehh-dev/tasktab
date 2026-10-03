@@ -8,6 +8,7 @@ const {
   updateColumnDirectly,
   enumLabels,
   runMigration,
+  migrationsFrom,
 } = require('../orchestrator');
 
 /**
@@ -42,15 +43,18 @@ describe('categorias de despesa', () => {
 
 // A migration mexe em dado de quem usa: o que era estacionamento vira outros.
 // O teste volta o banco para antes dela, grava o estado antigo e a aplica de
-// novo — o arranjo so funciona se o `down` devolver o valor ao enum.
+// novo — o arranjo so funciona se o `down` devolver o valor ao enum. Volta da
+// ultima ate ela, e nao so ela: com `down 1` o teste desfazia a migration que
+// tivesse vindo depois e quebrou na primeira que veio (`migrationsFrom`).
 describe('migration remove-estacionamento', () => {
   it('o up converte em outros o que era estacionamento', async () => {
     const report = await insertReport();
+    const ate = migrationsFrom('1790997116012_remove-estacionamento');
     let receipt;
     let merchant;
 
     try {
-      runMigration('down');
+      runMigration('down', ate);
 
       receipt = await insertReceipt(report.id, {
         status: 'confirmed',
@@ -60,7 +64,7 @@ describe('migration remove-estacionamento', () => {
       });
       merchant = await insertMerchant({ default_category: 'estacionamento' });
     } finally {
-      runMigration('up');
+      runMigration('up', ate);
     }
 
     const comprovante = await request('GET', `/api/receipts/${receipt.id}`);
