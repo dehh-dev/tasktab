@@ -66,6 +66,7 @@ async function findByReport(reportId, { status, category } = {}) {
   const { rows } = await db.query(
     `SELECT ${prefixed('r')},
             ${ISSUER_NAME} AS merchant_name,
+            ${ISSUER_CITY} AS merchant_city,
             m.default_category AS merchant_default_category
      FROM receipts r
      LEFT JOIN merchants m ON m.id = r.merchant_id

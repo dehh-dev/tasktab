@@ -68,6 +68,76 @@ function checkAccessKeys(receipts) {
     );
 }
 
+/** A UF de uma cidade no formato "Cidade/UF", ou `null`. */
+function stateOf(city) {
+  const match = /\/\s*([A-Za-z]{2})\s*$/.exec(city ?? '');
+  return match ? match[1].toUpperCase() : null;
+}
+
+/**
+ * O que a chave de acesso ja diz e ninguem conferia (issue 47): o mes da
+ * emissao, o tipo de emissao e a UF. A chave fechou o DV, entao e ela que
+ * vale — quando discorda do resto, o resto foi lido errado.
+ *
+ * - **Mes da chave diferente da data**: o OCR leu `02/06/2026` no lugar de
+ *   `02/08/2026` num cupom real, e agosto virou junho numa prestacao assinada.
+ * - **Contingencia**: tipo de emissao diferente de 1 e cupom emitido sem a
+ *   SEFAZ no ar, que precisa ter sido autorizado depois.
+ * - **UF da chave diferente da do emitente**: a cidade lida pode estar errada,
+ *   ou o emitente nao e quem parece.
+ */
+function checkAccessKeyFields(receipts) {
+  return receipts.flatMap((receipt) => {
+    const parsed = accessKey.parse(receipt.access_key);
+
+    if (!parsed) {
+      return [];
+    }
+
+    const alerts = [];
+
+    if (
+      receipt.issued_at &&
+      receipt.issued_at.slice(0, 7) !== parsed.issuedPeriod
+    ) {
+      alerts.push(
+        alert(
+          'chave_mes',
+          'erro',
+          `A chave de acesso diz que o cupom e de ${parsed.issuedPeriod}, e a data lida e ${receipt.issued_at}.`,
+          { receipt_id: receipt.id },
+        ),
+      );
+    }
+
+    if (parsed.emissionType !== '1') {
+      alerts.push(
+        alert(
+          'contingencia',
+          'aviso',
+          `Cupom emitido em contingencia (tipo de emissao ${parsed.emissionType}): confira se foi autorizado depois.`,
+          { receipt_id: receipt.id },
+        ),
+      );
+    }
+
+    const cityState = stateOf(receipt.merchant_city);
+
+    if (parsed.state && cityState && parsed.state !== cityState) {
+      alerts.push(
+        alert(
+          'chave_uf',
+          'aviso',
+          `A chave de acesso e de ${parsed.state}, e a cidade do emitente e de ${cityState}.`,
+          { receipt_id: receipt.id },
+        ),
+      );
+    }
+
+    return alerts;
+  });
+}
+
 /**
  * Soma dos itens diferente do total impresso.
  *
@@ -300,6 +370,7 @@ async function validateReport(reportId) {
   const alerts = [
     ...checkPeriod(report, receipts),
     ...checkAccessKeys(receipts),
+    ...checkAccessKeyFields(receipts),
     ...checkItemSum(receipts),
     ...checkFuelArithmetic(receipts),
     ...(await checkMerchantRange(receipts)),

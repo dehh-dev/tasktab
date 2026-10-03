@@ -708,6 +708,13 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 - Regra de conferencia so dispara com evidencia suficiente — a de itens exige
   ao menos dois itens legiveis, a de faixa exige historico minimo. Alarme falso
   destroi a confianca mais rapido que um erro nao detectado.
+- **O que a chave de acesso ja diz** (issue 47, `checkAccessKeyFields`): o mes
+  da emissao (posicoes 3 a 6) diferente da data lida e **erro** — o OCR trocou
+  agosto por junho num cupom real —, tipo de emissao diferente de 1 e
+  contingencia (aviso), e UF da chave diferente da UF da cidade do emitente
+  e aviso. A chave fechou o DV, entao e ela que vale: quando discorda do
+  resto, o resto foi lido errado. O mapa de codigo IBGE para sigla fica em
+  `access-key.js` (`state` no `parse`).
 - **Combustivel: litros vezes preco unitario contra o total** (issue 45,
   `extractFuelLines` em `normalize.js`). Pega o erro de um digito — o OCR leu
   o abastecimento de Itapipoca como R$ 2.225,49, e a linha dizia 39,56 L x

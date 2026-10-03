@@ -6,6 +6,7 @@ const {
   insertReceipt,
   insertMerchant,
 } = require('../../orchestrator');
+const { checkDigit } = require('../../../src/services/extraction/access-key');
 
 const CHAVE = '52260626048802000165650010001631601303284889';
 
@@ -377,5 +378,80 @@ describe('regra: combustivel', () => {
     const mercado = 'AGUA MINERAL 1,500 L 2,49 3,74\nVALOR TOTAL R$ 45,90';
 
     expect(await combustivel(mercado, 4590, 'alimentacao')).toHaveLength(0);
+  });
+});
+
+describe('regras: o que a chave de acesso ja diz', () => {
+  /**
+   * Uma chave que fecha o DV, com UF, mes e tipo de emissao escolhidos: o
+   * resto e o do cupom do caso-base.
+   */
+  function chave({ uf = '23', aamm = '2608', tipo = '1' } = {}) {
+    const cnpj = '26048802000165';
+    const modelo = '65';
+    const serie = '001';
+    const numero = '000163160';
+    const codigo = '30328488';
+    const sem = `${uf}${aamm}${cnpj}${modelo}${serie}${numero}${tipo}${codigo}`;
+    return `${sem}${checkDigit(sem)}`;
+  }
+
+  async function comChave(key, overrides = {}) {
+    const report = await insertReport({
+      period_start: '2026-06-01',
+      period_end: '2026-08-31',
+    });
+    await insertReceipt(report.id, {
+      status: 'needs_review',
+      issued_at: '2026-08-02',
+      amount_cents: 1500,
+      category: 'alimentacao',
+      access_key: key,
+      ...overrides,
+    });
+    return validar(report.id);
+  }
+
+  it('mes da chave diferente da data lida e erro', async () => {
+    // O cupom real: a chave e de agosto, e o OCR leu 02/06 no lugar de 02/08.
+    const body = await comChave(chave({ aamm: '2608' }), {
+      issued_at: '2026-06-02',
+    });
+
+    const alertas = porRegra(body, 'chave_mes');
+    expect(alertas).toHaveLength(1);
+    expect(alertas[0].severity).toBe('erro');
+  });
+
+  it('mes da chave igual ao da data nao acusa', async () => {
+    const body = await comChave(chave({ aamm: '2608' }));
+
+    expect(porRegra(body, 'chave_mes')).toHaveLength(0);
+  });
+
+  it('emissao em contingencia e aviso', async () => {
+    const normal = await comChave(chave({ tipo: '1' }));
+    const contingencia = await comChave(chave({ tipo: '9' }));
+
+    expect(porRegra(normal, 'contingencia')).toHaveLength(0);
+    expect(porRegra(contingencia, 'contingencia')).toMatchObject([
+      { severity: 'aviso' },
+    ]);
+  });
+
+  it('UF da chave diferente da cidade do emitente e aviso', async () => {
+    const merchant = await insertMerchant({ city: 'Goiânia/GO' });
+
+    const ceara = await comChave(chave({ uf: '23' }), {
+      merchant_id: merchant.id,
+    });
+    const goias = await comChave(chave({ uf: '52' }), {
+      merchant_id: merchant.id,
+    });
+
+    expect(porRegra(ceara, 'chave_uf')).toMatchObject([
+      { severity: 'aviso', message: expect.stringMatching(/CE.*GO/) },
+    ]);
+    expect(porRegra(goias, 'chave_uf')).toHaveLength(0);
   });
 });

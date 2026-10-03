@@ -2035,9 +2035,19 @@ A chave tem a UF (posições 1–2), o mês da emissão (3–6) e o tipo de emis
 
 **Critérios de aceite**
 
-- [ ] Mês da chave diferente da data do comprovante: erro — o caso 2606/2608
-- [ ] Tipo de emissão diferente de normal: "emitido em contingência"
-- [ ] UF da chave diferente da UF da cidade do emitente: aviso
+- [x] Mês da chave diferente da data do comprovante: erro — o caso 2606/2608
+- [x] Tipo de emissão diferente de normal: "emitido em contingência"
+- [x] UF da chave diferente da UF da cidade do emitente: aviso
+
+**Como ficou**
+
+Três regras em `checkAccessKeyFields`, todas sobre a chave que já fechou o DV:
+`chave_mes` (erro), `contingencia` (aviso) e `chave_uf` (aviso). A UF da
+cidade sai do "Cidade/UF" que a extração e a revisão gravam, e a listagem
+passou a trazer a cidade do emitente para a conferência usar. O mapa de código
+IBGE para sigla ficou em `access-key.js`. Os testes montam chaves com o DV
+certo pelo próprio `checkDigit` — a primeira versão errou um zero no número
+da nota, e o banco recusou a chave de 45 caracteres.
 
 ---
 
