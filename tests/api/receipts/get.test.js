@@ -134,6 +134,32 @@ describe('GET /api/reports/:id/receipts', () => {
     expect(response.body.meta.total_cents).toBe(4860);
   });
 
+  it('o que esta em revisao soma no total, e a categoria so com o confirmado', async () => {
+    const report = await insertReport();
+    const linhas = [
+      { status: 'confirmed', category: 'alimentacao', amount_cents: 1000 },
+      // A categoria dele e palpite da extracao: soma no total, nao no tipo.
+      { status: 'needs_review', category: 'combustivel', amount_cents: 2000 },
+      { status: 'duplicate', category: 'alimentacao', amount_cents: 1000 },
+      { status: 'failed', category: null, amount_cents: null },
+      // Recem-enviado: ainda sem categoria. Antes, este grupo e a linha de
+      // total do ROLLUP chegavam os dois com categoria nula.
+      { status: 'pending', category: null, amount_cents: null },
+    ];
+
+    for (const [index, linha] of linhas.entries()) {
+      await insertReceipt(report.id, { page_number: index + 1, ...linha });
+    }
+
+    const response = await request('GET', `/api/reports/${report.id}/receipts`);
+
+    expect(response.body.meta).toEqual({
+      total: 5,
+      total_cents: 3000,
+      by_category: { alimentacao: 1000 },
+    });
+  });
+
   it('rejeita categoria invalida no filtro', async () => {
     const report = await insertReport();
 

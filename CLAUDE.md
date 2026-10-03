@@ -520,6 +520,13 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   deixe um arquivo ruim derrubar o lote.
 - Confirmar exige `issued_at`, `amount_cents` e `category`, conferidos sobre o
   registro ja gravado. Duplicata continua listada e **fora do somatorio**.
+- **O total da tela ja soma o que esta em revisao, e a categoria so o
+  confirmado** (`summarizeByReport`). Decisao de quem usa: o valor em revisao
+  vai para o total, sem categoria e sem bloco a parte — a categoria dele e
+  palpite. O alerta de adiantamento compara o mesmo total. Planilha e Anexo I
+  so levam o confirmado, entao os totais batem com o relatorio conferido.
+  `GROUPING()` separa a linha de total do `ROLLUP` do grupo sem categoria: os
+  dois chegam com `category` nulo, e qual valia dependia da ordem das linhas.
 - **Reprocessar o que uma pessoa ja conferiu** — confirmado, ou corrigido a mao
   (`extraction_source = 'manual'`) — exige `{ "discard_review": true }`; sem
   isso, `409`. Decisao de quem usa: permitido, com confirmacao explicita, e a

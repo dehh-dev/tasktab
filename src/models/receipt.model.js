@@ -71,8 +71,15 @@ async function findByReport(reportId, { status, category } = {}) {
 /**
  * Total e somatorio por categoria, em centavos.
  *
- * Duplicata fica de fora da soma — continua listada e vai no PDF consolidado,
- * mas somar as duas era exatamente o erro que a ferramenta existe para evitar.
+ * O total ja inclui o que esta em revisao: quem revisa quer ver para onde a
+ * prestacao vai, e o valor lido aparece somado desde a extracao. Duplicata
+ * fica de fora — continua listada e vai no PDF consolidado, mas somar as duas
+ * era exatamente o erro que a ferramenta existe para evitar.
+ *
+ * A categoria so soma o confirmado. A de quem ainda esta em revisao e palpite
+ * da extracao, e distribuir o valor por um palpite faria o subtotal de um tipo
+ * mudar sozinho a cada correcao — decisao de quem usa: o valor em revisao vai
+ * para o total, sem categoria.
  */
 async function summarizeByReport(reportId, { status, category } = {}) {
   const params = [reportId];
@@ -81,14 +88,20 @@ async function summarizeByReport(reportId, { status, category } = {}) {
     ...buildFilters({ status, category }, params),
   ];
 
+  // GROUPING separa a linha do ROLLUP do grupo dos comprovantes sem
+  // categoria: os dois chegam com `category` nulo, e todo upload cria
+  // comprovante sem categoria. Qual dos dois valia dependia da ordem das
+  // linhas.
   const { rows } = await db.query(
     `SELECT
+       GROUPING(category) = 1 AS is_total,
+       category,
        COUNT(*)::int AS total,
        COALESCE(SUM(amount_cents) FILTER (WHERE status <> 'duplicate'), 0)::int
          AS total_cents,
-       category,
-       COALESCE(SUM(amount_cents) FILTER (WHERE status <> 'duplicate'), 0)::int
-         AS category_cents
+       COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
+       COALESCE(SUM(amount_cents) FILTER (WHERE status = 'confirmed'), 0)::int
+         AS confirmed_cents
      FROM receipts
      WHERE ${conditions.join(' AND ')}
      GROUP BY ROLLUP (category)`,
@@ -98,11 +111,11 @@ async function summarizeByReport(reportId, { status, category } = {}) {
   const totals = { total: 0, total_cents: 0, by_category: {} };
 
   for (const row of rows) {
-    if (row.category === null) {
+    if (row.is_total) {
       totals.total = row.total;
       totals.total_cents = row.total_cents;
-    } else {
-      totals.by_category[row.category] = row.category_cents;
+    } else if (row.category !== null && row.confirmed > 0) {
+      totals.by_category[row.category] = row.confirmed_cents;
     }
   }
 

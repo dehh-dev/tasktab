@@ -267,3 +267,52 @@ describe('alerta nao bloqueia', () => {
     expect(lista.body.meta.total_cents).toBe(5000);
   });
 });
+
+describe('regra: adiantamento', () => {
+  it('o que esta em revisao ja conta no total comparado ao adiantamento', async () => {
+    const report = await insertReport({ advance_cents: 10000 });
+
+    await insertReceipt(report.id, {
+      page_number: 1,
+      status: 'confirmed',
+      issued_at: '2026-06-10',
+      amount_cents: 8000,
+      category: 'alimentacao',
+    });
+    // O mesmo total da tela: o valor em revisao soma, e o aviso chega antes
+    // de a pessoa confirmar o ultimo comprovante.
+    await insertReceipt(report.id, {
+      page_number: 2,
+      status: 'needs_review',
+      issued_at: '2026-06-11',
+      amount_cents: 3000,
+      category: 'alimentacao',
+    });
+
+    const alertas = porRegra(await validar(report.id), 'adiantamento');
+
+    expect(alertas).toHaveLength(1);
+    expect(alertas[0].message).toMatch(/1000 centavos/);
+  });
+
+  it('duplicata nao conta no total comparado ao adiantamento', async () => {
+    const report = await insertReport({ advance_cents: 10000 });
+
+    await insertReceipt(report.id, {
+      page_number: 1,
+      status: 'confirmed',
+      issued_at: '2026-06-10',
+      amount_cents: 8000,
+      category: 'alimentacao',
+    });
+    await insertReceipt(report.id, {
+      page_number: 2,
+      status: 'duplicate',
+      issued_at: '2026-06-10',
+      amount_cents: 8000,
+      category: 'alimentacao',
+    });
+
+    expect(porRegra(await validar(report.id), 'adiantamento')).toHaveLength(0);
+  });
+});

@@ -3,6 +3,7 @@
 const ExcelJS = require('exceljs');
 const JSZip = require('jszip');
 const {
+  request,
   requestBinary,
   insertReport,
   insertReceipt,
@@ -228,6 +229,39 @@ describe('GET /api/reports/:id/export.xlsx', () => {
     const zip = await JSZip.loadAsync(response.buffer);
     const workbookXml = await zip.file('xl/workbook.xml').async('string');
     expect(workbookXml).toMatch(/<calcPr[^>]*fullCalcOnLoad="1"/);
+  });
+
+  it('com o relatorio conferido, o total da tela e o da planilha', async () => {
+    const report = await insertReport();
+    await insertReceipt(
+      report.id,
+      confirmed({
+        page_number: 1,
+        issued_at: '2026-06-19',
+        amount_cents: 3760,
+      }),
+    );
+    // A duplicata fica fora dos dois. Durante a revisao a tela soma tambem o
+    // que ainda nao foi confirmado; conferido o relatorio, os totais batem.
+    await insertReceipt(report.id, {
+      page_number: 2,
+      status: 'duplicate',
+      category: 'alimentacao',
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
+    });
+
+    const { workbook } = await loadWorkbook(report.id);
+    const summary = workbook.getWorksheet('Resumo');
+    const planilha = evaluateSum(
+      workbook,
+      'Resumo',
+      `C${findRow(summary, 'TOTAL')}`,
+    );
+
+    const tela = await request('GET', `/api/reports/${report.id}/receipts`);
+
+    expect(Math.round(planilha * 100)).toBe(tela.body.meta.total_cents);
   });
 
   it('traz a cidade do emitente na coluna Cidade', async () => {

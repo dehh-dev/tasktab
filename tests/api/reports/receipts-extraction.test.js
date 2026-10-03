@@ -58,7 +58,7 @@ describe('extracao no upload', () => {
     ).toBe(true);
   });
 
-  it('o subtotal da listagem ja inclui o que esta em revisao, marcado como palpite', async () => {
+  it('o que esta em revisao ja soma no total, sem entrar na categoria', async () => {
     const report = await insertReport();
 
     await upload(report.id, [
@@ -68,13 +68,14 @@ describe('extracao no upload', () => {
     await waitForProcessing(report.id);
     const response = await request('GET', `/api/reports/${report.id}/receipts`);
 
-    // O valor ja esta na linha e a categoria veio de palpite, entao o subtotal
-    // aparece — mas provisorio: a linha continua em `needs_review` e carrega a
-    // marca de palpite. Subtotal nao e assinatura.
+    // O valor ja esta na linha e entra no total: quem revisa ve para onde a
+    // prestacao vai. A categoria veio de palpite e carrega a marca, entao nao
+    // vira subtotal de tipo enquanto ninguem a confirmar.
     expect(response.body.data[0].amount_cents).toBe(3760);
     expect(response.body.data[0].status).toBe('needs_review');
     expect(response.body.data[0].category_guessed).toBe(true);
-    expect(response.body.meta.by_category).toEqual({ alimentacao: 3760 });
+    expect(response.body.meta.total_cents).toBe(3760);
+    expect(response.body.meta.by_category).toEqual({});
   });
 
   it('extrai cada arquivo do lote independentemente', async () => {

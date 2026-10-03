@@ -69,8 +69,8 @@ test('envia um PDF por clique e ve o total atualizar', async ({
 
   // O upload responde 202 e o processamento roda em segundo plano: o total
   // so aparece depois do polling capturar o needs_review.
-  // O valor se repete de proposito — na linha do comprovante, no total e no
-  // subtotal do tipo que a extracao adivinhou. Escopar ao item "Total" e o que
+  // O valor se repete de proposito — na linha do comprovante e no total; o
+  // subtotal do tipo so soma o confirmado. Escopar ao item "Total" e o que
   // mantem a assercao sobre o numero que importa aqui.
   await expect(
     page

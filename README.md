@@ -225,6 +225,13 @@ disco; reenviar responde `200` com o que ja existe, e nao erro.
 `219.98000000000002` na conferencia manual que originou este projeto, e a
 conversao para reais so acontece na exportacao.
 
+A listagem de comprovantes devolve em `meta` o `total_cents` com tudo o que ja
+tem valor, **menos duplicata** — inclusive o que ainda esta em revisao, para
+quem revisa ver para onde a prestacao vai — e o `by_category` so com o
+confirmado: a categoria de quem ainda nao foi conferido e palpite. A planilha
+e o Anexo I so levam o confirmado, entao os totais batem quando o relatorio
+esta conferido.
+
 ### Extracao automatica
 
 PDF com camada de texto tem data e valor preenchidos no proprio upload, e o
