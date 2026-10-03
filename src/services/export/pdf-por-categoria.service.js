@@ -36,10 +36,13 @@ function slug(label) {
  * junto, como comprovacao, e a pagina sem categoria vai para "Sem categoria".
  * A numeracao dos arquivos e corrida, para ninguem procurar um arquivo que
  * faltou entre o 01 e o 03.
+ *
+ * Devolve cada arquivo com os comprovantes que levou e as paginas que saiu:
+ * e o que a checagem final (issue 57) confere contra o que foi recebido.
  */
-async function buildCategoryZip(receipts) {
+async function buildCategoryPdfs(receipts) {
   const sources = new Map();
-  const zip = new JSZip();
+  const files = [];
 
   // Cada arquivo enviado e lido uma vez, por mais paginas que tenha.
   function load(filePath) {
@@ -92,11 +95,26 @@ async function buildCategoryZip(receipts) {
       doc.addPage(page);
     }
 
-    const name = `${String(index + 1).padStart(2, '0')}_${slug(group.label)}.pdf`;
-    zip.file(name, await doc.save());
+    files.push({
+      name: `${String(index + 1).padStart(2, '0')}_${slug(group.label)}.pdf`,
+      receiptIds: group.receipts.map((receipt) => receipt.id),
+      pageCount: doc.getPageCount(),
+      bytes: await doc.save(),
+    });
+  }
+
+  return files;
+}
+
+/** Os PDFs por categoria num ZIP, um arquivo por categoria com despesa. */
+async function buildCategoryZip(receipts) {
+  const zip = new JSZip();
+
+  for (const file of await buildCategoryPdfs(receipts)) {
+    zip.file(file.name, file.bytes);
   }
 
   return zip.generateAsync({ type: 'nodebuffer' });
 }
 
-module.exports = { buildCategoryZip };
+module.exports = { buildCategoryPdfs, buildCategoryZip };

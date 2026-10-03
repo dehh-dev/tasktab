@@ -6,6 +6,7 @@ import ReceiptSummary from './ReceiptSummary';
 import ReceiptList from './ReceiptList';
 import ReceiptReview from './ReceiptReview';
 import ConfirmDialog from './ConfirmDialog';
+import FinalCheck from './FinalCheck';
 import ReportForm from './ReportForm';
 import ValidationPanel from './ValidationPanel';
 import { formatDate, formatMoney, reportStatusLabel } from '../constants';
@@ -77,6 +78,8 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
   const [pollError, setPollError] = useState(null);
   const [pollFailures, setPollFailures] = useState(0);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [finalCheck, setFinalCheck] = useState(null);
+  const [checking, setChecking] = useState(false);
   const [editingReport, setEditingReport] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [reportErrors, setReportErrors] = useState({});
@@ -268,6 +271,29 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
   }
 
   /**
+   * Antes de fechar, a checagem final do procedimento (issue 57). Informa,
+   * nao bloqueia: com algo em aberto o botao vira "Fechar mesmo assim", e
+   * se a checagem nao responder, o dialogo diz isso e deixa fechar igual.
+   */
+  async function requestClose() {
+    setChecking(true);
+
+    try {
+      const { data } = await api.getFinalCheck(reportId);
+      setFinalCheck({ items: data });
+    } catch (caught) {
+      setFinalCheck({ error: caught.message });
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function handleClose() {
+    await handleStatusChange('closed');
+    setFinalCheck(null);
+  }
+
+  /**
    * Titulo, periodo, adiantamento e cidade principal (issue 44). O erro de
    * campo volta no formulario, preservando o que foi digitado.
    */
@@ -344,6 +370,23 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
       onCancel={() => setPendingReprocess(null)}
       busy={reprocessing}
     />
+  );
+
+  const openChecks = finalCheck?.items?.filter((item) => !item.ok).length;
+  const closeDialog = finalCheck && (
+    <ConfirmDialog
+      title="Fechar relatorio?"
+      message="Fechado, o relatorio fica somente leitura ate alguem reabrir."
+      confirmLabel={
+        openChecks === 0 ? 'Fechar relatorio' : 'Fechar mesmo assim'
+      }
+      busyLabel="Fechando..."
+      onConfirm={handleClose}
+      onCancel={() => setFinalCheck(null)}
+      busy={changingStatus}
+    >
+      <FinalCheck result={finalCheck} />
+    </ConfirmDialog>
   );
 
   if (reviewingId) {
@@ -454,8 +497,10 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
             <button
               type="button"
               className="btn"
-              onClick={() => handleStatusChange(closed ? 'open' : 'closed')}
-              disabled={changingStatus}
+              onClick={() =>
+                closed ? handleStatusChange('open') : requestClose()
+              }
+              disabled={changingStatus || checking}
             >
               {closed ? 'Reabrir relatorio' : 'Fechar relatorio'}
             </button>
@@ -547,6 +592,7 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
 
       {deleteDialog}
       {reprocessDialog}
+      {closeDialog}
     </>
   );
 }

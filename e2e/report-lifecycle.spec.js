@@ -25,6 +25,11 @@ test('fechar trava a tela, e reabrir devolve as acoes', async ({
   await expect(page.getByRole('button', { name: 'Deletar' })).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Fechar relatorio' }).click();
+  // A checagem final aponta o comprovante ainda em revisao, e nao impede.
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Fechar mesmo assim' })
+    .click();
 
   // A API ja recusa cada escrita com 409 (ha teste de cada uma); aqui e a
   // tela nao oferecer o que seria recusado.
@@ -42,6 +47,38 @@ test('fechar trava a tela, e reabrir devolve as acoes', async ({
 
   await expect(page.getByRole('button', { name: 'Deletar' })).toHaveCount(1);
   await expect(page.getByText('Arraste PDFs aqui')).toBeVisible();
+});
+
+test('fechar mostra a checagem final antes, e cancelar nao fecha', async ({
+  page,
+  request,
+}) => {
+  const report = await createReport(request, { title: 'Checagem final' });
+  await addReceipts(request, report.id, [await makeReceiptPdf()]);
+
+  await openReport(page, report);
+  await page.getByRole('button', { name: 'Fechar relatorio' }).click();
+
+  // Os quatro itens do procedimento, cada um dizendo em texto se confere.
+  const checagem = page
+    .getByRole('dialog')
+    .getByRole('list', { name: 'Checagem final' });
+  await expect(checagem.getByRole('listitem')).toHaveCount(4);
+  await expect(checagem).toContainText(
+    'Falta 1 comprovante ainda nao foi confirmado por uma pessoa.',
+  );
+  await expect(checagem).toContainText(
+    'Confere 1 pagina recebida, cada uma em exatamente um PDF de categoria.',
+  );
+
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Cancelar' })
+    .click();
+
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('Fechado', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Deletar' })).toHaveCount(1);
 });
 
 test('o PDF consolidado sai sem confirmado; o Anexo I so com', async ({

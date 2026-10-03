@@ -56,6 +56,7 @@ const ROUTES = [
   { method: 'GET', path: '/api/reports/:id/receipts', roles: EVERYONE },
   { method: 'POST', path: '/api/reports/:id/receipts', roles: WRITERS },
   { method: 'GET', path: '/api/reports/:id/validation', roles: EVERYONE },
+  { method: 'GET', path: '/api/reports/:id/final-check', roles: EVERYONE },
   { method: 'GET', path: '/api/reports/:id/export.xlsx', roles: EVERYONE },
   {
     method: 'GET',

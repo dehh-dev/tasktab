@@ -1,11 +1,7 @@
 'use strict';
 
-const crypto = require('crypto');
-const fs = require('fs/promises');
-const path = require('path');
 const JSZip = require('jszip');
 const { PDFDocument, StandardFonts } = require('pdf-lib');
-const env = require('../../../src/config/env');
 const { extractPdfText } = require('../../helpers/pdf-text');
 const {
   renderPdfPage,
@@ -17,18 +13,8 @@ const {
   requestBinary,
   insertReport,
   insertReceipt,
+  saveUpload,
 } = require('../../orchestrator');
-
-/**
- * Grava o PDF no diretorio de upload, com o proprio hash como nome, como o
- * upload faz: a exportacao le a pagina original do disco.
- */
-async function saveUpload(buffer) {
-  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
-  await fs.mkdir(env.upload.dir, { recursive: true });
-  await fs.writeFile(path.join(env.upload.dir, `${hash}.pdf`), buffer);
-  return { file_path: `${hash}.pdf`, file_hash: hash };
-}
 
 /** Um PDF com uma marca de texto por pagina, para achar cada uma depois. */
 async function makeMarkedPdf(...marks) {
@@ -83,10 +69,10 @@ function marksOf(files) {
 describe('GET /api/reports/:id/export/pdfs-por-categoria.zip', () => {
   it('um PDF por categoria com despesa, em ordem cronologica, num ZIP', async () => {
     const report = await insertReport();
-    const lote = await saveUpload(
+    const lote = saveUpload(
       await makeMarkedPdf('Pagina A', 'Pagina B', 'Pagina C', 'Pagina E'),
     );
-    const avulso = await saveUpload(await makeMarkedPdf('Pagina D'));
+    const avulso = saveUpload(await makeMarkedPdf('Pagina D'));
 
     // Fora de ordem de proposito, e de um jeito que nem a ordem de envio nem
     // a inversa coincidem com a cronologica: a exportacao e quem ordena.
@@ -149,7 +135,7 @@ describe('GET /api/reports/:id/export/pdfs-por-categoria.zip', () => {
       marcas.slice(4, 7),
       marcas.slice(7),
     ]) {
-      const lote = await saveUpload(await makeMarkedPdf(...grupo));
+      const lote = saveUpload(await makeMarkedPdf(...grupo));
 
       for (const page of grupo.keys()) {
         await insertReceipt(
@@ -176,7 +162,7 @@ describe('GET /api/reports/:id/export/pdfs-por-categoria.zip', () => {
     async (angle) => {
       const report = await insertReport();
       const source = await makeRotatedPdf(angle);
-      await insertReceipt(report.id, pagina(await saveUpload(source), 1));
+      await insertReceipt(report.id, pagina(saveUpload(source), 1));
 
       const { files } = await loadZip(report.id);
       const gerado = files['01_alimentacao.pdf'];
@@ -203,7 +189,7 @@ describe('GET /api/reports/:id/export/pdfs-por-categoria.zip', () => {
     const report = await insertReport();
     const receipt = await insertReceipt(
       report.id,
-      pagina(await saveUpload(await makeRotatedPdf(90)), 1),
+      pagina(saveUpload(await makeRotatedPdf(90)), 1),
     );
     // 90 da origem mais 90 da revisao: a pagina sai a 180, sem que o arquivo
     // original seja regravado.

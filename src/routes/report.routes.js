@@ -32,6 +32,11 @@ router.get(
   requireScope('reports:read'),
   asyncHandler(controller.validate),
 );
+router.get(
+  '/:id/final-check',
+  requireScope('reports:read'),
+  asyncHandler(controller.showFinalCheck),
+);
 
 // As exportacoes levam o relatorio inteiro num arquivo — cupom, CNPJ e valor.
 // Sao leitura de relatorio, e passam pela mesma posse.

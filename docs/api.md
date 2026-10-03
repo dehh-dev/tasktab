@@ -43,25 +43,26 @@ Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
 Como cada etapa funciona esta em
 [prestacao-de-contas.md](prestacao-de-contas.md).
 
-| Metodo   | Rota                                             | Descricao                     |
-| -------- | ------------------------------------------------ | ----------------------------- |
-| `GET`    | `/api/reports`                                   | Lista (filtro por `status`)   |
-| `POST`   | `/api/reports`                                   | Cria                          |
-| `GET`    | `/api/reports/:id`                               | Detalhe                       |
-| `PATCH`  | `/api/reports/:id`                               | Atualiza                      |
-| `DELETE` | `/api/reports/:id`                               | Remove (leva os comprovantes) |
-| `POST`   | `/api/reports/:id/receipts`                      | Envia 1..N PDFs               |
-| `GET`    | `/api/reports/:id/receipts`                      | Lista comprovantes com totais |
-| `GET`    | `/api/receipts/:id`                              | Detalhe                       |
-| `PATCH`  | `/api/receipts/:id`                              | Corrige campos na revisao     |
-| `DELETE` | `/api/receipts/:id`                              | Remove                        |
-| `GET`    | `/api/receipts/:id/image`                        | Pagina do comprovante (WebP)  |
-| `POST`   | `/api/receipts/:id/reprocess`                    | Reenvia para a fila           |
-| `GET`    | `/api/reports/:id/validation`                    | Alertas de conferencia        |
-| `GET`    | `/api/reports/:id/export.xlsx`                   | Planilha do procedimento      |
-| `GET`    | `/api/reports/:id/export/anexo-i.xlsx`           | Anexo I (Excel)               |
-| `GET`    | `/api/reports/:id/export.pdf`                    | PDF consolidado               |
-| `GET`    | `/api/reports/:id/export/pdfs-por-categoria.zip` | Um PDF por categoria, num ZIP |
+| Metodo   | Rota                                             | Descricao                       |
+| -------- | ------------------------------------------------ | ------------------------------- |
+| `GET`    | `/api/reports`                                   | Lista (filtro por `status`)     |
+| `POST`   | `/api/reports`                                   | Cria                            |
+| `GET`    | `/api/reports/:id`                               | Detalhe                         |
+| `PATCH`  | `/api/reports/:id`                               | Atualiza                        |
+| `DELETE` | `/api/reports/:id`                               | Remove (leva os comprovantes)   |
+| `POST`   | `/api/reports/:id/receipts`                      | Envia 1..N PDFs                 |
+| `GET`    | `/api/reports/:id/receipts`                      | Lista comprovantes com totais   |
+| `GET`    | `/api/receipts/:id`                              | Detalhe                         |
+| `PATCH`  | `/api/receipts/:id`                              | Corrige campos na revisao       |
+| `DELETE` | `/api/receipts/:id`                              | Remove                          |
+| `GET`    | `/api/receipts/:id/image`                        | Pagina do comprovante (WebP)    |
+| `POST`   | `/api/receipts/:id/reprocess`                    | Reenvia para a fila             |
+| `GET`    | `/api/reports/:id/validation`                    | Alertas de conferencia          |
+| `GET`    | `/api/reports/:id/final-check`                   | Checagem final, antes de fechar |
+| `GET`    | `/api/reports/:id/export.xlsx`                   | Planilha do procedimento        |
+| `GET`    | `/api/reports/:id/export/anexo-i.xlsx`           | Anexo I (Excel)                 |
+| `GET`    | `/api/reports/:id/export.pdf`                    | PDF consolidado                 |
+| `GET`    | `/api/reports/:id/export/pdfs-por-categoria.zip` | Um PDF por categoria, num ZIP   |
 
 Base: `/api/merchants` — o cadastro que da categoria ao comprovante.
 

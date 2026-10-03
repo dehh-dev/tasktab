@@ -33,7 +33,8 @@ CommonJS.
 - `ConfirmDialog` usa `<dialog>` com `showModal()`. **Nao volte para uma `div`
   com `aria-modal`**: era uma promessa de isolamento que o browser nao
   cumpria. O `close()` roda em `useLayoutEffect` — mais tarde, o no ja saiu do
-  DOM e o foco nao volta.
+  DOM e o foco nao volta. Conteudo alem da mensagem vai em `children`, como a
+  checagem final ao fechar o relatorio.
 - Atalho que vale com o foco em qualquer lugar (`ReceiptReview`: `Escape`,
   `Alt+seta`) vai em `document.addEventListener` dentro de `useEffect`, nunca
   em `onKeyDown` de `div`: depois de uma remontagem o foco fica fora da

@@ -7,6 +7,7 @@ const validation = require('../services/validation');
 const ownership = require('../services/auth/ownership');
 const { loadReport, reportClosed } = require('../services/auth/access.service');
 const retention = require('../services/retention.service');
+const finalCheck = require('../services/final-check.service');
 const planilha = require('../services/export/planilha.service');
 const anexoI = require('../services/export/anexo-i.service');
 const pdfConsolidado = require('../services/export/pdf-consolidado.service');
@@ -112,6 +113,25 @@ async function validate(req, res) {
   res.json({ data: result.alerts, meta: result.meta });
 }
 
+/**
+ * GET /api/reports/:id/final-check — a checagem final, mostrada antes de
+ * fechar. Informa, nao bloqueia: o PATCH que fecha nao depende dela.
+ */
+async function showFinalCheck(req, res) {
+  const id = validator.validateId(req.params.id);
+  await loadReport(req.user, id);
+
+  const checks = await finalCheck.checkReport(id);
+
+  res.json({
+    data: checks,
+    meta: {
+      total: checks.length,
+      ok: checks.filter((check) => check.ok).length,
+    },
+  });
+}
+
 /** GET /api/reports/:id/export.xlsx */
 async function exportXlsx(req, res) {
   const id = validator.validateId(req.params.id);
@@ -195,6 +215,7 @@ module.exports = {
   update,
   destroy,
   validate,
+  showFinalCheck,
   exportXlsx,
   exportAnexoI,
   exportPdf,

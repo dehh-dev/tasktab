@@ -15,6 +15,7 @@ const {
   requestUpload,
   insertReport,
   insertMerchant,
+  saveUpload,
   waitForProcessing,
 } = require('../../orchestrator');
 const {
@@ -22,9 +23,6 @@ const {
   makeQrReceiptPdf,
   makeRotatedPdf,
 } = require('../../fixtures/pdf');
-const fs = require('fs/promises');
-const path = require('path');
-const env = require('../../../src/config/env');
 const db = require('../../../src/config/database');
 
 /**
@@ -33,17 +31,8 @@ const db = require('../../../src/config/database');
  * disco, entao nao ha como testar sem um arquivo real por tras do registro.
  */
 async function insertConfirmedWithFile(reportId, buffer, overrides = {}) {
-  const hash = require('crypto')
-    .createHash('sha256')
-    .update(buffer)
-    .digest('hex');
-  const fileName = `${hash}.pdf`;
-  await fs.mkdir(env.upload.dir, { recursive: true });
-  await fs.writeFile(path.join(env.upload.dir, fileName), buffer);
-
   const data = {
-    file_path: fileName,
-    file_hash: hash,
+    ...saveUpload(buffer),
     page_number: 1,
     status: 'confirmed',
     amount_cents: 1000,

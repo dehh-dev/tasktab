@@ -32,6 +32,12 @@
   `409`, e o unico PATCH aceito e `{ "status": "open" }`. A trava fica no
   `loadReport`/`loadReceipt`, **depois** da posse: o fechado alheio continua
   dando 404. Leitura e exportacao seguem liberadas.
+- **A checagem final** (`final-check.service.js`, issue 57) e mostrada antes
+  de fechar e **nao bloqueia**: o PATCH que fecha nao depende dela. Ela
+  confere as entregas de verdade — somas pelos grupos da planilha
+  (`conferenceTotals`) contra o total do banco, paginas pelos PDFs por
+  categoria montados (`buildCategoryPdfs`). Nao troque por uma conta paralela:
+  ela concordaria com o banco e esconderia o grupo que perdeu linha.
 - As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
 - **O giro e do comprovante, nao do arquivo** (`receipts.rotation`, quarto de
   volta): vale para a imagem, o OCR do reprocessamento e o PDF consolidado.

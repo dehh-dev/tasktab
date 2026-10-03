@@ -1,6 +1,7 @@
 'use strict';
 
 const { execSync, spawn, spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('../src/config/database');
@@ -685,6 +686,20 @@ function uploadedFilePath(filePath) {
 }
 
 /**
+ * Grava o PDF no diretorio de upload com o proprio SHA-256 como nome, como o
+ * upload faz, e devolve as colunas do comprovante que apontam para ele: as
+ * exportacoes e a checagem final leem a pagina original do disco.
+ */
+function saveUpload(buffer) {
+  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+
+  fs.mkdirSync(env.upload.dir, { recursive: true });
+  fs.writeFileSync(uploadedFilePath(`${hash}.pdf`), buffer);
+
+  return { file_path: `${hash}.pdf`, file_hash: hash };
+}
+
+/**
  * Temporarios do multer que ficaram no disco. O upload grava antes de saber se
  * o relatorio existe (ou e da pessoa); o que sobrar aqui e um PDF com CNPJ de
  * terceiros que ninguem mais alcanca pela API.
@@ -725,6 +740,7 @@ module.exports = {
   findReceipts,
   uploadedFileExists,
   uploadedFilePath,
+  saveUpload,
   leftoverUploads,
   waitForProcessing,
   waitForQueue,

@@ -32,6 +32,24 @@ Relatorio **fechado** e somente leitura, ate para o dono: toda escrita
 responde `409`, e o unico `PATCH` aceito e `{ "status": "open" }`. Leitura e
 exportacao seguem liberadas — fechado e justamente o que se exporta.
 
+Antes de fechar, a tela mostra a **checagem final** do procedimento
+(`GET /api/reports/:id/final-check`), quatro itens que dizem cada um se
+confere:
+
+| `check`       | O que confere                                                             |
+| ------------- | ------------------------------------------------------------------------- |
+| `somas`       | soma das linhas = total = subtotais por tipo = subtotais por cidade       |
+| `paginas`     | toda pagina em exatamente um PDF de categoria, e geradas iguais recebidas |
+| `chaves`      | toda chave de acesso passa no digito verificador                          |
+| `confirmados` | todo valor foi confirmado por uma pessoa (a duplicata nao conta)          |
+
+Ela confere as entregas como elas saem: as somas vem dos mesmos grupos que a
+planilha escreve, contra o total do banco, e as paginas, dos PDFs por
+categoria montados de verdade — um arquivo de comprovante que sumiu do disco
+aparece ali, e nao na hora de exportar. **Informa, nao bloqueia**: com algo em
+aberto, o botao vira "Fechar mesmo assim", e o `PATCH` que fecha nao depende
+dela.
+
 ## Extracao
 
 Cascata em tres degraus: **texto do PDF → QR Code → OCR**. PDF com camada de

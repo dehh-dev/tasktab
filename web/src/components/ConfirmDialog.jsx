@@ -9,6 +9,7 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
   busy,
+  children,
 }) {
   const dialogRef = useRef(null);
 
@@ -66,6 +67,7 @@ export default function ConfirmDialog({
         <p className="dialog__body">
           {message} {target && <span className="dialog__target">{target}</span>}
         </p>
+        {children}
         <div className="dialog__actions">
           {/* autoFocus no botao seguro: um Enter acidental nao pode deletar. */}
           <button

@@ -2360,9 +2360,33 @@ não bloqueia.
 
 **Critérios de aceite**
 
-- [ ] Soma das linhas = total = subtotais por categoria = subtotais por
+- [x] Soma das linhas = total = subtotais por categoria = subtotais por
       cidade
-- [ ] Toda página em exatamente um PDF de categoria; páginas geradas =
+- [x] Toda página em exatamente um PDF de categoria; páginas geradas =
       recebidas
-- [ ] Toda chave com DV validado; todo valor confirmado por uma pessoa
-- [ ] Diálogo antes de fechar, com o que falta
+- [x] Toda chave com DV validado; todo valor confirmado por uma pessoa
+- [x] Diálogo antes de fechar, com o que falta
+
+**Como ficou**
+
+A rota nova é `GET /api/reports/:id/final-check`, com quatro itens: `somas`,
+`paginas`, `chaves` e `confirmados`. Cada item traz `ok`, a mensagem e os
+números dele. Na tela, "Fechar relatorio" abre um diálogo com os itens, cada
+um escrito "Confere" ou "Falta". Com algo em aberto, o botão vira "Fechar
+mesmo assim", e reabrir continua direto. O `PATCH` que fecha não depende da
+checagem, e há teste disso.
+
+**Decidido:** a checagem confere as entregas como elas saem, e não faz uma
+conta paralela que concordaria sempre com o banco.
+
+- As somas vêm de `conferenceTotals`, os mesmos grupos que a planilha
+  escreve, e são comparadas com o total confirmado do banco. A planilha também
+  passou a guardar estes resultados no bloco de conferência. Antes, as quatro
+  células repetiam o mesmo total. Tirar o grupo "Sem categoria" da planilha,
+  ou somar o que está em revisão, derruba o teste da checagem.
+- As páginas vêm dos PDFs por categoria montados de verdade
+  (`buildCategoryPdfs`). Por isso um arquivo de comprovante que sumiu do disco
+  aparece na checagem, com o número do comprovante, em vez de virar erro 500
+  na hora de exportar.
+- Duplicata não conta como valor a confirmar. Chave ausente não é chave
+  inválida: recibo e comanda não têm chave.

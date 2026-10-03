@@ -474,6 +474,26 @@ function addLine(sheet, number, label, value, { currency = true } = {}) {
 }
 
 /**
+ * As somas do bloco de conferencia em centavos, pelos mesmos grupos que as
+ * tabelas do Resumo usam. A planilha guarda estes resultados, e a checagem
+ * final (issue 57) confere os mesmos numeros antes de o relatorio fechar.
+ */
+function conferenceTotals(receipts) {
+  const rows = receipts
+    .filter((receipt) => receipt.status === 'confirmed')
+    .map((receipt) => expenseRow(receipt));
+  const sum = (items) => items.reduce((total, item) => total + item.cents, 0);
+  const sumGroups = (groups) =>
+    groups.reduce((total, group) => total + sum(group.rows), 0);
+
+  return {
+    lines: sum(rows),
+    byType: sumGroups(typeGroups(rows)),
+    byCity: sumGroups(cityGroups(rows)),
+  };
+}
+
+/**
  * O bloco de conferencia do procedimento: as quatro somas que precisam
  * bater — linhas, total geral, tipos e cidades — e a celula que diz se
  * batem. Geradas aqui, batem sempre; o bloco existe para quem edita a
@@ -483,19 +503,18 @@ function addLine(sheet, number, label, value, { currency = true } = {}) {
 function addCheckBlock(
   sheet,
   startRow,
-  { expenses, typeTotalRow, cityTotalRow },
+  { expenses, typeTotalRow, cityTotalRow, totals },
 ) {
   sheet.getCell(`A${startRow}`).value = 'Conferência';
   styleTitle(sheet.getCell(`A${startRow}`));
 
-  const total = expenses.total / 100;
   const sums = [
     [
       'Soma das linhas',
       expenses.lastRow > 1
         ? formulaWithResult(
             `SUM(${sheetRange(EXPENSES_SHEET, `${AMOUNT_COLUMN}2:${AMOUNT_COLUMN}${expenses.lastRow}`)})`,
-            total,
+            totals.lines / 100,
           )
         : 0,
     ],
@@ -503,12 +522,20 @@ function addCheckBlock(
       'Total geral',
       formulaWithResult(
         sheetRange(EXPENSES_SHEET, `${AMOUNT_COLUMN}${expenses.totalRow}`),
-        total,
+        totals.lines / 100,
       ),
     ],
-    ['Soma por tipo', formulaWithResult(`C${typeTotalRow}`, total)],
-    ['Soma por cidade', formulaWithResult(`C${cityTotalRow}`, total)],
+    [
+      'Soma por tipo',
+      formulaWithResult(`C${typeTotalRow}`, totals.byType / 100),
+    ],
+    [
+      'Soma por cidade',
+      formulaWithResult(`C${cityTotalRow}`, totals.byCity / 100),
+    ],
   ];
+  const agree =
+    totals.lines === totals.byType && totals.lines === totals.byCity;
 
   sums.forEach(([label, value], index) => {
     addLine(sheet, startRow + 1 + index, label, value);
@@ -528,7 +555,10 @@ function addCheckBlock(
     sheet,
     resultRow,
     'Resultado',
-    formulaWithResult(`IF(AND(${equal}),"OK","DIVERGÊNCIA")`, 'OK'),
+    formulaWithResult(
+      `IF(AND(${equal}),"OK","DIVERGÊNCIA")`,
+      agree ? 'OK' : 'DIVERGÊNCIA',
+    ),
     { currency: false },
   );
   sheet.getCell(`C${resultRow}`).font = { bold: true, size: 11 };
@@ -635,7 +665,7 @@ function addExcludedBlock(sheet, startRow, excluded) {
  * por cidade, a conferencia das somas, o saldo e os documentos sem chave
  * (issue 50).
  */
-function fillSummarySheet(sheet, { report, rows, expenses, excluded }) {
+function fillSummarySheet(sheet, { report, rows, expenses, excluded, totals }) {
   sheet.getCell('A1').value = report.title;
   sheet.getCell('A1').font = { bold: true, size: 14, color: { argb: NAVY } };
   sheet.getCell('A2').value =
@@ -660,6 +690,7 @@ function fillSummarySheet(sheet, { report, rows, expenses, excluded }) {
     expenses,
     typeTotalRow: types.totalRow,
     cityTotalRow: cities.totalRow,
+    totals,
   });
   const balance = addBalanceBlock(sheet, check.nextRow, {
     report,
@@ -843,9 +874,15 @@ async function buildWorkbook(report, receipts, alerts = []) {
     };
   }).filter((item) => item.count > 0);
 
-  fillSummarySheet(summary, { report, rows, expenses, excluded });
+  fillSummarySheet(summary, {
+    report,
+    rows,
+    expenses,
+    excluded,
+    totals: conferenceTotals(receipts),
+  });
 
   return workbook;
 }
 
-module.exports = { buildWorkbook };
+module.exports = { buildWorkbook, conferenceTotals };

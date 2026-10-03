@@ -37,6 +37,9 @@ linha de uma aba para a contagem da outra em teste E2E. Por isso tambem
 - **Conferencia** do relatorio inteiro no detalhe (`ValidationPanel`),
   agrupada pela classe do procedimento, com "Ver comprovante" em cada alerta
   que tem um.
+- **Fechar o relatorio** passa pela checagem final (`FinalCheck`, num
+  `ConfirmDialog`): cada item diz em texto se confere ou o que falta. Com algo
+  em aberto, o botao vira "Fechar mesmo assim"; reabrir e direto.
 - **Fila de revisao** (`ReceiptReview`): imagem do comprovante pelo endpoint
   proprio, com zoom por botao ou roda do mouse, arrasto para andar pelo cupom
   ampliado, e o formulario de data, valor e categoria ao lado.

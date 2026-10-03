@@ -957,6 +957,44 @@ textarea.field__input {
   justify-content: flex-end;
 }
 
+/* ---------- checagem final (issue 57) ---------- */
+
+/* A marca na borda segue a paleta dos alertas: concluido para o que confere,
+   o amarelo de pendente para o que falta. "Confere" e "Falta" vao escritos. */
+.final-check {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+
+.final-check__item {
+  border-left: 3px solid var(--done-muted);
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-left: 8px;
+}
+
+.final-check__item[data-ok='false'] {
+  border-left-color: var(--attention-muted);
+}
+
+.final-check__status {
+  color: var(--done-strong);
+  flex: none;
+  font-weight: 600;
+  min-width: 64px;
+}
+
+.final-check__item[data-ok='false'] .final-check__status {
+  color: var(--attention-strong);
+}
+
+.final-check__error {
+  color: var(--danger-strong);
+  margin: 0 0 20px;
+}
+
 /* ---------- upload ---------- */
 
 .upload {

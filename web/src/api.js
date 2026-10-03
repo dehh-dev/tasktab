@@ -203,6 +203,11 @@ export function getValidation(reportId) {
   return request(`${REPORTS_URL}/${reportId}/validation`);
 }
 
+/** A checagem final (issue 57), mostrada antes de fechar o relatorio. */
+export function getFinalCheck(reportId) {
+  return request(`${REPORTS_URL}/${reportId}/final-check`);
+}
+
 export function listReceipts(reportId, { status, category } = {}) {
   const params = new URLSearchParams();
   if (status) {
