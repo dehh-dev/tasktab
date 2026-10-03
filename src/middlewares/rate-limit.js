@@ -23,10 +23,9 @@ function build({ max, skipRead = false }) {
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    // A suite roda dezenas de requisicoes em segundos e trombaria em qualquer
-    // teto realista. O limitador e verificado manualmente — veja o README.
     skip: (req) =>
-      env.isTest || (skipRead && !WRITE_METHODS.includes(req.method)),
+      !env.rateLimit.enabled ||
+      (skipRead && !WRITE_METHODS.includes(req.method)),
     handler: (req, res) => {
       const error = new TooManyRequestsError();
       res.status(error.statusCode).json(error.toJSON());
@@ -34,7 +33,7 @@ function build({ max, skipRead = false }) {
   });
 }
 
-// Dois tetos sobrepostos: um geral, e um mais apertado so para escrita.
+// Um teto para toda requisicao, e um mais apertado so para escrita.
 const readLimiter = build({ max: env.rateLimit.max });
 const writeLimiter = build({ max: env.rateLimit.writeMax, skipRead: true });
 
@@ -42,6 +41,11 @@ const writeLimiter = build({ max: env.rateLimit.writeMax, skipRead: true });
  * Teto proprio das rotas de prestacao de contas. Revisar um lote de 30 cupons
  * sao 30 PATCH em poucos minutos, mais o upload — o teto geral de escrita
  * cortaria o usuario no meio do trabalho.
+ *
+ * Substitui o geral nessas rotas, e nao se soma a ele: cada familia de rota
+ * passa por um teto de escrita so (`src/routes/index.js`). Quando os dois eram
+ * aplicados em sequencia, o geral cortava na centesima escrita e este nunca
+ * chegava a valer.
  */
 const batchWriteLimiter = build({
   max: env.rateLimit.batchWriteMax,

@@ -183,6 +183,14 @@ export function getReport(id) {
   return request(`${REPORTS_URL}/${id}`);
 }
 
+/** Titulo, periodo, adiantamento e cidade principal (issue 44). */
+export function updateReport(id, data) {
+  return request(`${REPORTS_URL}/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
 /** Fechar (`closed`) trava a escrita; reabrir (`open`) e o unico PATCH aceito ali. */
 export function setReportStatus(id, status) {
   return request(`${REPORTS_URL}/${id}`, {
@@ -193,6 +201,11 @@ export function setReportStatus(id, status) {
 
 export function getValidation(reportId) {
   return request(`${REPORTS_URL}/${reportId}/validation`);
+}
+
+/** A checagem final (issue 57), mostrada antes de fechar o relatorio. */
+export function getFinalCheck(reportId) {
+  return request(`${REPORTS_URL}/${reportId}/final-check`);
 }
 
 export function listReceipts(reportId, { status, category } = {}) {
@@ -231,8 +244,15 @@ export function deleteReceipt(id) {
   return request(`${RECEIPTS_URL}/${id}`, { method: 'DELETE' });
 }
 
-export function reprocessReceipt(id) {
-  return request(`${RECEIPTS_URL}/${id}/reprocess`, { method: 'POST' });
+/**
+ * Reenfileira a pagina. O que uma pessoa ja conferiu so e reprocessado com
+ * `discardReview`: a extracao regrava data, valor e categoria por cima.
+ */
+export function reprocessReceipt(id, { discardReview = false } = {}) {
+  return request(`${RECEIPTS_URL}/${id}/reprocess`, {
+    method: 'POST',
+    body: JSON.stringify(discardReview ? { discard_review: true } : {}),
+  });
 }
 
 /** Categoria padrao do emitente: vale para os proximos cupons daquele CNPJ. */
@@ -243,9 +263,14 @@ export function setMerchantCategory(id, category) {
   });
 }
 
-/** URL da imagem renderizada do comprovante — usada direto num <img src>. */
-export function receiptImageUrl(id) {
-  return `${RECEIPTS_URL}/${id}/image`;
+/**
+ * URL da imagem renderizada do comprovante — usada direto num <img src>. O
+ * giro vai na URL so para o navegador nao reaproveitar a imagem de antes de
+ * girar; quem decide a rotacao e o servidor, pelo que esta gravado.
+ */
+export function receiptImageUrl(id, rotation = 0) {
+  const base = `${RECEIPTS_URL}/${id}/image`;
+  return rotation ? `${base}?rotacao=${rotation}` : base;
 }
 
 /**
@@ -265,4 +290,9 @@ export function reportAnexoIUrl(id) {
 /** PDF consolidado com os comprovantes carimbados. */
 export function reportPdfUrl(id) {
   return `${REPORTS_URL}/${id}/export.pdf`;
+}
+
+/** Um PDF por categoria, com as paginas originais, num ZIP. */
+export function reportCategoryPdfsUrl(id) {
+  return `${REPORTS_URL}/${id}/export/pdfs-por-categoria.zip`;
 }

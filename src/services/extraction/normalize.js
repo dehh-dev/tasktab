@@ -471,6 +471,63 @@ function extractLooseTotal(text) {
   return null;
 }
 
+/**
+ * Linha de abastecimento: litros, preco por litro e total da linha, nessa
+ * ordem — `39,56 L 5,70 225,49` ou `18,461 L x R$ 4,97 R$ 91,75`, como as duas
+ * notas de combustivel de Itapipoca sairam do OCR.
+ */
+const FUEL_LINE =
+  /(\d{1,4}[.,]\d{1,3})[^\S\n]*(?:L|LT|LTS|LITROS?)\b[^\S\n]*(?:[xX*][^\S\n]*)?(?:R\$[^\S\n]*)?(\d{1,2}[.,]\d{2,3})[^\S\n]+(?:=[^\S\n]*)?(?:R\$[^\S\n]*)?(\d{1,3}(?:\.\d{3})*[.,]\d{2})[^\S\n]*$/i;
+
+/**
+ * Quantidade ou preco com ate `places` casas, em inteiros de 10^-places.
+ *
+ * Diferente de `parseAmountToCents`, o separador unico e sempre decimal: num
+ * abastecimento `18.461` sao 18 litros e meio, e nao dezoito mil — foi assim
+ * que o OCR escreveu a nota de Formosa.
+ */
+function parseDecimal(text, places) {
+  const [whole, fraction = ''] = text.split(/[.,]/);
+  return (
+    Number(whole) * 10 ** places +
+    Number(fraction.padEnd(places, '0').slice(0, places))
+  );
+}
+
+/**
+ * Linhas de abastecimento do cupom, cada uma dizendo se fecha a propria conta.
+ *
+ * "E a checagem que pega erro de um digito": litros vezes preco unitario tem
+ * de dar o total da linha. A conta e em inteiros — litros e preco em
+ * milesimos, o produto em milionesimos de real —, com um centavo de folga,
+ * porque a bomba arredonda ou trunca. Linha que nao fecha nao e descartada:
+ * quem decide o que fazer com ela e a regra que a usa.
+ */
+function extractFuelLines(text) {
+  if (typeof text !== 'string') {
+    return [];
+  }
+
+  return text
+    .split('\n')
+    .map((line) => line.match(FUEL_LINE))
+    .filter(Boolean)
+    .map((match) => {
+      const liters = parseDecimal(match[1], 3);
+      const unitPrice = parseDecimal(match[2], 3);
+      const totalCents = parseAmountToCents(match[3]);
+
+      return {
+        liters,
+        unitPrice,
+        totalCents,
+        closes:
+          totalCents !== null &&
+          Math.abs(liters * unitPrice - totalCents * 10000) <= 10000,
+      };
+    });
+}
+
 module.exports = {
   parseAmountToCents,
   parseDate,
@@ -480,4 +537,5 @@ module.exports = {
   extractCity,
   extractCnpj,
   extractItemTotals,
+  extractFuelLines,
 };

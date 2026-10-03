@@ -3,17 +3,26 @@
 const { PDFDocument, PDFName, PDFDict } = require('pdf-lib');
 const { extractPdfText } = require('../../helpers/pdf-text');
 const {
+  renderPdfPage,
+  maxPixelDifference,
+} = require('../../helpers/pdf-render');
+const {
+  STAMP_HEIGHT,
+} = require('../../../src/services/export/pdf-consolidado.service');
+const {
   requestBinary,
   request,
   requestUpload,
   insertReport,
   insertMerchant,
+  saveUpload,
   waitForProcessing,
 } = require('../../orchestrator');
-const { makeReceiptPdf, makeQrReceiptPdf } = require('../../fixtures/pdf');
-const fs = require('fs/promises');
-const path = require('path');
-const env = require('../../../src/config/env');
+const {
+  makeReceiptPdf,
+  makeQrReceiptPdf,
+  makeRotatedPdf,
+} = require('../../fixtures/pdf');
 const db = require('../../../src/config/database');
 
 /**
@@ -22,17 +31,8 @@ const db = require('../../../src/config/database');
  * disco, entao nao ha como testar sem um arquivo real por tras do registro.
  */
 async function insertConfirmedWithFile(reportId, buffer, overrides = {}) {
-  const hash = require('crypto')
-    .createHash('sha256')
-    .update(buffer)
-    .digest('hex');
-  const fileName = `${hash}.pdf`;
-  await fs.mkdir(env.upload.dir, { recursive: true });
-  await fs.writeFile(path.join(env.upload.dir, fileName), buffer);
-
   const data = {
-    file_path: fileName,
-    file_hash: hash,
+    ...saveUpload(buffer),
     page_number: 1,
     status: 'confirmed',
     amount_cents: 1000,
@@ -234,5 +234,74 @@ describe('GET /api/reports/:id/export.pdf', () => {
     expect(response.status).toBe(200);
     const doc = await PDFDocument.load(response.buffer);
     expect(doc.getPageCount()).toBe(1);
+  });
+});
+
+// O escaneamento chega com orientacao variada, e a pagina de cabeca para
+// baixo e corrigida pelo `/Rotate` — na prestacao de Itapipoca, uma das 42.
+// Embutida sem a rotacao, ela voltava invertida no consolidado, enquanto a
+// revisao a mostrava certa.
+describe('GET /api/reports/:id/export.pdf com pagina girada', () => {
+  it.each([90, 180, 270])(
+    '/Rotate %i sai como a origem e exibida',
+    async (angle) => {
+      const report = await insertReport();
+      const source = await makeRotatedPdf(angle);
+      await insertConfirmedWithFile(report.id, source);
+
+      const response = await requestBinary(
+        'GET',
+        `/api/reports/${report.id}/export.pdf`,
+      );
+
+      const original = renderPdfPage(source, 1);
+      // A pagina 1 e o indice; a 2, o comprovante.
+      const exported = renderPdfPage(response.buffer, 2);
+
+      expect(exported.width).toBe(original.width);
+      expect(exported.height).toBe(original.height + STAMP_HEIGHT);
+      expect(maxPixelDifference(original, exported, original.height)).toBe(0);
+    },
+  );
+
+  it('o giro escolhido na revisao soma ao /Rotate da origem', async () => {
+    const report = await insertReport();
+    const receipt = await insertConfirmedWithFile(
+      report.id,
+      await makeRotatedPdf(90),
+    );
+    // 90 da origem mais 90 da revisao: a pagina sai a 180, sem que o arquivo
+    // original seja regravado.
+    await request('PATCH', `/api/receipts/${receipt.id}`, { rotation: 90 });
+
+    const response = await requestBinary(
+      'GET',
+      `/api/reports/${report.id}/export.pdf`,
+    );
+
+    const esperado = renderPdfPage(await makeRotatedPdf(180), 1);
+    const exported = renderPdfPage(response.buffer, 2);
+
+    expect(exported.width).toBe(esperado.width);
+    expect(maxPixelDifference(esperado, exported, esperado.height)).toBe(0);
+  });
+
+  it('o carimbo continua no rodape, na horizontal', async () => {
+    const report = await insertReport();
+    await insertConfirmedWithFile(report.id, await makeRotatedPdf(90));
+
+    const response = await requestBinary(
+      'GET',
+      `/api/reports/${report.id}/export.pdf`,
+    );
+    const exported = renderPdfPage(response.buffer, 2);
+    const band = exported.pixels.subarray(
+      (exported.height - STAMP_HEIGHT) * exported.width,
+    );
+
+    expect(Math.min(...band)).toBeLessThan(128);
+    expect(extractPdfText(response.buffer)[1]).toMatch(
+      /Item 01 \| 19\/06\/2026/,
+    );
   });
 });

@@ -25,6 +25,19 @@ const FIRST_DATA_ROW = 32;
 const LAST_DATA_ROW = 100;
 const TOTALS_ROW = 101;
 
+// As colunas de valor do formulario versao 19, como o procedimento de
+// prestacao de contas as descreve. O total da linha (Y) cobre as seis: com
+// so S, W e X, o valor de taxi lancado em Q sumiria do total.
+const VALUE_COLUMNS = {
+  O: 'Passagens',
+  Q: 'Taxi/Conducoes',
+  S: 'Alimentacao',
+  U: 'Hospedagem',
+  W: 'Combustivel',
+  X: 'Outras',
+};
+const CURRENCY = '[$R$-416] #,##0.00';
+
 async function main() {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Anexo I');
@@ -46,10 +59,8 @@ async function main() {
     B: 'Data',
     C: 'Cidade',
     G: 'Descricao',
-    S: 'Alimentacao',
+    ...VALUE_COLUMNS,
     T: 'Pagamento',
-    W: 'Transporte',
-    X: 'Hospedagem',
     Y: 'Total',
   };
   for (const [col, label] of Object.entries(header)) {
@@ -57,16 +68,20 @@ async function main() {
     sheet.getCell(`${col}${FIRST_DATA_ROW - 1}`).font = { bold: true };
   }
 
+  const valueColumns = Object.keys(VALUE_COLUMNS);
+
   for (let row = FIRST_DATA_ROW; row <= LAST_DATA_ROW; row += 1) {
     sheet.getCell(`B${row}`).numFmt = 'DD/MM/YYYY';
-    sheet.getCell(`S${row}`).value = 0;
-    sheet.getCell(`S${row}`).numFmt = '[$R$-416] #,##0.00';
-    sheet.getCell(`W${row}`).value = 0;
-    sheet.getCell(`W${row}`).numFmt = '[$R$-416] #,##0.00';
-    sheet.getCell(`X${row}`).value = 0;
-    sheet.getCell(`X${row}`).numFmt = '[$R$-416] #,##0.00';
-    sheet.getCell(`Y${row}`).value = { formula: `S${row}+W${row}+X${row}` };
-    sheet.getCell(`Y${row}`).numFmt = '[$R$-416] #,##0.00';
+
+    for (const col of valueColumns) {
+      sheet.getCell(`${col}${row}`).value = 0;
+      sheet.getCell(`${col}${row}`).numFmt = CURRENCY;
+    }
+
+    sheet.getCell(`Y${row}`).value = {
+      formula: valueColumns.map((col) => `${col}${row}`).join('+'),
+    };
+    sheet.getCell(`Y${row}`).numFmt = CURRENCY;
 
     // Lista suspensa por linha, numa coluna que o remendo da Issue 17 NUNCA
     // toca — e o que prova que o patch preserva validacao de dados.
@@ -77,12 +92,12 @@ async function main() {
     };
   }
 
-  for (const col of ['S', 'W', 'X', 'Y']) {
+  for (const col of [...valueColumns, 'Y']) {
     const cell = sheet.getCell(`${col}${TOTALS_ROW}`);
     cell.value = {
       formula: `SUM(${col}${FIRST_DATA_ROW}:${col}${LAST_DATA_ROW})`,
     };
-    cell.numFmt = '[$R$-416] #,##0.00';
+    cell.numFmt = CURRENCY;
     cell.font = { bold: true };
   }
   sheet.getCell(`B${TOTALS_ROW}`).value = 'TOTAIS';

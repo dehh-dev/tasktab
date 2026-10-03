@@ -54,6 +54,9 @@ test('abre a revisao preenchida pela extracao, com a origem e sem a chave', asyn
   // da tela acima da data.
   await expect(page.getByText(/QR Code/)).toBeVisible();
   await expect(page.getByText(chave)).toHaveCount(0);
+  // Com a chave lida, nao ha o que digitar: o campo so aparece quando ela
+  // falta (expenses-access-key.spec.js).
+  await expect(page.locator('#review-access-key')).toHaveCount(0);
 });
 
 test('confirmar avanca para o proximo pendente sem recarregar', async ({

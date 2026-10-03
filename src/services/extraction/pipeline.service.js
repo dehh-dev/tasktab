@@ -109,7 +109,7 @@ async function processPage(receipt, page, { buffer, log }) {
   // Ultimo degrau da cascata: sem camada de texto, tenta ler a imagem.
   if (!text) {
     const scanned = await ocrService
-      .readPage(buffer, receipt.page_number)
+      .readPage(buffer, receipt.page_number, { rotation: receipt.rotation })
       .catch((error) => {
         log?.warn(
           { err: error, receipt_id: receipt.id },
@@ -146,10 +146,13 @@ async function processPage(receipt, page, { buffer, log }) {
     };
   }
 
+  const issuerName = parsers.merchantName(text ?? '');
+  const issuerCity = fields.city?.value ?? null;
+
   const { merchant_id, category, category_guessed } = await classify(
     fields.cnpj?.value,
-    parsers.merchantName(text ?? ''),
-    fields.city?.value ?? null,
+    issuerName,
+    issuerCity,
   );
 
   // So o que e provadamente o mesmo documento colapsa sozinho; suspeita vira
@@ -181,6 +184,10 @@ async function processPage(receipt, page, { buffer, log }) {
     issued_at: fields.issued_at?.value ?? null,
     amount_cents: fields.amount_cents?.value ?? null,
     access_key: key?.value ?? null,
+    // O que o papel diz sobre quem emitiu, com ou sem CNPJ: e o que as saidas
+    // usam quando o comprovante nao tem emitente cadastrado (issue 42).
+    issuer_name: issuerName,
+    issuer_city: issuerCity,
     merchant_id,
     category,
     category_guessed,
@@ -281,4 +288,4 @@ function lowestConfidence(fields) {
   return values.length > 0 ? Math.min(...values) : null;
 }
 
-module.exports = { processFile };
+module.exports = { processFile, classify };

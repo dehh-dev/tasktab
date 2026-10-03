@@ -1,5 +1,6 @@
 'use strict';
 
+const JSZip = require('jszip');
 const { test, expect } = require('@playwright/test');
 const { clearReports, createReport, addReceipts } = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
@@ -16,6 +17,16 @@ async function openReportWithReceipt(page, request, report, buffer) {
   await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
   await page.getByRole('button', { name: report.title }).click();
   await expect(page.locator('.list-item')).toHaveCount(1);
+}
+
+async function readDownload(download) {
+  const chunks = [];
+
+  for await (const chunk of await download.createReadStream()) {
+    chunks.push(chunk);
+  }
+
+  return Buffer.concat(chunks);
 }
 
 test('exportar so libera depois que ha comprovante confirmado', async ({
@@ -54,13 +65,34 @@ test('exportar so libera depois que ha comprovante confirmado', async ({
 
   // `PK` e a assinatura de um zip — todo .xlsx e um. Conferir o conteudo
   // celula a celula e trabalho da suite de integracao.
-  const stream = await download.createReadStream();
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  const buffer = Buffer.concat(chunks);
+  const buffer = await readDownload(download);
 
   expect(buffer.subarray(0, 2).toString()).toBe('PK');
   expect(buffer.length).toBeGreaterThan(1000);
+});
+
+test('os PDFs por categoria saem num ZIP sem esperar a confirmacao', async ({
+  page,
+  request,
+}) => {
+  const report = await createReport(request, {
+    title: 'Entrega por categoria',
+  });
+
+  await openReportWithReceipt(page, request, report, await makeReceiptPdf());
+
+  // Como o PDF consolidado, o ZIP leva toda pagina, conferida ou nao: o
+  // link ja vale com o comprovante ainda em revisao.
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'PDFs por categoria' }).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toBe(`comprovantes-${report.id}.zip`);
+
+  // Um PDF so, o da unica categoria com pagina. Conferir pagina e pixel e
+  // trabalho da suite de integracao.
+  const zip = await JSZip.loadAsync(await readDownload(download));
+  expect(Object.keys(zip.files)).toEqual([
+    expect.stringMatching(/^01_[a-z-]+\.pdf$/),
+  ]);
 });

@@ -10,6 +10,7 @@ const pipeline = require('../services/extraction/pipeline.service');
 const queue = require('../services/extraction/queue');
 const retention = require('../services/retention.service');
 const receiptImage = require('../services/receipt-image.service');
+const typedIssuer = require('../services/typed-issuer.service');
 const {
   loadReport,
   loadReceipt,
@@ -198,7 +199,12 @@ async function update(req, res) {
   const current = await loadReceipt(req.user, id, { write: true });
 
   const data = receiptValidator.validateUpdate(req.body, current);
-  const receipt = await Receipt.update(id, data);
+
+  // A chave ou o CNPJ digitados dizem quem emitiu: vinculam o emitente e, no
+  // caso da chave, acusam a duplicata exata, como a extracao faria.
+  const fromIssuer = await typedIssuer.applyTypedIssuer(current, data);
+
+  const receipt = await Receipt.update(id, { ...data, ...fromIssuer });
 
   res.json({ data: receipt });
 }
@@ -228,11 +234,14 @@ async function destroy(req, res) {
  * Reenfileira uma pagina. Serve para o comprovante que ficou preso em
  * `processing` — a fila vive na memoria do processo, entao um reinicio no meio
  * do lote deixa registros nesse estado — e para tentar de novo depois de
- * ajustar o cadastro do emitente.
+ * ajustar o cadastro do emitente. O que uma pessoa ja conferiu so e
+ * reprocessado com `discard_review: true` — ver `validateReprocess`.
  */
 async function reprocess(req, res) {
   const id = receiptValidator.validateId(req.params.id);
   const receipt = await loadReceipt(req.user, id, { write: true });
+
+  receiptValidator.validateReprocess(req.body, receipt);
 
   const buffer = await readOriginal(
     receipt,
@@ -257,9 +266,9 @@ async function reprocess(req, res) {
  * por conveniencia — decisao ja registrada desde a Issue 0.
  *
  * O navegador guarda a imagem, mas pergunta antes de cada uso (`no-cache`): a
- * pergunta passa pela sessao e pela posse, e como o ETag e o par (hash do
- * arquivo, pagina), que nunca muda depois de gravado, a resposta e um 304 sem
- * renderizar nada. Com `max-age` a copia era servida sem pergunta nenhuma por
+ * pergunta passa pela sessao e pela posse, e como o ETag e o trio (hash do
+ * arquivo, pagina, rotacao), que so muda quando a revisao gira a pagina, a
+ * resposta e um 304 sem renderizar nada. Com `max-age` a copia era servida sem pergunta nenhuma por
  * um dia — depois do logout, e ate para outra conta no mesmo navegador.
  */
 async function image(req, res) {
@@ -268,9 +277,11 @@ async function image(req, res) {
 
   // Vai tambem no 304: sem isto ele herdaria o `no-store` da API, e o
   // navegador descartaria a copia — cada exibicao voltaria a renderizar.
+  // A rotacao entra no ETag: girada a pagina na revisao, a copia guardada com
+  // o giro antigo nao pode voltar como 304.
   const cache = {
     'Cache-Control': 'private, no-cache',
-    ETag: `"${receipt.file_hash}-${receipt.page_number}"`,
+    ETag: `"${receipt.file_hash}-${receipt.page_number}-${receipt.rotation}"`,
   };
 
   if (req.headers['if-none-match'] === cache.ETag) {
@@ -286,7 +297,7 @@ async function image(req, res) {
   // (sharp, canvas, memoria) e do servidor, e responder "reenvie o arquivo"
   // mandaria a pessoa repetir um upload que nao resolve nada.
   const image = await receiptImage
-    .render(buffer, receipt.page_number)
+    .render(buffer, receipt.page_number, receipt.rotation)
     .catch((error) => {
       if (error?.name !== 'InvalidPDFException') {
         throw error;

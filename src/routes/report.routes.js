@@ -32,6 +32,11 @@ router.get(
   requireScope('reports:read'),
   asyncHandler(controller.validate),
 );
+router.get(
+  '/:id/final-check',
+  requireScope('reports:read'),
+  asyncHandler(controller.showFinalCheck),
+);
 
 // As exportacoes levam o relatorio inteiro num arquivo — cupom, CNPJ e valor.
 // Sao leitura de relatorio, e passam pela mesma posse.
@@ -49,6 +54,11 @@ router.get(
   '/:id/export.pdf',
   requireScope('reports:read'),
   asyncHandler(controller.exportPdf),
+);
+router.get(
+  '/:id/export/pdfs-por-categoria.zip',
+  requireScope('reports:read'),
+  asyncHandler(controller.exportCategoryPdfs),
 );
 
 router.get('/', requireScope('reports:read'), asyncHandler(controller.index));

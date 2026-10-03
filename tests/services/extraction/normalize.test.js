@@ -6,6 +6,7 @@ const {
   extractTotal,
   extractDate,
   extractCnpj,
+  extractFuelLines,
 } = require('../../../src/services/extraction/normalize');
 
 describe('parseAmountToCents', () => {
@@ -168,5 +169,44 @@ describe('extractCnpj', () => {
     expect(
       extractCnpj('52260626048802000165650010001631601303284889'),
     ).toBeNull();
+  });
+});
+
+describe('extractFuelLines', () => {
+  // Os dois exemplos do procedimento, a linha do OCR de Itapipoca e a da nota
+  // de Formosa com o preco sujo — esta e lida, mas nao fecha a propria conta.
+  const casos = [
+    ['39,56 L 5,70 225,49', { totalCents: 22549, closes: true }],
+    ['18,461 L X 4,97 91,75', { totalCents: 9175, closes: true }],
+    ['39,560 LT X 5,700 = 225,49', { totalCents: 22549, closes: true }],
+    ['18.461 L x R$49,97 R$ 91.75', { totalCents: 9175, closes: false }],
+  ];
+
+  it.each(casos)('%s', (linha, esperado) => {
+    expect(extractFuelLines(linha)).toEqual([
+      expect.objectContaining(esperado),
+    ]);
+  });
+
+  it('separador unico e decimal: 18.461 sao litros, nao milhares', () => {
+    expect(extractFuelLines('18.461 L x 4,97 91,75')[0]).toMatchObject({
+      liters: 18461,
+      unitPrice: 4970,
+    });
+  });
+
+  it('ignora o que nao e linha de abastecimento', () => {
+    const texto = [
+      '000004 — ETANOL Bi06 Bo03 TqO2 EI95341,32',
+      '.. VALOR TOTAL Ri 2... 2.225,49',
+      'AGUA MINERAL 1,5 L',
+    ].join('\n');
+
+    expect(extractFuelLines(texto)).toEqual([]);
+  });
+
+  it('a ancora nao atravessa a quebra de linha', () => {
+    // Litros numa linha e preco e total na seguinte nao sao uma linha so.
+    expect(extractFuelLines('39,56 L\n5,70 225,49')).toEqual([]);
   });
 });

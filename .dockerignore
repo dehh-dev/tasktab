@@ -30,4 +30,4 @@ env.test
 Dockerfile
 .dockerignore
 README.md
-CLAUDE.md
+**/CLAUDE.md

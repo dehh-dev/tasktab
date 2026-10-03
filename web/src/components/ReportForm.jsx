@@ -1,24 +1,43 @@
 import { useState } from 'react';
-import { parseMoneyToCents } from '../constants';
+import { centsToInputValue, parseMoneyToCents } from '../constants';
 
 const EMPTY = {
   title: '',
   period_start: '',
   period_end: '',
   advance_cents: '',
+  main_city: '',
 };
 
+function valuesFrom(report) {
+  if (!report) {
+    return EMPTY;
+  }
+
+  return {
+    title: report.title ?? '',
+    period_start: report.period_start ?? '',
+    period_end: report.period_end ?? '',
+    advance_cents: centsToInputValue(report.advance_cents),
+    main_city: report.main_city ?? '',
+  };
+}
+
 /**
- * Criacao de relatorio. So criacao por enquanto — o backlog nao pede edicao
- * de relatorio na interface, e inventar isso seria alem do que foi pedido.
+ * Criacao e edicao de relatorio. A edicao entrou na issue 44: titulo, periodo
+ * e adiantamento nao se corrigiam depois de criados — e adiantamento esquecido
+ * e justamente o que o procedimento manda sinalizar, porque sem ele nao ha
+ * saldo.
  */
 export default function ReportForm({
+  report,
   onSubmit,
   onCancel,
   submitting,
   serverErrors = {},
 }) {
-  const [values, setValues] = useState(EMPTY);
+  const editing = Boolean(report);
+  const [values, setValues] = useState(() => valuesFrom(report));
   const [localErrors, setLocalErrors] = useState({});
 
   const errors = { ...serverErrors, ...localErrors };
@@ -45,6 +64,12 @@ export default function ReportForm({
     if (!values.period_end) {
       found.period_end = 'period_end e obrigatorio';
     }
+    if (
+      values.advance_cents.trim() !== '' &&
+      parseMoneyToCents(values.advance_cents) === null
+    ) {
+      found.advance_cents = 'advance_cents deve ser um valor valido';
+    }
     setLocalErrors(found);
     return Object.keys(found).length === 0;
   }
@@ -60,16 +85,21 @@ export default function ReportForm({
       title: values.title.trim(),
       period_start: values.period_start,
       period_end: values.period_end,
-      // Entrada vazia ou invalida vira 0 aqui, e nao no parser: o parser
-      // devolve null para "nao sei o que e isto", e 0 e uma decisao de
-      // produto ("sem adiantamento informado"), nao a mesma coisa.
-      advance_cents: parseMoneyToCents(values.advance_cents) ?? 0,
+      // Vazio e "nao informado", e vai nulo — nao zero: zero e "nao houve
+      // adiantamento", e os dois so se distinguem se a tela nao os misturar.
+      advance_cents:
+        values.advance_cents.trim() === ''
+          ? null
+          : parseMoneyToCents(values.advance_cents),
+      main_city: values.main_city.trim() || null,
     });
   }
 
   return (
     <form className="form" onSubmit={handleSubmit} noValidate>
-      <h2 className="form__title">Novo relatorio</h2>
+      <h2 className="form__title">
+        {editing ? 'Editar relatorio' : 'Novo relatorio'}
+      </h2>
 
       <div className="form__grid">
         <div className="field field--full">
@@ -149,9 +179,42 @@ export default function ReportForm({
             inputMode="decimal"
             placeholder="0,00"
             value={values.advance_cents}
+            aria-invalid={Boolean(errors.advance_cents)}
+            aria-describedby="report-advance-hint"
             onChange={(event) => setField('advance_cents', event.target.value)}
           />
-          <span className="field__hint">Opcional</span>
+          <span className="field__hint" id="report-advance-hint">
+            Em branco: ainda nao informado. 0: nao houve adiantamento.
+          </span>
+          {errors.advance_cents && (
+            <span className="field__error" role="alert">
+              {errors.advance_cents}
+            </span>
+          )}
+        </div>
+
+        <div className="field">
+          <label className="field__label" htmlFor="report-main-city">
+            Cidade principal
+          </label>
+          <input
+            id="report-main-city"
+            className="field__input"
+            type="text"
+            placeholder="Itapipoca/CE"
+            value={values.main_city}
+            aria-invalid={Boolean(errors.main_city)}
+            onChange={(event) => setField('main_city', event.target.value)}
+          />
+          <span className="field__hint">
+            Opcional. O destino da viagem, para apontar a despesa feita fora
+            dele.
+          </span>
+          {errors.main_city && (
+            <span className="field__error" role="alert">
+              {errors.main_city}
+            </span>
+          )}
         </div>
       </div>
 
@@ -169,7 +232,13 @@ export default function ReportForm({
           className="btn btn--primary"
           disabled={submitting}
         >
-          {submitting ? 'Criando...' : 'Criar relatorio'}
+          {editing
+            ? submitting
+              ? 'Salvando...'
+              : 'Salvar relatorio'
+            : submitting
+              ? 'Criando...'
+              : 'Criar relatorio'}
         </button>
       </div>
     </form>

@@ -4,6 +4,7 @@ const ExcelJS = require('exceljs');
 const JSZip = require('jszip');
 const fs = require('fs/promises');
 const {
+  request,
   requestBinary,
   insertReport,
   insertReceipt,
@@ -53,10 +54,74 @@ describe('GET /api/reports/:id/export/anexo-i.xlsx', () => {
     expect(sheet.getCell('S32').value).toBe(37.6);
 
     // A formula da linha e a do total nunca sao tocadas pelo remendo.
-    expect(sheet.getCell('Y32').value).toEqual({ formula: 'S32+W32+X32' });
+    expect(sheet.getCell('Y32').value).toEqual({
+      formula: 'O32+Q32+S32+U32+W32+X32',
+    });
     expect(sheet.getCell('Y101').value).toEqual({
       formula: 'SUM(Y32:Y100)',
     });
+  });
+
+  it('cada categoria vai para a coluna do formulario versao 19', async () => {
+    const report = await insertReport();
+
+    // Uma por dia, para a ordem das linhas ser a da lista.
+    const expected = [
+      ['alimentacao', 'S'],
+      ['combustivel', 'W'],
+      ['transporte', 'Q'],
+      ['lavanderia', 'X'],
+      ['outros', 'X'],
+    ];
+
+    for (const [index, [category]] of expected.entries()) {
+      await insertReceipt(report.id, {
+        page_number: index + 1,
+        issued_at: `2026-06-1${index}`,
+        amount_cents: 1000 + index,
+        category,
+        status: 'confirmed',
+      });
+    }
+
+    const { workbook } = await loadAnexo(report.id);
+    const sheet = workbook.getWorksheet('Anexo I');
+
+    const actual = expected.map(([category], index) => {
+      const row = anexoI.FIRST_DATA_ROW + index;
+      const filled = ['O', 'Q', 'S', 'U', 'W', 'X'].filter(
+        (column) => sheet.getCell(`${column}${row}`).value !== 0,
+      );
+      const total = sheet.getCell(`Y${row}`).value.formula.split('+');
+
+      return [category, filled.join(), total.includes(`${filled[0]}${row}`)];
+    });
+
+    // A corrida de taxi ia para W, que no formulario e Combustivel — e o
+    // total da linha so cobria S, W e X.
+    expect(actual).toEqual(
+      expected.map(([category, column]) => [category, column, true]),
+    );
+  });
+
+  it('sem emitente cadastrado, cidade e descricao saem do comprovante', async () => {
+    const report = await insertReport();
+    const receipt = await insertReceipt(report.id, {
+      issued_at: '2026-08-03',
+      amount_cents: 2850,
+      category: 'alimentacao',
+      status: 'confirmed',
+    });
+    await request('PATCH', `/api/receipts/${receipt.id}`, {
+      issuer_name: 'Espetinho do Raimundinho',
+      issuer_city: 'Itapipoca/CE',
+    });
+
+    const { workbook } = await loadAnexo(report.id);
+    const sheet = workbook.getWorksheet('Anexo I');
+
+    expect(sheet.getCell('C32').value).toBe('Itapipoca/CE');
+    expect(sheet.getCell('G32').value).toMatch(/Espetinho do Raimundinho/);
   });
 
   it('so inclui comprovantes confirmados', async () => {

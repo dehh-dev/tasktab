@@ -1,7 +1,17 @@
 'use strict';
 
-const { BadRequestError, ValidationError } = require('../../infra/errors');
-const { isValidIsoDate, parseId } = require('./rules');
+const {
+  BadRequestError,
+  ConflictError,
+  ValidationError,
+} = require('../../infra/errors');
+const {
+  isValidIsoDate,
+  parseId,
+  validateCnpj,
+  optionalText,
+} = require('./rules');
+const accessKey = require('../services/extraction/access-key');
 
 const BODY_NOT_OBJECT = {
   message: 'Corpo da requisicao deve ser um objeto JSON.',
@@ -16,7 +26,6 @@ const INVALID_ID = {
 const EXPENSE_CATEGORIES = [
   'alimentacao',
   'combustivel',
-  'estacionamento',
   'lavanderia',
   'transporte',
   'outros',
@@ -32,9 +41,22 @@ const RECEIPT_STATUSES = [
   'failed',
 ];
 
-// Campos que a revisao humana preenche. Corrigir qualquer um deles marca a
-// origem como manual — e o que permite a tela destacar o que veio de OCR.
+// Campos que a revisao humana preenche, e sem os quais nao se confirma.
 const REVIEWED_FIELDS = ['issued_at', 'amount_cents', 'category'];
+
+// Corrigir qualquer um destes marca a origem como manual — e o que permite a
+// tela destacar o que veio de OCR. Chave, CNPJ e emitente entram aqui e nao na
+// lista de cima: recibo manuscrito e comanda nao tem chave, e se confirmam do
+// mesmo jeito.
+const MANUAL_FIELDS = [
+  ...REVIEWED_FIELDS,
+  'access_key',
+  'cnpj',
+  'issuer_name',
+  'issuer_city',
+];
+
+const ISSUER_MAX_LENGTH = 255;
 
 function fromEnum(field, allowed) {
   return (value, errors) => {
@@ -78,6 +100,66 @@ function validateAmountCents(value, errors) {
       field: 'amount_cents',
       message:
         'amount_cents deve ser um inteiro de centavos maior ou igual a 0',
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
+/**
+ * Chave de acesso digitada na revisao, quando o QR e o texto nao a deram.
+ *
+ * Aceita os separadores com que a chave e impressa e devolve so os 44
+ * caracteres. O DV decide: o procedimento conta o cupom em que o mes da
+ * emissao saia borrado e parecia 2606 — so 2608 fechava o verificador, e era
+ * a data certa. Chave que nao fecha e recusada, nunca gravada pela metade.
+ */
+function validateAccessKey(value, errors) {
+  if (value === null) {
+    return null;
+  }
+
+  const key = accessKey.normalizeKey(value);
+
+  if (key === null) {
+    errors.push({
+      field: 'access_key',
+      message:
+        'access_key deve ter 44 caracteres: 6 digitos, 12 letras ou digitos e 26 digitos',
+    });
+    return undefined;
+  }
+
+  if (!accessKey.isValid(key)) {
+    errors.push({
+      field: 'access_key',
+      message: 'access_key nao fecha o digito verificador',
+    });
+    return undefined;
+  }
+
+  return key;
+}
+
+// Nome e cidade de quem emitiu, como estao no papel (issue 42).
+const validateIssuerName = optionalText('issuer_name', ISSUER_MAX_LENGTH);
+const validateIssuerCity = optionalText('issuer_city', ISSUER_MAX_LENGTH);
+
+// Quarto de volta, no sentido horario, como o `/Rotate` do PDF.
+const ROTATIONS = [0, 90, 180, 270];
+
+/**
+ * Giro da pagina escolhido na revisao (issue 43). Nao marca a origem como
+ * manual: girar nao muda nenhum valor lido, e e justamente o passo antes de
+ * reprocessar — com a marca, o reprocessamento pediria para descartar uma
+ * conferencia que ninguem fez.
+ */
+function validateRotation(value, errors) {
+  if (!ROTATIONS.includes(value)) {
+    errors.push({
+      field: 'rotation',
+      message: 'rotation deve ser 0, 90, 180 ou 270',
     });
     return undefined;
   }
@@ -131,6 +213,28 @@ function validateUpdate(body, current = {}) {
     data.status = validateStatus(body.status, errors);
   }
 
+  if (body.access_key !== undefined) {
+    data.access_key = validateAccessKey(body.access_key, errors);
+  }
+
+  if (body.issuer_name !== undefined) {
+    data.issuer_name = validateIssuerName(body.issuer_name, errors);
+  }
+
+  if (body.issuer_city !== undefined) {
+    data.issuer_city = validateIssuerCity(body.issuer_city, errors);
+  }
+
+  if (body.rotation !== undefined) {
+    data.rotation = validateRotation(body.rotation, errors);
+  }
+
+  // Nulo desvincula o emitente — o CNPJ do texto pode ser o da credenciadora
+  // do cartao, e nao o de quem vendeu.
+  if (body.cnpj !== undefined) {
+    data.cnpj = body.cnpj === null ? null : validateCnpj(body.cnpj, errors);
+  }
+
   assertValid(errors);
 
   if (Object.keys(data).length === 0) {
@@ -139,7 +243,21 @@ function validateUpdate(body, current = {}) {
       details: [
         {
           field: 'body',
-          message: 'campos aceitos: issued_at, amount_cents, category, status',
+          message:
+            'campos aceitos: issued_at, amount_cents, category, status, access_key, cnpj, issuer_name, issuer_city, rotation',
+        },
+      ],
+    });
+  }
+
+  // O CNPJ confiavel e o das posicoes 7 a 20 da chave. Com ela no comprovante,
+  // um CNPJ digitado so poderia contradize-la.
+  if ('cnpj' in data && (current.access_key || data.access_key)) {
+    throw new ValidationError({
+      details: [
+        {
+          field: 'cnpj',
+          message: 'cnpj vem da chave de acesso deste comprovante',
         },
       ],
     });
@@ -153,7 +271,7 @@ function validateUpdate(body, current = {}) {
   }
 
   // Correcao humana marca a origem, para a revisao saber o que ja foi olhado.
-  if (REVIEWED_FIELDS.some((field) => field in data)) {
+  if (MANUAL_FIELDS.some((field) => field in data)) {
     data.extraction_source = 'manual';
   }
 
@@ -164,6 +282,46 @@ function validateUpdate(body, current = {}) {
   }
 
   return data;
+}
+
+/**
+ * Reprocessar regrava data, valor e categoria com o que a extracao ler. Sobre
+ * o que uma pessoa ja conferiu — confirmou, ou corrigiu a mao — isso apaga
+ * trabalho de revisao. A API aceitava sem perguntar; agora pede a confirmacao
+ * explicita em `discard_review`, decidida com quem usa.
+ */
+function validateReprocess(body, current) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new BadRequestError({
+      message: 'Corpo da requisicao deve ser um objeto JSON.',
+      action: 'Envie um objeto vazio, ou { "discard_review": true }.',
+    });
+  }
+
+  if (
+    body.discard_review !== undefined &&
+    typeof body.discard_review !== 'boolean'
+  ) {
+    throw new ValidationError({
+      details: [
+        {
+          field: 'discard_review',
+          message: 'discard_review deve ser booleano',
+        },
+      ],
+    });
+  }
+
+  const reviewed =
+    current.status === 'confirmed' || current.extraction_source === 'manual';
+
+  if (reviewed && body.discard_review !== true) {
+    throw new ConflictError({
+      message: 'Este comprovante ja foi conferido por uma pessoa.',
+      action:
+        'Reprocessar substitui a data, o valor e a categoria conferidos pelo que a extracao ler. Para seguir mesmo assim, confirme o descarte da conferencia.',
+    });
+  }
 }
 
 function validateId(rawId) {
@@ -190,6 +348,7 @@ module.exports = {
   EXPENSE_CATEGORIES,
   RECEIPT_STATUSES,
   validateUpdate,
+  validateReprocess,
   validateId,
   validateListQuery,
 };

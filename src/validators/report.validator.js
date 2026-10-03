@@ -7,6 +7,7 @@ const {
   isoDateNotAfter,
   parseId,
   parsePagination,
+  optionalText,
 } = require('./rules');
 
 const BODY_NOT_OBJECT = {
@@ -74,6 +75,11 @@ function validateStatus(value, errors) {
  * 219.98000000000002 na conferencia manual que originou este projeto.
  */
 function validateAdvanceCents(value, errors) {
+  // Nulo e "nao informado"; zero e "nao houve adiantamento" (issue 44).
+  if (value === null) {
+    return null;
+  }
+
   if (!Number.isInteger(value) || value < 0) {
     errors.push({
       field: 'advance_cents',
@@ -84,6 +90,9 @@ function validateAdvanceCents(value, errors) {
   }
   return value;
 }
+
+// A cidade principal da viagem: a base das regras de despesa fora dela.
+const validateMainCity = optionalText('main_city');
 
 function assertValid(errors) {
   if (errors.length > 0) {
@@ -135,6 +144,10 @@ function validateCreate(body) {
     data.advance_cents = validateAdvanceCents(body.advance_cents, errors);
   }
 
+  if (body.main_city !== undefined) {
+    data.main_city = validateMainCity(body.main_city, errors);
+  }
+
   if (body.status !== undefined) {
     data.status = validateStatus(body.status, errors);
   }
@@ -167,6 +180,10 @@ function validateUpdate(body, current = {}) {
     data.advance_cents = validateAdvanceCents(body.advance_cents, errors);
   }
 
+  if (body.main_city !== undefined) {
+    data.main_city = validateMainCity(body.main_city, errors);
+  }
+
   if (body.status !== undefined) {
     data.status = validateStatus(body.status, errors);
   }
@@ -188,7 +205,7 @@ function validateUpdate(body, current = {}) {
         {
           field: 'body',
           message:
-            'campos aceitos: title, period_start, period_end, advance_cents, status',
+            'campos aceitos: title, period_start, period_end, advance_cents, main_city, status',
         },
       ],
     });

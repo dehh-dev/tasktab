@@ -6,6 +6,7 @@ const {
   PDFDocument,
   StandardFonts,
   rgb,
+  degrees,
   PDFName,
   PDFString,
   PDFNumber,
@@ -50,6 +51,38 @@ function truncateToWidth(text, font, size, maxWidth) {
     truncated = truncated.slice(0, -1);
   }
   return `${truncated}...`;
+}
+
+/** `/Rotate` da pagina, reduzido a 0, 90, 180 ou 270. */
+function pageRotation(page) {
+  const quarterTurns = Math.round(page.getRotation().angle / 90);
+  return (((quarterTurns % 4) + 4) % 4) * 90;
+}
+
+/**
+ * Onde desenhar a pagina embutida para que ela saia como a original e exibida.
+ *
+ * O `/Rotate` e atributo da pagina, nao do conteudo: embutida como XObject, a
+ * pagina chega como esta gravada no arquivo, sem a rotacao, e a pagina nova
+ * nasce sem `/Rotate`. Era assim que um cupom de cabeca para baixo, ja
+ * corrigido na origem, voltava invertido no consolidado. Desenhar a pagina ja
+ * girada faz a nova mostrar o que a original mostra, com a faixa do carimbo
+ * no rodape e na horizontal.
+ *
+ * O `/Rotate` gira no sentido horario e o `drawPage`, no anti-horario em torno
+ * de (x, y) — dai o angulo negativo e o deslocamento de cada caso.
+ */
+function placement(width, height, rotation) {
+  switch (rotation) {
+    case 90:
+      return { width: height, height: width, x: 0, y: width };
+    case 180:
+      return { width, height, x: width, y: height };
+    case 270:
+      return { width: height, height: width, x: height, y: 0 };
+    default:
+      return { width, height, x: 0, y: 0 };
+  }
 }
 
 function stampText(seq, receipt) {
@@ -212,18 +245,31 @@ async function buildConsolidatedPdf(report, receipts) {
     const filePath = path.join(env.upload.dir, receipt.file_path);
     const bytes = await fs.readFile(filePath);
     const source = await PDFDocument.load(bytes);
-    const [embedded] = await doc.embedPdf(source, [receipt.page_number - 1]);
+    const index = receipt.page_number - 1;
+    const [embedded] = await doc.embedPdf(source, [index]);
 
-    const { width, height } = embedded;
-    const page = doc.addPage([width, height + STAMP_HEIGHT]);
-    page.drawPage(embedded, { x: 0, y: STAMP_HEIGHT, width, height });
+    // O `/Rotate` da origem mais o giro escolhido na revisao (issue 43): o
+    // arquivo original nao e regravado, e o consolidado sai como a revisao
+    // mostra a pagina.
+    const rotation =
+      (pageRotation(source.getPage(index)) + (receipt.rotation ?? 0)) % 360;
+    const shown = placement(embedded.width, embedded.height, rotation);
+
+    const page = doc.addPage([shown.width, shown.height + STAMP_HEIGHT]);
+    page.drawPage(embedded, {
+      x: shown.x,
+      y: STAMP_HEIGHT + shown.y,
+      width: embedded.width,
+      height: embedded.height,
+      rotate: degrees(-rotation),
+    });
 
     const seq = contentPages.length + 1;
     const text = truncateToWidth(
       stampText(seq, receipt),
       font,
       STAMP_FONT_SIZE,
-      width - STAMP_MARGIN * 2,
+      shown.width - STAMP_MARGIN * 2,
     );
     page.drawText(text, {
       x: STAMP_MARGIN,
@@ -271,4 +317,10 @@ async function buildConsolidatedPdf(report, receipts) {
   };
 }
 
-module.exports = { buildConsolidatedPdf, chronological, stampText };
+module.exports = {
+  buildConsolidatedPdf,
+  chronological,
+  pageRotation,
+  stampText,
+  STAMP_HEIGHT,
+};

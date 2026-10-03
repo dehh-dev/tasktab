@@ -5,6 +5,7 @@ const {
   request,
   insertReport,
   waitForProcessing,
+  updateColumnDirectly,
 } = require('../../orchestrator');
 const { makeScannedReceiptPdf, makeReceiptPdf } = require('../../fixtures/pdf');
 
@@ -114,6 +115,39 @@ describe('processamento assincrono', () => {
     expect(receipt.status).toBe('needs_review');
   });
 
+  it('reprocessar le a pagina girada na revisao', async () => {
+    const report = await insertReport();
+
+    // O cupom fotografado de cabeca para baixo: o Tesseract nao endireita a
+    // pagina sozinho. E o unico escaneado a mais da suite, porque prova um
+    // pedaco que o teste da cascata nao prova — o giro chegar ao OCR.
+    await upload(report.id, [
+      {
+        buffer: await makeScannedReceiptPdf({
+          total: '37,60',
+          date: '19/06/2026',
+          upsideDown: true,
+        }),
+        filename: 'invertido.pdf',
+      },
+    ]);
+    const [receipt] = await listReceipts(report.id);
+
+    await request('PATCH', `/api/receipts/${receipt.id}`, { rotation: 180 });
+    const response = await request(
+      'POST',
+      `/api/receipts/${receipt.id}/reprocess`,
+    );
+    expect(response.status).toBe(202);
+
+    const [reprocessado] = await listReceipts(report.id);
+    expect(reprocessado).toMatchObject({
+      extraction_source: 'ocr',
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
+    });
+  }, 60000);
+
   it('reprocessa um comprovante pela rota', async () => {
     const report = await insertReport();
 
@@ -125,9 +159,11 @@ describe('processamento assincrono', () => {
 
     // Simula o que sobra de um reinicio no meio do lote: a fila vive na
     // memoria do processo, entao ha registros que ficam presos em processing.
-    await request('PATCH', `/api/receipts/${receipt.id}`, {
-      amount_cents: null,
-    });
+    // Escrito direto no banco porque a API nao produz esse estado — e um
+    // PATCH marcaria a linha como corrigida a mao, que reprocessar so aceita
+    // com a confirmacao do descarte.
+    await updateColumnDirectly('receipts', receipt.id, 'amount_cents', null);
+    await updateColumnDirectly('receipts', receipt.id, 'status', 'processing');
 
     const response = await request(
       'POST',

@@ -121,6 +121,18 @@ describe('o contraexemplo obrigatorio', () => {
     // que a ferramenta existe para evitar.
     expect(data.map((receipt) => receipt.amount_cents)).toEqual([4860, 4860]);
     expect(meta.total).toBe(2);
+
+    // E a conferencia avisa, nos dois, para ninguem apagar um deles.
+    const conferencia = await request(
+      'GET',
+      `/api/reports/${report.id}/validation`,
+    );
+    const repetidos = conferencia.body.data.filter(
+      (alerta) => alerta.rule === 'valor_repetido',
+    );
+    expect(repetidos.map((alerta) => alerta.receipt_id).sort()).toEqual(
+      data.map((receipt) => receipt.id).sort(),
+    );
   });
 
   it('nao sugere duplicata para notas fiscais distintas no mesmo dia', async () => {
@@ -145,12 +157,16 @@ describe('o contraexemplo obrigatorio', () => {
     );
 
     // Chaves diferentes sao documentos diferentes por definicao: nem suspeita
-    // ha. Sem isso, restaurante de preco fixo viraria uma enxurrada de alertas.
-    const suspeitas = response.body.data.filter(
-      (alerta) => alerta.rule === 'possivel_duplicata',
-    );
+    // ha. Sem isso, restaurante de preco fixo viraria uma enxurrada de
+    // decisoes a tomar. O que sai e o contrario, informativo: nao apague.
+    const porRegra = (regra) =>
+      response.body.data.filter((alerta) => alerta.rule === regra);
 
-    expect(suspeitas).toHaveLength(0);
+    expect(porRegra('possivel_duplicata')).toHaveLength(0);
+    expect(porRegra('valor_repetido')).toMatchObject([
+      { level: 'informativo' },
+      { level: 'informativo' },
+    ]);
   });
 });
 
@@ -185,7 +201,8 @@ describe('duplicata provavel', () => {
     );
 
     expect(suspeitas).toHaveLength(1);
-    expect(suspeitas[0].severity).toBe('aviso');
+    // Pode ser o mesmo gasto, pode nao ser: quem decide e uma pessoa.
+    expect(suspeitas[0].level).toBe('decisao');
     // O alerta liga os dois comprovantes, e nao so traz o campo preenchido.
     expect([suspeitas[0].receipt_id, suspeitas[0].related_id].sort()).toEqual(
       [first.id, second.id].sort(),

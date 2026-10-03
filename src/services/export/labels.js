@@ -9,16 +9,27 @@
 // categoria, e a aplicacao grava NULL no comprovante. Ter um rotulo proprio
 // para ele criava dois nomes para a mesma coisa — foi o que fez o subtotal
 // "Nao classificado" da planilha nunca casar com as linhas "Sem categoria".
+// Os rotulos sao os do procedimento de prestacao de contas. `transporte` fica
+// com esse nome no banco e sai como Taxi/Locomocao, que e como quem confere o
+// chama.
 const CATEGORY_LABELS = {
   alimentacao: 'Alimentação',
   combustivel: 'Combustível',
-  estacionamento: 'Estacionamento',
   lavanderia: 'Lavanderia',
-  transporte: 'Transporte',
+  transporte: 'Táxi/Locomoção',
   outros: 'Outros',
 };
 
 const NO_CATEGORY_LABEL = 'Sem categoria';
+
+// As classes da conferencia (issue 48), como a aba de Observacoes as escreve.
+const LEVEL_LABELS = {
+  pendente: 'Pendente',
+  decisao: 'Decisão',
+  atencao: 'Atenção',
+  verificado: 'Verificado',
+  informativo: 'Informativo',
+};
 
 const STATUS_LABELS = {
   pending: 'Pendente',
@@ -47,6 +58,10 @@ function statusLabel(status) {
   return STATUS_LABELS[status] || status;
 }
 
+function levelLabel(level) {
+  return LEVEL_LABELS[level] || level;
+}
+
 module.exports = {
   CATEGORY_LABELS,
   STATUS_LABELS,
@@ -54,4 +69,5 @@ module.exports = {
   categoryKey,
   categoryLabel,
   statusLabel,
+  levelLabel,
 };

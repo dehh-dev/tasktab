@@ -1,14 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as api from '../api';
+import { ApiError } from '../api';
 import ReceiptUpload from './ReceiptUpload';
 import ReceiptSummary from './ReceiptSummary';
 import ReceiptList from './ReceiptList';
 import ReceiptReview from './ReceiptReview';
 import ConfirmDialog from './ConfirmDialog';
+import FinalCheck from './FinalCheck';
+import ReportForm from './ReportForm';
+import ValidationPanel from './ValidationPanel';
 import { formatDate, formatMoney, reportStatusLabel } from '../constants';
 
 const POLL_INTERVAL_MS = 1500;
+// Teto da espera depois de falhas seguidas: o bastante para nao insistir num
+// servidor que respondeu 429, curto o bastante para a tela voltar sozinha.
+const POLL_MAX_INTERVAL_MS = 15000;
 const EMPTY_META = { total: 0, total_cents: 0, by_category: {} };
+
+function isProcessing(receipt) {
+  return receipt.status === 'pending' || receipt.status === 'processing';
+}
 
 /** Ids dos comprovantes que ainda precisam de revisao, na ordem da lista. */
 function needsReviewQueue(receipts) {
@@ -62,7 +73,16 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
 
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [pendingReprocess, setPendingReprocess] = useState(null);
+  const [reprocessing, setReprocessing] = useState(false);
+  const [pollError, setPollError] = useState(null);
+  const [pollFailures, setPollFailures] = useState(0);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [finalCheck, setFinalCheck] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [editingReport, setEditingReport] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [reportErrors, setReportErrors] = useState({});
 
   /**
    * Devolve os comprovantes recem-buscados, e nao so os grava no estado.
@@ -82,6 +102,10 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
     setReceipts(receiptsResponse.data);
     setMeta(receiptsResponse.meta);
     setAlerts(validationResponse.data);
+    // A tela acabou de ser recarregada inteira: um aviso de falha do
+    // acompanhamento, se havia, ja nao diz a verdade.
+    setPollError(null);
+    setPollFailures(0);
 
     return receiptsResponse.data;
   }, [reportId]);
@@ -107,21 +131,52 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
     }
   }, [reviewingId, receipts]);
 
-  // Poll so enquanto houver comprovante ainda em processamento; para sozinho
+  /**
+   * Um ciclo do acompanhamento: so a lista, que e o que muda enquanto a
+   * extracao roda. Relatorio e conferencia so mudam quando ela termina, e
+   * busca-los a cada 1,5 s gastava o teto de leitura — tres requisicoes por
+   * ciclo esgotavam os 600 da janela em cinco minutos de OCR, e a conferencia
+   * ainda custa consultas por comprovante.
+   */
+  const poll = useCallback(async () => {
+    try {
+      const response = await api.listReceipts(reportId);
+
+      // Terminou: recarrega tudo de uma vez. Se essa recarga falhar, a lista
+      // de antes continua dizendo "em processamento", e o ciclo seguinte tenta
+      // de novo — em vez de parar com a conferencia desatualizada.
+      if (response.data.some(isProcessing)) {
+        setReceipts(response.data);
+        setMeta(response.meta);
+      } else {
+        await load();
+      }
+
+      setPollError(null);
+      setPollFailures(0);
+    } catch (caught) {
+      // Antes, o erro era engolido e nenhum ciclo novo era agendado: a tela
+      // ficava em "processando" para sempre, sem dizer nada. Agora avisa e
+      // tenta de novo, cada vez esperando mais.
+      setPollError({ message: caught.message, action: caught.action });
+      setPollFailures((failures) => failures + 1);
+    }
+  }, [reportId, load]);
+
+  // Acompanha so enquanto houver comprovante em processamento; para sozinho
   // quando nao ha mais nenhum, para nao ficar batendo a toa.
   useEffect(() => {
-    const stillProcessing = receipts.some(
-      (receipt) =>
-        receipt.status === 'pending' || receipt.status === 'processing',
-    );
-
-    if (!stillProcessing) {
+    if (!receipts.some(isProcessing)) {
       return undefined;
     }
 
-    const timer = setTimeout(() => load().catch(() => {}), POLL_INTERVAL_MS);
+    const delay = Math.min(
+      POLL_INTERVAL_MS * 2 ** pollFailures,
+      POLL_MAX_INTERVAL_MS,
+    );
+    const timer = setTimeout(poll, delay);
     return () => clearTimeout(timer);
-  }, [receipts, load]);
+  }, [receipts, pollFailures, poll]);
 
   /** Recarrega e avanca para o proximo pendente — ou fecha, se a fila esvaziou. */
   async function handleAction() {
@@ -164,13 +219,36 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
    * Reenfileira a pagina. O status volta para `pending`, e o poll ja existente
    * retoma sozinho ate a extracao terminar.
    */
-  async function handleReprocess(receipt) {
+  async function handleReprocess(receipt, { discardReview = false } = {}) {
+    setReprocessing(true);
+
     try {
-      await api.reprocessReceipt(receipt.id);
+      await api.reprocessReceipt(receipt.id, { discardReview });
+      setPendingReprocess(null);
       await load();
     } catch (caught) {
       setError({ message: caught.message, action: caught.action });
+      setPendingReprocess(null);
+    } finally {
+      setReprocessing(false);
     }
+  }
+
+  /**
+   * O que uma pessoa ja conferiu — confirmou, ou corrigiu a mao — so e
+   * reprocessado depois do dialogo: a extracao regrava data, valor e
+   * categoria por cima. A API confere de novo e recusa sem a confirmacao.
+   */
+  function requestReprocess(receipt) {
+    const reviewed =
+      receipt.status === 'confirmed' || receipt.extraction_source === 'manual';
+
+    if (reviewed) {
+      setPendingReprocess(receipt);
+      return;
+    }
+
+    handleReprocess(receipt);
   }
 
   /**
@@ -189,6 +267,54 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
       setError({ message: caught.message, action: caught.action });
     } finally {
       setChangingStatus(false);
+    }
+  }
+
+  /**
+   * Antes de fechar, a checagem final do procedimento (issue 57). Informa,
+   * nao bloqueia: com algo em aberto o botao vira "Fechar mesmo assim", e
+   * se a checagem nao responder, o dialogo diz isso e deixa fechar igual.
+   */
+  async function requestClose() {
+    setChecking(true);
+
+    try {
+      const { data } = await api.getFinalCheck(reportId);
+      setFinalCheck({ items: data });
+    } catch (caught) {
+      setFinalCheck({ error: caught.message });
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function handleClose() {
+    await handleStatusChange('closed');
+    setFinalCheck(null);
+  }
+
+  /**
+   * Titulo, periodo, adiantamento e cidade principal (issue 44). O erro de
+   * campo volta no formulario, preservando o que foi digitado.
+   */
+  async function handleSaveReport(values) {
+    setSavingReport(true);
+    setReportErrors({});
+
+    try {
+      await api.updateReport(reportId, values);
+      setEditingReport(false);
+      await load();
+    } catch (caught) {
+      const byField = caught instanceof ApiError ? caught.fieldErrors() : {};
+
+      if (Object.keys(byField).length > 0) {
+        setReportErrors(byField);
+      } else {
+        setError({ message: caught.message, action: caught.action });
+      }
+    } finally {
+      setSavingReport(false);
     }
   }
 
@@ -229,6 +355,38 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
       onCancel={() => setPendingDelete(null)}
       busy={deleting}
     />
+  );
+
+  const reprocessDialog = pendingReprocess && (
+    <ConfirmDialog
+      title="Reprocessar comprovante conferido?"
+      target={receiptLabel(pendingReprocess)}
+      message="A data, o valor e a categoria conferidos serao substituidos pelo que a extracao ler, e o comprovante volta para a revisao."
+      confirmLabel="Reprocessar"
+      busyLabel="Reprocessando..."
+      onConfirm={() =>
+        handleReprocess(pendingReprocess, { discardReview: true })
+      }
+      onCancel={() => setPendingReprocess(null)}
+      busy={reprocessing}
+    />
+  );
+
+  const openChecks = finalCheck?.items?.filter((item) => !item.ok).length;
+  const closeDialog = finalCheck && (
+    <ConfirmDialog
+      title="Fechar relatorio?"
+      message="Fechado, o relatorio fica somente leitura ate alguem reabrir."
+      confirmLabel={
+        openChecks === 0 ? 'Fechar relatorio' : 'Fechar mesmo assim'
+      }
+      busyLabel="Fechando..."
+      onConfirm={handleClose}
+      onCancel={() => setFinalCheck(null)}
+      busy={changingStatus}
+    >
+      <FinalCheck result={finalCheck} />
+    </ConfirmDialog>
   );
 
   if (reviewingId) {
@@ -294,7 +452,7 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
           {
             // Download por <a href>, nao por fetch: entregar o arquivo baixado
             // exigiria um `blob:`, que a CSP do projeto nao libera. Excel e
-            // Anexo I so levam o confirmado; o PDF leva todo comprovante.
+            // Anexo I so levam o confirmado; os PDFs levam todo comprovante.
           }
           <ExportLink
             href={api.reportXlsxUrl(reportId)}
@@ -317,13 +475,32 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
           >
             PDF consolidado
           </ExportLink>
+          <ExportLink
+            href={api.reportCategoryPdfsUrl(reportId)}
+            download={`comprovantes-${reportId}.zip`}
+            enabled={receipts.length > 0}
+          >
+            PDFs por categoria
+          </ExportLink>
+
+          {editable && !editingReport && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setEditingReport(true)}
+            >
+              Editar relatorio
+            </button>
+          )}
 
           {canWrite && (
             <button
               type="button"
               className="btn"
-              onClick={() => handleStatusChange(closed ? 'open' : 'closed')}
-              disabled={changingStatus}
+              onClick={() =>
+                closed ? handleStatusChange('open') : requestClose()
+              }
+              disabled={changingStatus || checking}
             >
               {closed ? 'Reabrir relatorio' : 'Fechar relatorio'}
             </button>
@@ -338,7 +515,31 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
         </div>
       )}
 
-      {report && (
+      {pollError && (
+        <div className="alert" role="status">
+          <div className="alert__title">
+            Nao foi possivel acompanhar o processamento: {pollError.message}
+          </div>
+          <div>
+            {pollError.action} A tela tenta de novo sozinha em instantes.
+          </div>
+        </div>
+      )}
+
+      {editingReport && report && (
+        <ReportForm
+          report={report}
+          onSubmit={handleSaveReport}
+          onCancel={() => {
+            setEditingReport(false);
+            setReportErrors({});
+          }}
+          submitting={savingReport}
+          serverErrors={reportErrors}
+        />
+      )}
+
+      {report && !editingReport && (
         <div className="form" aria-label="Dados do relatorio">
           <h2 className="form__title">{report.title}</h2>
           <div className="task__meta">
@@ -349,8 +550,19 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
               {formatDate(report.period_start)} a{' '}
               {formatDate(report.period_end)}
             </span>
-            {report.advance_cents > 0 && (
-              <span>Adiantamento: {formatMoney(report.advance_cents)}</span>
+            {
+              // Nulo e "nao informado", zero e "nao houve" (issue 44): sem
+              // adiantamento nao ha saldo, e a tela diz qual dos dois e.
+            }
+            <span>
+              {report.advance_cents === null
+                ? 'Adiantamento nao informado'
+                : report.advance_cents === 0
+                  ? 'Sem adiantamento'
+                  : `Adiantamento: ${formatMoney(report.advance_cents)}`}
+            </span>
+            {report.main_city && (
+              <span>Cidade principal: {report.main_city}</span>
             )}
           </div>
         </div>
@@ -369,15 +581,18 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
         editable && <ReceiptUpload reportId={reportId} onUploaded={load} />
       }
       <ReceiptSummary meta={meta} />
+      <ValidationPanel alerts={alerts} onOpen={setReviewingId} />
       <ReceiptList
         receipts={receipts}
         onOpen={setReviewingId}
         onDelete={editable ? setPendingDelete : undefined}
-        onReprocess={editable ? handleReprocess : undefined}
-        busy={deleting}
+        onReprocess={editable ? requestReprocess : undefined}
+        busy={deleting || reprocessing}
       />
 
       {deleteDialog}
+      {reprocessDialog}
+      {closeDialog}
     </>
   );
 }

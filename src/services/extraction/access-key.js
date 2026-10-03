@@ -32,6 +32,37 @@
  */
 
 const LENGTH = 44;
+
+// Codigo IBGE da UF, que abre a chave (posicoes 1 e 2).
+const UF_BY_CODE = {
+  11: 'RO',
+  12: 'AC',
+  13: 'AM',
+  14: 'RR',
+  15: 'PA',
+  16: 'AP',
+  17: 'TO',
+  21: 'MA',
+  22: 'PI',
+  23: 'CE',
+  24: 'RN',
+  25: 'PB',
+  26: 'PE',
+  27: 'AL',
+  28: 'SE',
+  29: 'BA',
+  31: 'MG',
+  32: 'ES',
+  33: 'RJ',
+  35: 'SP',
+  41: 'PR',
+  42: 'SC',
+  43: 'RS',
+  50: 'MS',
+  51: 'MT',
+  52: 'GO',
+  53: 'DF',
+};
 const FORMAT = /^\d{6}[A-Z0-9]{12}\d{26}$/;
 
 /** Como a chave aparece num texto ou no QR, sem separadores. */
@@ -95,6 +126,8 @@ function parse(input) {
   return {
     key,
     uf: key.slice(0, 2),
+    // Sigla da UF, ou `null` para um codigo que nao e de UF nenhuma.
+    state: UF_BY_CODE[Number(key.slice(0, 2))] ?? null,
     issuedYear: year,
     issuedMonth: month,
     // Primeiro dia do mes de emissao. A chave nao carrega o dia — serve como

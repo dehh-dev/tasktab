@@ -3,10 +3,13 @@ import { useLayoutEffect, useRef } from 'react';
 export default function ConfirmDialog({
   title,
   target,
+  message = 'Esta acao nao pode ser desfeita.',
   confirmLabel = 'Confirmar',
+  busyLabel = 'Deletando...',
   onConfirm,
   onCancel,
   busy,
+  children,
 }) {
   const dialogRef = useRef(null);
 
@@ -62,9 +65,9 @@ export default function ConfirmDialog({
           {title}
         </h2>
         <p className="dialog__body">
-          Esta acao nao pode ser desfeita.{' '}
-          {target && <span className="dialog__target">{target}</span>}
+          {message} {target && <span className="dialog__target">{target}</span>}
         </p>
+        {children}
         <div className="dialog__actions">
           {/* autoFocus no botao seguro: um Enter acidental nao pode deletar. */}
           <button
@@ -82,7 +85,7 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
           >
-            {busy ? 'Deletando...' : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

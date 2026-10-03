@@ -1,6 +1,7 @@
 'use strict';
 
-const { execSync, spawnSync } = require('child_process');
+const { execSync, spawn, spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('../src/config/database');
@@ -25,12 +26,19 @@ function apiUrl(pathname) {
  * Espera o servidor responder no /api/health. O `npm test` sobe a API em
  * paralelo ao Jest, entao a suite nao pode assumir que ela ja esta no ar.
  */
-async function waitForWebServer() {
+async function waitForWebServer(
+  baseUrl = BASE_URL,
+  { attempts = MAX_ATTEMPTS, isAlive = () => true } = {},
+) {
   let lastError;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (!isAlive()) {
+      throw new Error(`A API em ${baseUrl} encerrou antes de responder.`);
+    }
+
     try {
-      const response = await fetch(apiUrl('/api/health'));
+      const response = await fetch(`${baseUrl}/api/health`);
 
       if (response.status === 200) {
         return;
@@ -45,13 +53,68 @@ async function waitForWebServer() {
   }
 
   throw new Error(
-    `A API nao respondeu em ${BASE_URL} apos ${MAX_ATTEMPTS} tentativas.\n` +
+    `A API nao respondeu em ${baseUrl} apos ${attempts} tentativas.\n` +
       `Ultimo erro: ${lastError && lastError.message}`,
   );
 }
 
 async function waitForAllServices() {
   await waitForWebServer();
+}
+
+/**
+ * Sobe uma segunda instancia da API, em processo e porta proprios, com
+ * variaveis a mais. Serve ao que a instancia principal deixa desligado de
+ * proposito em teste — o limitador de requisicoes, que trombaria na suite.
+ *
+ * Fala com o mesmo banco de teste, entao a sessao do usuario padrao vale nela
+ * tambem: o `request()` com `baseUrl` chega autenticado como sempre.
+ *
+ * A espera e mais longa que a da API principal, que ja esta de pe quando a
+ * suite comeca: um processo novo le centenas de arquivos de `node_modules`, e
+ * com o disco disputado por outro programa a partida ja levou 38 s — contra
+ * os 0,4 s de costume. Se ele morrer no caminho, a falha sai na hora, com o
+ * que ele escreveu no stderr.
+ */
+const INSTANCE_ATTEMPTS = 240;
+
+async function startApiInstance(extraEnv = {}, { port = 3002 } = {}) {
+  const child = spawn('node', ['src/server.js'], {
+    cwd: ROOT,
+    env: { ...process.env, ...extraEnv, NODE_ENV: 'test', PORT: String(port) },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  const baseUrl = `http://localhost:${port}`;
+
+  let stderr = '';
+  child.stderr.on('data', (chunk) => {
+    stderr = `${stderr}${chunk}`.slice(-2000);
+  });
+
+  const exited = () => child.exitCode !== null || child.signalCode !== null;
+
+  function stop() {
+    return new Promise((resolve) => {
+      if (exited()) {
+        resolve();
+        return;
+      }
+      child.once('exit', () => resolve());
+      child.kill('SIGTERM');
+    });
+  }
+
+  try {
+    await waitForWebServer(baseUrl, {
+      attempts: INSTANCE_ATTEMPTS,
+      isAlive: () => !exited(),
+    });
+  } catch (error) {
+    await stop();
+    throw new Error(`${error.message}\n${stderr}`.trim());
+  }
+
+  return { baseUrl, stop };
 }
 
 /**
@@ -63,8 +126,57 @@ async function waitForAllServices() {
  * arquivo a sua propria copia de `process.env`.
  */
 function runPendingMigrations() {
+  migrate(
+    'up',
+    'Nao foi possivel preparar o banco de teste. Confira se o Postgres ' +
+      'esta no ar (`npm run services:up`) e se o banco tasktab_test existe.',
+  );
+}
+
+/**
+ * Anda `count` migrations para tras (`down`) ou para a frente (`up`) no banco
+ * de teste. Serve ao teste que prova a conversao de dado de uma migration:
+ * volta para antes dela, grava o estado antigo e aplica de novo.
+ *
+ * Quem chama devolve o banco ao topo num `finally`: o resto da suite rodando
+ * sobre o schema velho falharia longe daqui, sem dizer por que.
+ */
+function runMigration(direction, count = 1) {
+  if (!['up', 'down'].includes(direction) || !Number.isInteger(count)) {
+    throw new Error(`migration invalida: ${direction} ${count}`);
+  }
+
+  migrate(
+    `${direction} ${count}`,
+    `Nao foi possivel rodar ${direction} ${count} no banco de teste.`,
+  );
+}
+
+/**
+ * Quantas migrations ha do arquivo `name` (inclusive) ate a ultima: o que um
+ * `down` precisa desfazer para chegar a antes dele.
+ *
+ * Desfazer so a do meio nao serve. O node-pg-migrate confere a ordem do que ja
+ * rodou, e reaplicada ela ficaria registrada depois das seguintes — a proxima
+ * execucao da suite recusaria o `up` por ordem trocada.
+ */
+function migrationsFrom(name) {
+  const files = fs
+    .readdirSync(path.join(ROOT, 'migrations'))
+    .filter((file) => file.endsWith('.js'))
+    .sort();
+  const index = files.findIndex((file) => file.startsWith(`${name}`));
+
+  if (index === -1) {
+    throw new Error(`migration inexistente: ${name}`);
+  }
+
+  return files.length - index;
+}
+
+function migrate(args, failure) {
   try {
-    execSync('npx node-pg-migrate --envPath env.test up', {
+    execSync(`npx node-pg-migrate --envPath env.test ${args}`, {
       cwd: ROOT,
       env: process.env,
       stdio: 'pipe',
@@ -75,11 +187,7 @@ function runPendingMigrations() {
       .map((buffer) => buffer.toString())
       .join('\n');
 
-    throw new Error(
-      'Nao foi possivel preparar o banco de teste. Confira se o Postgres ' +
-        'esta no ar (`npm run services:up`) e se o banco tasktab_test existe.' +
-        `\n\n${output}`,
-    );
+    throw new Error(`${failure}\n\n${output}`);
   }
 }
 
@@ -407,6 +515,19 @@ async function updateColumnDirectly(table, id, column, value) {
   return rows[0];
 }
 
+/** Valores de um enum do banco, na ordem em que foram declarados. */
+async function enumLabels(typeName) {
+  const { rows } = await db.query(
+    `SELECT e.enumlabel AS label
+     FROM pg_enum e
+     JOIN pg_type t ON t.oid = e.enumtypid
+     WHERE t.typname = $1
+     ORDER BY e.enumsortorder`,
+    [typeName],
+  );
+  return rows.map((row) => row.label);
+}
+
 /** O hash gravado de uma pessoa, para conferir o rehash do login. */
 async function findPasswordHash(userId) {
   const { rows } = await db.query(
@@ -439,10 +560,16 @@ async function findSessions(userId) {
 
 /**
  * Requisicao HTTP real contra a API. Um `body` string e enviado cru, o que
- * permite testar payload malformado.
+ * permite testar payload malformado. `baseUrl` aponta para outra instancia
+ * (`startApiInstance`).
  */
-async function request(method, pathname, body, { token } = {}) {
-  const response = await fetch(apiUrl(pathname), {
+async function request(
+  method,
+  pathname,
+  body,
+  { token, baseUrl = BASE_URL } = {},
+) {
+  const response = await fetch(`${baseUrl}${pathname}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body:
@@ -559,6 +686,20 @@ function uploadedFilePath(filePath) {
 }
 
 /**
+ * Grava o PDF no diretorio de upload com o proprio SHA-256 como nome, como o
+ * upload faz, e devolve as colunas do comprovante que apontam para ele: as
+ * exportacoes e a checagem final leem a pagina original do disco.
+ */
+function saveUpload(buffer) {
+  const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+
+  fs.mkdirSync(env.upload.dir, { recursive: true });
+  fs.writeFileSync(uploadedFilePath(`${hash}.pdf`), buffer);
+
+  return { file_path: `${hash}.pdf`, file_hash: hash };
+}
+
+/**
  * Temporarios do multer que ficaram no disco. O upload grava antes de saber se
  * o relatorio existe (ou e da pessoa); o que sobrar aqui e um PDF com CNPJ de
  * terceiros que ninguem mais alcanca pela API.
@@ -580,7 +721,10 @@ module.exports = {
   insertSession,
   createUserWithSession,
   waitForAllServices,
+  startApiInstance,
   runPendingMigrations,
+  runMigration,
+  migrationsFrom,
   runScript,
   clearDatabase,
   closeDatabase,
@@ -589,12 +733,14 @@ module.exports = {
   insertReceipt,
   insertMerchant,
   updateColumnDirectly,
+  enumLabels,
   findSessions,
   sessionHoursLeft,
   findPasswordHash,
   findReceipts,
   uploadedFileExists,
   uploadedFilePath,
+  saveUpload,
   leftoverUploads,
   waitForProcessing,
   waitForQueue,

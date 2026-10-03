@@ -29,16 +29,21 @@ const LAST_DATA_ROW = 100;
 const MAX_ROWS = LAST_DATA_ROW - FIRST_DATA_ROW + 1;
 
 /**
- * Mapa provisorio: qual coluna de valor recebe cada categoria. O backlog cita
- * so tres colunas de exemplo (S/W/X) para oito categorias do enum — o
- * formulario oficial provavelmente tem mais colunas. **Redefinir este mapa e
- * o primeiro ajuste ao trocar pelo template real.**
+ * Coluna de valor de cada categoria, no mapa do formulario versao 19 descrito
+ * pelo procedimento de prestacao de contas: O Passagens, Q Taxi/Conducoes,
+ * S Alimentacao, U Hospedagem, W Combustivel, X Outras.
+ *
+ * Lavanderia nao tem coluna propria e cai em X — o que o procedimento registra
+ * como certo, e nao como erro de classificacao. Estacionamento tambem caia, e
+ * desde a Issue 40 ja chega classificado como Outros. Ate a Issue 38 o mapa
+ * era placeholder e mandava `transporte` para W: uma corrida de taxi saia
+ * lancada como abastecimento. Confira o mapa de novo quando o formulario
+ * oficial substituir o template sintetico.
  */
 const CATEGORY_COLUMN = {
   alimentacao: 'S',
   combustivel: 'W',
-  estacionamento: 'W',
-  transporte: 'W',
+  transporte: 'Q',
   lavanderia: 'X',
   outros: 'X',
   nao_classificado: 'X',

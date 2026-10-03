@@ -732,15 +732,71 @@ textarea.field__input {
   font-weight: 600;
 }
 
-/* Aviso (severidade "aviso" da conferencia) segue a mesma logica do badge de
-   pendente: amarelo, nao laranja — laranja fica reservado para erro/perigo. */
-.alert[data-severity='aviso'] {
+/* As classes da conferencia (issue 48). Laranja fica para "atencao", o que
+   provavelmente foi lido errado; pendente e decisao seguem o amarelo do badge
+   de pendente; o resto e discreto. A cor so reforca: o nome da classe vai
+   escrito no titulo de cada alerta. */
+.alert[data-level='pendente'],
+.alert[data-level='decisao'] {
   background: var(--attention-subtle);
   border-color: var(--attention-muted);
 }
 
-.alert[data-severity='aviso'] .alert__title {
+.alert[data-level='pendente'] .alert__title,
+.alert[data-level='decisao'] .alert__title {
   color: var(--attention-strong);
+}
+
+.alert[data-level='verificado'] {
+  background: var(--done-subtle);
+  border-color: var(--done-muted);
+}
+
+.alert[data-level='verificado'] .alert__title {
+  color: var(--done-strong);
+}
+
+.alert[data-level='informativo'] {
+  background: var(--neutral-subtle);
+  border-color: var(--neutral-muted);
+}
+
+.alert[data-level='informativo'] .alert__title {
+  color: var(--fg-muted);
+}
+
+/* ---------- conferencia do relatorio ---------- */
+
+.validation {
+  margin-bottom: 16px;
+}
+
+.validation__title {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.validation__group {
+  margin-bottom: 8px;
+}
+
+.validation__group > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.validation__list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.validation__list li {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
 
 .alert__actions {
@@ -899,6 +955,44 @@ textarea.field__input {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+/* ---------- checagem final (issue 57) ---------- */
+
+/* A marca na borda segue a paleta dos alertas: concluido para o que confere,
+   o amarelo de pendente para o que falta. "Confere" e "Falta" vao escritos. */
+.final-check {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+
+.final-check__item {
+  border-left: 3px solid var(--done-muted);
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-left: 8px;
+}
+
+.final-check__item[data-ok='false'] {
+  border-left-color: var(--attention-muted);
+}
+
+.final-check__status {
+  color: var(--done-strong);
+  flex: none;
+  font-weight: 600;
+  min-width: 64px;
+}
+
+.final-check__item[data-ok='false'] .final-check__status {
+  color: var(--attention-strong);
+}
+
+.final-check__error {
+  color: var(--danger-strong);
+  margin: 0 0 20px;
 }
 
 /* ---------- upload ---------- */

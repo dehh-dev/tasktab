@@ -4,8 +4,8 @@ const db = require('../config/database');
 
 const COLUMNS = `id, report_id, merchant_id, file_path, file_hash, page_number,
                  issued_at, amount_cents, category, category_guessed, access_key,
-                 status, extraction_source, confidence, raw_text, duplicate_of_id,
-                 created_at, updated_at`;
+                 issuer_name, issuer_city, rotation, status, extraction_source,
+                 confidence, raw_text, duplicate_of_id, created_at, updated_at`;
 
 /** As colunas com o alias da tabela, para consulta com JOIN. */
 function prefixed(alias) {
@@ -23,11 +23,20 @@ const UPDATABLE_COLUMNS = [
   'category',
   'category_guessed',
   'access_key',
+  'issuer_name',
+  'issuer_city',
+  'rotation',
   'status',
   'extraction_source',
   'confidence',
   'duplicate_of_id',
 ];
+
+// Nome e cidade de quem emitiu: os do cadastro, quando o comprovante tem
+// emitente, e os do proprio papel quando nao tem — o recibo manuscrito sem
+// CNPJ. Um lugar so, para a lista, a revisao e as tres saidas nao divergirem.
+const ISSUER_NAME = 'COALESCE(m.name, r.issuer_name)';
+const ISSUER_CITY = 'COALESCE(m.city, r.issuer_city)';
 
 function buildFilters({ status, category }, params) {
   const conditions = [];
@@ -56,7 +65,8 @@ async function findByReport(reportId, { status, category } = {}) {
   // revisao precisa da categoria do cadastro para oferecer atualiza-la.
   const { rows } = await db.query(
     `SELECT ${prefixed('r')},
-            m.name AS merchant_name,
+            ${ISSUER_NAME} AS merchant_name,
+            ${ISSUER_CITY} AS merchant_city,
             m.default_category AS merchant_default_category
      FROM receipts r
      LEFT JOIN merchants m ON m.id = r.merchant_id
@@ -71,8 +81,15 @@ async function findByReport(reportId, { status, category } = {}) {
 /**
  * Total e somatorio por categoria, em centavos.
  *
- * Duplicata fica de fora da soma — continua listada e vai no PDF consolidado,
- * mas somar as duas era exatamente o erro que a ferramenta existe para evitar.
+ * O total ja inclui o que esta em revisao: quem revisa quer ver para onde a
+ * prestacao vai, e o valor lido aparece somado desde a extracao. Duplicata
+ * fica de fora — continua listada e vai no PDF consolidado, mas somar as duas
+ * era exatamente o erro que a ferramenta existe para evitar.
+ *
+ * A categoria so soma o confirmado. A de quem ainda esta em revisao e palpite
+ * da extracao, e distribuir o valor por um palpite faria o subtotal de um tipo
+ * mudar sozinho a cada correcao — decisao de quem usa: o valor em revisao vai
+ * para o total, sem categoria.
  */
 async function summarizeByReport(reportId, { status, category } = {}) {
   const params = [reportId];
@@ -81,14 +98,20 @@ async function summarizeByReport(reportId, { status, category } = {}) {
     ...buildFilters({ status, category }, params),
   ];
 
+  // GROUPING separa a linha do ROLLUP do grupo dos comprovantes sem
+  // categoria: os dois chegam com `category` nulo, e todo upload cria
+  // comprovante sem categoria. Qual dos dois valia dependia da ordem das
+  // linhas.
   const { rows } = await db.query(
     `SELECT
+       GROUPING(category) = 1 AS is_total,
+       category,
        COUNT(*)::int AS total,
        COALESCE(SUM(amount_cents) FILTER (WHERE status <> 'duplicate'), 0)::int
          AS total_cents,
-       category,
-       COALESCE(SUM(amount_cents) FILTER (WHERE status <> 'duplicate'), 0)::int
-         AS category_cents
+       COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
+       COALESCE(SUM(amount_cents) FILTER (WHERE status = 'confirmed'), 0)::int
+         AS confirmed_cents
      FROM receipts
      WHERE ${conditions.join(' AND ')}
      GROUP BY ROLLUP (category)`,
@@ -98,15 +121,43 @@ async function summarizeByReport(reportId, { status, category } = {}) {
   const totals = { total: 0, total_cents: 0, by_category: {} };
 
   for (const row of rows) {
-    if (row.category === null) {
+    if (row.is_total) {
       totals.total = row.total;
       totals.total_cents = row.total_cents;
-    } else {
-      totals.by_category[row.category] = row.category_cents;
+    } else if (row.category !== null && row.confirmed > 0) {
+      totals.by_category[row.category] = row.confirmed_cents;
     }
   }
 
   return totals;
+}
+
+/**
+ * Historico do emitente de cada comprovante do relatorio: menor e maior
+ * valor, e quantos confirmados ha dele em qualquer relatorio, fora o proprio
+ * comprovante. Um `Map` por `id`, sem entrada para quem nao tem historico.
+ *
+ * Uma consulta para o relatorio inteiro: uma por comprovante eram 40 a cada
+ * abertura da conferencia de um relatorio de 40 (issue 52).
+ */
+async function merchantHistoryByReport(reportId) {
+  const { rows } = await db.query(
+    `SELECT r.id,
+            MIN(o.amount_cents)::int AS min_cents,
+            MAX(o.amount_cents)::int AS max_cents,
+            COUNT(*)::int AS total
+     FROM receipts r
+     JOIN receipts o
+       ON o.merchant_id = r.merchant_id
+      AND o.id <> r.id
+      AND o.amount_cents IS NOT NULL
+      AND o.status = 'confirmed'
+     WHERE r.report_id = $1
+     GROUP BY r.id`,
+    [reportId],
+  );
+
+  return new Map(rows.map(({ id, ...history }) => [id, history]));
 }
 
 /**
@@ -121,7 +172,8 @@ async function findForExport(reportId) {
   const { rows } = await db.query(
     `SELECT r.id, r.issued_at, r.amount_cents, r.category, r.status,
             r.duplicate_of_id, r.access_key, r.file_path, r.page_number,
-            m.name AS merchant_name, m.city AS merchant_city
+            r.rotation,
+            ${ISSUER_NAME} AS merchant_name, ${ISSUER_CITY} AS merchant_city
      FROM receipts r
      LEFT JOIN merchants m ON m.id = r.merchant_id
      WHERE r.report_id = $1
@@ -182,6 +234,8 @@ const EXTRACTION_COLUMNS = [
   'category',
   'category_guessed',
   'access_key',
+  'issuer_name',
+  'issuer_city',
   'confidence',
   'merchant_id',
   'duplicate_of_id',
@@ -282,6 +336,7 @@ module.exports = {
   UPDATABLE_COLUMNS,
   findByReport,
   summarizeByReport,
+  merchantHistoryByReport,
   findForExport,
   findById,
   findByReportAndHash,

@@ -1,6 +1,6 @@
 'use strict';
 
-const { PDFDocument, StandardFonts } = require('pdf-lib');
+const { PDFDocument, StandardFonts, degrees, rgb } = require('pdf-lib');
 
 /**
  * PDFs sinteticos para a suite.
@@ -108,7 +108,11 @@ const SCAN_FONTS = ['DejaVu Sans', 'Liberation Sans', 'Noto Sans', 'Arial'];
  * de pagina que muitos escaneados trazem: texto que existe mas nao e util, e
  * nao pode impedir a pagina de descer para o OCR.
  */
-async function makeScannedReceiptPdf({ residualText, ...options } = {}) {
+async function makeScannedReceiptPdf({
+  residualText,
+  upsideDown = false,
+  ...options
+} = {}) {
   const { createCanvas, GlobalFonts } = require('@napi-rs/canvas');
   const sharp = require('sharp');
 
@@ -133,7 +137,13 @@ async function makeScannedReceiptPdf({ residualText, ...options } = {}) {
     context.fillText(String(line), 40, 90 + row * 70);
   });
 
-  const png = canvas.toBuffer('image/png');
+  // `upsideDown` fotografa o cupom de cabeca para baixo, como chegou o do
+  // combustivel de Itapipoca: o conteudo invertido numa pagina sem `/Rotate`,
+  // que so o giro escolhido na revisao endireita.
+  const drawn = canvas.toBuffer('image/png');
+  const png = upsideDown
+    ? await sharp(drawn).rotate(180).png().toBuffer()
+    : drawn;
 
   const { data } = await sharp(png)
     .greyscale()
@@ -176,11 +186,40 @@ function makeNonPdf() {
   return Buffer.from('PK isto parece um zip');
 }
 
+/**
+ * Uma pagina em pe com `/Rotate`. As duas marcas ficam em cantos opostos e em
+ * tons diferentes: qualquer giro errado troca uma pela outra ou as tira do
+ * lugar, e a comparacao de pixels acusa.
+ */
+async function makeRotatedPdf(angle) {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([200, 600]);
+
+  page.drawRectangle({
+    x: 0,
+    y: 540,
+    width: 60,
+    height: 60,
+    color: rgb(0, 0, 0),
+  });
+  page.drawRectangle({
+    x: 140,
+    y: 0,
+    width: 60,
+    height: 60,
+    color: rgb(0.5, 0.5, 0.5),
+  });
+  page.setRotation(degrees(angle));
+
+  return Buffer.from(await doc.save());
+}
+
 module.exports = {
   makePdf,
   makeReceiptPdf,
   makeQrReceiptPdf,
   makeScannedReceiptPdf,
+  makeRotatedPdf,
   receiptLines,
   makeCorruptPdf,
   makeNonPdf,

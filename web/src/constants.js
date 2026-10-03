@@ -26,9 +26,8 @@ export function formatDate(isoDate) {
 export const EXPENSE_CATEGORIES = [
   { value: 'alimentacao', label: 'Alimentacao' },
   { value: 'combustivel', label: 'Combustivel' },
-  { value: 'estacionamento', label: 'Estacionamento' },
   { value: 'lavanderia', label: 'Lavanderia' },
-  { value: 'transporte', label: 'Transporte' },
+  { value: 'transporte', label: 'Taxi/Locomocao' },
   { value: 'outros', label: 'Outros' },
   { value: 'nao_classificado', label: 'Nao classificado' },
 ];
@@ -41,6 +40,22 @@ export function categoryLabel(value) {
     EXPENSE_CATEGORIES.find((category) => category.value === value)?.label ??
     value
   );
+}
+
+/**
+ * A classificacao do procedimento nos alertas da conferencia (issue 48), na
+ * ordem em que a tela os agrupa. Espelha `LEVELS` do servico de conferencia.
+ */
+export const ALERT_LEVELS = [
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'decisao', label: 'Decisao' },
+  { value: 'atencao', label: 'Atencao' },
+  { value: 'verificado', label: 'Verificado' },
+  { value: 'informativo', label: 'Informativo' },
+];
+
+export function alertLevelLabel(value) {
+  return ALERT_LEVELS.find((level) => level.value === value)?.label ?? value;
 }
 
 /** Espelha o enum receipt_status do banco. */

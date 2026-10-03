@@ -85,9 +85,17 @@ test('o auditor le o relatorio e o comprovante, sem nada que os altere', async (
 
   await expect(page.locator('.dropzone')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Deletar' })).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Editar relatorio' }),
+  ).toHaveCount(0);
 
   await page.locator('.list-item .link-button').first().click();
   await page.waitForSelector('.review__fields');
+
+  // Nem girar a pagina: o giro e gravado, e o auditor nao escreve.
+  await expect(
+    page.getByRole('button', { name: 'Girar para a direita' }),
+  ).toHaveCount(0);
 
   // O que foi extraido esta la para ser conferido...
   await expect(page.locator('#review-amount')).toHaveValue('37,60');

@@ -3,6 +3,7 @@ import * as api from '../api';
 import { ApiError } from '../api';
 import {
   EXPENSE_CATEGORIES,
+  alertLevelLabel,
   centsToInputValue,
   formatDate,
   parseMoneyToCents,
@@ -14,6 +15,46 @@ const ZOOM_MAX = 3;
 const ZOOM_STEP = 0.25;
 
 const LOW_CONFIDENCE = 0.7;
+
+/**
+ * Atalhos de recorte do procedimento de prestacao de contas (issue 46): a
+ * pagina inteira nao e legivel campo a campo, e a proporcao dela ja diz o
+ * tipo. Paisagem e recibo manuscrito em bloco; retrato muito alto e cupom
+ * termico. Cada atalho e um retangulo em fracao da pagina — zoom e rolagem
+ * sobre a mesma imagem, sem renderizar nada novo.
+ *
+ * "Muito alto" e a partir de 1,6: os cupons da prestacao de Itapipoca iam de
+ * 2 a 2,5 vezes mais altos que largos, e a pagina A4 do recibo padrao tem 1,41.
+ */
+const TALL_RATIO = 1.6;
+const HEADER = { label: 'Cabecalho', x: [0, 0.75], y: [0, 0.4] };
+const HANDWRITTEN = [
+  { label: 'Valor', x: [0.55, 1], y: [0, 0.42] },
+  { label: 'Data', x: [0, 1], y: [0.7, 1] },
+];
+// Tres fatias com 3% de sobreposicao, como o procedimento fatia o cupom.
+const SLICE = (1 + 2 * 0.03) / 3;
+const RECEIPT_SLICES = ['Topo', 'Meio', 'Fim'].map((label, index) => ({
+  label,
+  x: [0, 1],
+  y: [index * (SLICE - 0.03), Math.min(1, index * (SLICE - 0.03) + SLICE)],
+}));
+
+function cropShortcuts(size) {
+  if (!size) {
+    return [];
+  }
+
+  if (size.width > size.height) {
+    return [...HANDWRITTEN, HEADER];
+  }
+
+  if (size.height / size.width >= TALL_RATIO) {
+    return [HEADER, ...RECEIPT_SLICES];
+  }
+
+  return [HEADER];
+}
 
 /**
  * A confianca gravada e uma so por comprovante, nao por campo: o pipeline de
@@ -64,12 +105,34 @@ export default function ReceiptReview({
     issued_at: receipt.issued_at ?? '',
     amount_cents: centsToInputValue(receipt.amount_cents),
     category: receipt.category ?? '',
+    access_key: '',
+    issuer_name: receipt.issuer_name ?? '',
+    issuer_city: receipt.issuer_city ?? '',
+    cnpj: '',
   });
+
+  // A chave so e pedida quando a extracao nao a achou. Com ela no comprovante
+  // nao ha o que digitar: sao 44 caracteres que ninguem confere a olho, e o DV
+  // ja os conferiu quando ela foi lida.
+  const askForKey = !receipt.access_key;
+
+  // Sem emitente cadastrado — o recibo manuscrito, sem CNPJ legivel —, nome e
+  // cidade vem do proprio papel e se corrigem aqui. Com emitente, quem fala e
+  // o cadastro, e a planilha usa o dele.
+  const askForIssuer = !receipt.merchant_id;
   const [localErrors, setLocalErrors] = useState({});
   const [serverErrors, setServerErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [zoom, setZoom] = useState(1);
+  // O giro e gravado na hora e vale para a imagem, o reprocessamento e o PDF
+  // consolidado. Fica no estado local para a imagem trocar sem remontar a
+  // revisao: zoom e rolagem continuam onde estavam.
+  const [rotation, setRotation] = useState(receipt.rotation ?? 0);
+  const [rotating, setRotating] = useState(false);
+  const [loadedRotation, setLoadedRotation] = useState(null);
+  // Proporcao da imagem carregada — ja girada —, que escolhe os atalhos.
+  const [imageSize, setImageSize] = useState(null);
 
   // Emitente ainda sem categoria: a escolha desta revisao vira o cadastro dele
   // por padrao, que e o caso de uso (7 dos 28 cupons do caso-base eram do
@@ -90,6 +153,9 @@ export default function ReceiptReview({
   const [dismissed, setDismissed] = useState(() => new Set());
 
   const scrollRef = useRef(null);
+  const imageRef = useRef(null);
+  // Rolagem pedida por um atalho, aplicada depois que o zoom novo pinta.
+  const pendingScroll = useRef(null);
   // Os dados do gesto em curso ficam num ref, nao em estado: eles mudam a cada
   // pixel de movimento e nada na tela depende deles diretamente — re-renderizar
   // por causa disso derrubaria o arrasto para um engasgo.
@@ -98,6 +164,7 @@ export default function ReceiptReview({
   const [pannable, setPannable] = useState(false);
 
   const errors = { ...serverErrors, ...localErrors };
+  const shortcuts = cropShortcuts(imageSize);
 
   // So oferece quando ha emitente e a escolha difere do que ele ja tem: com a
   // mesma categoria no cadastro nao ha o que atualizar.
@@ -180,11 +247,23 @@ export default function ReceiptReview({
         await api.setMerchantCategory(receipt.merchant_id, values.category);
       }
 
+      // A chave digitada vai junto: se ela nao fechar o DV, o 422 volta no
+      // campo e nada e confirmado — o que a pessoa digitou fica na tela.
+      const typedKey = askForKey ? values.access_key.trim() : '';
+      // Com a chave digitada, o CNPJ vem dela: mandar os dois seria pedir ao
+      // servidor que escolhesse entre eles.
+      const typedCnpj = askForIssuer && !typedKey ? values.cnpj.trim() : '';
+
       await api.updateReceipt(receipt.id, {
         issued_at: values.issued_at,
         amount_cents: amountCents,
         category: values.category,
         status: 'confirmed',
+        ...(typedKey ? { access_key: typedKey } : {}),
+        ...(askForIssuer
+          ? { issuer_name: values.issuer_name, issuer_city: values.issuer_city }
+          : {}),
+        ...(typedCnpj ? { cnpj: typedCnpj } : {}),
       });
       await onAction();
     } catch (caught) {
@@ -254,7 +333,74 @@ export default function ReceiptReview({
     setPannable(
       box.scrollWidth > box.clientWidth || box.scrollHeight > box.clientHeight,
     );
-  }, [zoom, imageLoaded]);
+    // Girada, a imagem troca de proporcao: mede de novo quando a nova chega.
+  }, [zoom, imageLoaded, loadedRotation]);
+
+  /**
+   * Leva o retangulo do atalho para o painel: o zoom que o faz caber, e a
+   * rolagem que poe o canto dele no canto do painel. O transform cresce a
+   * partir do canto superior esquerdo, entao o canto de uma regiao fica em
+   * fracao x tamanho x zoom.
+   */
+  function showRegion(region) {
+    const box = scrollRef.current;
+    const image = imageRef.current;
+
+    if (!box || !image) {
+      return;
+    }
+
+    const width = image.offsetWidth;
+    const height = image.offsetHeight;
+    const [left, right] = region.x;
+    const [top, bottom] = region.y;
+
+    const fit = Math.min(
+      box.clientWidth / ((right - left) * width),
+      box.clientHeight / ((bottom - top) * height),
+    );
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, fit));
+    const target = { left: left * width * next, top: top * height * next };
+
+    if (next === zoom) {
+      box.scrollLeft = target.left;
+      box.scrollTop = target.top;
+      return;
+    }
+
+    pendingScroll.current = target;
+    setZoom(next);
+  }
+
+  useLayoutEffect(() => {
+    const box = scrollRef.current;
+    const target = pendingScroll.current;
+
+    if (!box || !target) {
+      return;
+    }
+
+    box.scrollLeft = target.left;
+    box.scrollTop = target.top;
+    pendingScroll.current = null;
+  }, [zoom]);
+
+  /** Quarto de volta: +90 no sentido horario, -90 no anti-horario. */
+  async function rotate(delta) {
+    const next = (rotation + delta + 360) % 360;
+
+    setRotating(true);
+    setError(null);
+
+    try {
+      await api.updateReceipt(receipt.id, { rotation: next });
+      setRotation(next);
+    } catch (caught) {
+      setError({ message: caught.message, action: caught.action });
+    } finally {
+      setRotating(false);
+    }
+  }
 
   /**
    * Arrastar para navegar pelo cupom ampliado. Mexe no `scrollLeft`/`scrollTop`
@@ -368,11 +514,9 @@ export default function ReceiptReview({
               key={alertKey(alert)}
               className="alert"
               role="alert"
-              data-severity={alert.severity}
+              data-level={alert.level}
             >
-              <div className="alert__title">
-                {alert.severity === 'erro' ? 'Erro' : 'Aviso'}
-              </div>
+              <div className="alert__title">{alertLevelLabel(alert.level)}</div>
               <div>{alert.message}</div>
               <div className="alert__actions">
                 {canWrite && alert.rule === 'possivel_duplicata' && (
@@ -434,7 +578,48 @@ export default function ReceiptReview({
                 Redefinir
               </button>
             )}
+            {canWrite && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => rotate(-90)}
+                  disabled={rotating}
+                  aria-label="Girar para a esquerda"
+                >
+                  ↺
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => rotate(90)}
+                  disabled={rotating}
+                  aria-label="Girar para a direita"
+                >
+                  ↻
+                </button>
+              </>
+            )}
           </div>
+
+          {shortcuts.length > 0 && (
+            <div
+              className="review__zoom-controls"
+              role="group"
+              aria-label="Atalhos de recorte"
+            >
+              {shortcuts.map((region) => (
+                <button
+                  key={region.label}
+                  type="button"
+                  className="btn btn--sm"
+                  onClick={() => showRegion(region)}
+                >
+                  {region.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Focavel de proposito: com o cupom ampliado, quem navega por
               teclado tambem precisa alcancar o que saiu da area visivel — as
@@ -469,15 +654,25 @@ export default function ReceiptReview({
                   <p className="state">Carregando imagem...</p>
                 )}
                 <img
+                  ref={imageRef}
                   className="review__image"
-                  src={api.receiptImageUrl(receipt.id)}
+                  // A URL muda com o giro: o navegador guarda a imagem para
+                  // revalidar, e sem isso mostraria a copia sem perguntar.
+                  src={api.receiptImageUrl(receipt.id, rotation)}
                   alt={`Comprovante #${receipt.id}`}
                   // Sem isso o navegador trata o gesto como "arrastar imagem"
                   // e o cupom sai voando atras do cursor como fantasma.
                   draggable={false}
                   hidden={!imageLoaded}
                   style={{ transform: `scale(${zoom})` }}
-                  onLoad={() => setImageLoaded(true)}
+                  onLoad={(event) => {
+                    setImageLoaded(true);
+                    setLoadedRotation(rotation);
+                    setImageSize({
+                      width: event.currentTarget.naturalWidth,
+                      height: event.currentTarget.naturalHeight,
+                    });
+                  }}
                   onError={() => setImageFailed(true)}
                 />
               </>
@@ -494,7 +689,7 @@ export default function ReceiptReview({
             <ConfidenceBadge receipt={receipt} />
           </div>
 
-          {/* Um fieldset desabilitado trava os tres campos de uma vez, com a
+          {/* Um fieldset desabilitado trava os campos de uma vez, com a
               semantica nativa: o leitor de tela anuncia os campos como
               indisponiveis, e nenhum Enter confirma por acidente. */}
           <fieldset className="review__fieldset" disabled={!canWrite}>
@@ -593,6 +788,115 @@ export default function ReceiptReview({
                 </span>
               )}
             </div>
+
+            {askForIssuer && (
+              <>
+                <div className="field">
+                  <label className="field__label" htmlFor="review-issuer-name">
+                    Estabelecimento
+                  </label>
+                  <input
+                    id="review-issuer-name"
+                    className="field__input"
+                    type="text"
+                    value={values.issuer_name}
+                    aria-invalid={Boolean(errors.issuer_name)}
+                    onChange={(event) =>
+                      setField('issuer_name', event.target.value)
+                    }
+                  />
+                  {errors.issuer_name && (
+                    <span className="field__error" role="alert">
+                      {errors.issuer_name}
+                    </span>
+                  )}
+                </div>
+
+                <div className="field">
+                  <label className="field__label" htmlFor="review-issuer-city">
+                    Cidade
+                  </label>
+                  <input
+                    id="review-issuer-city"
+                    className="field__input"
+                    type="text"
+                    value={values.issuer_city}
+                    aria-invalid={Boolean(errors.issuer_city)}
+                    aria-describedby="review-issuer-city-hint"
+                    onChange={(event) =>
+                      setField('issuer_city', event.target.value)
+                    }
+                  />
+                  <span className="field__hint" id="review-issuer-city-hint">
+                    Como esta no comprovante, nunca a do destino da viagem.
+                  </span>
+                  {errors.issuer_city && (
+                    <span className="field__error" role="alert">
+                      {errors.issuer_city}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+
+            {askForKey && (
+              <div className="field">
+                <label className="field__label" htmlFor="review-access-key">
+                  Chave de acesso
+                </label>
+                <input
+                  id="review-access-key"
+                  className="field__input"
+                  type="text"
+                  inputMode="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={values.access_key}
+                  aria-invalid={Boolean(errors.access_key)}
+                  aria-describedby="review-access-key-hint"
+                  onChange={(event) =>
+                    setField('access_key', event.target.value)
+                  }
+                />
+                <span className="field__hint" id="review-access-key-hint">
+                  Opcional. Os 44 caracteres do cupom, com ou sem espacos — o
+                  digito verificador confere a digitacao.
+                </span>
+                {errors.access_key && (
+                  <span className="field__error" role="alert">
+                    {errors.access_key}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {askForIssuer && askForKey && (
+              <div className="field">
+                <label className="field__label" htmlFor="review-cnpj">
+                  CNPJ
+                </label>
+                <input
+                  id="review-cnpj"
+                  className="field__input"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={values.cnpj}
+                  aria-invalid={Boolean(errors.cnpj)}
+                  aria-describedby="review-cnpj-hint"
+                  onChange={(event) => setField('cnpj', event.target.value)}
+                />
+                <span className="field__hint" id="review-cnpj-hint">
+                  Opcional, sem chave de acesso: o do carimbo ou do cabecalho.
+                  Vincula o emitente e a categoria do cadastro dele.
+                </span>
+                {errors.cnpj && (
+                  <span className="field__error" role="alert">
+                    {errors.cnpj}
+                  </span>
+                )}
+              </div>
+            )}
 
             {offerMerchantUpdate && (
               <label className="field field--checkbox">

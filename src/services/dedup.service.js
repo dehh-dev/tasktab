@@ -47,32 +47,30 @@ async function findExactDuplicate(receipt) {
  * Duas notas com chave de acesso diferente sao documentos diferentes por
  * definicao, entao nem entram na lista — e o que impede a suspeita de virar
  * ruido em restaurante que cobra sempre o mesmo preco.
+ *
+ * Devolve os pares do relatorio inteiro, cada um uma vez (`id` < `other_id`),
+ * numa consulta so: uma por comprovante eram 40 a cada abertura da
+ * conferencia de um relatorio de 40 (issue 52).
  */
-async function findProbableDuplicates(receipt) {
-  if (!receipt.issued_at || receipt.amount_cents === null) {
-    return [];
-  }
-
+async function findProbableDuplicates(reportId) {
   const { rows } = await db.query(
-    `SELECT id, access_key FROM receipts
-     WHERE report_id = $1
-       AND issued_at = $2
-       AND amount_cents = $3
-       AND id <> $4
-       AND status <> 'duplicate'
-       AND (
-         access_key IS NULL
-         OR $5::varchar IS NULL
-         OR access_key = $5
-       )
-     ORDER BY id`,
-    [
-      receipt.report_id,
-      receipt.issued_at,
-      receipt.amount_cents,
-      receipt.id,
-      receipt.access_key,
-    ],
+    `SELECT a.id, b.id AS other_id
+     FROM receipts a
+     JOIN receipts b
+       ON b.report_id = a.report_id
+      AND b.issued_at = a.issued_at
+      AND b.amount_cents = a.amount_cents
+      AND b.id > a.id
+      AND b.status <> 'duplicate'
+      AND (
+        a.access_key IS NULL
+        OR b.access_key IS NULL
+        OR a.access_key = b.access_key
+      )
+     WHERE a.report_id = $1
+       AND a.status <> 'duplicate'
+     ORDER BY a.id, b.id`,
+    [reportId],
   );
 
   return rows;

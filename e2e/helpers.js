@@ -102,6 +102,16 @@ async function createReport(request, overrides = {}) {
  * Vai numa requisicao so, no campo `files`, como a tela manda.
  */
 async function addReceipts(request, reportId, buffers) {
+  await sendReceipts(request, reportId, buffers);
+  return waitForReceipts(request, reportId);
+}
+
+/**
+ * Poe os PDFs no relatorio pela API e volta logo, com a extracao ainda
+ * rodando. So para as specs cujo assunto e o acompanhamento do processamento;
+ * nas outras, `addReceipts`.
+ */
+async function sendReceipts(request, reportId, buffers) {
   const form = new FormData();
 
   buffers.forEach((buffer, index) => {
@@ -116,8 +126,7 @@ async function addReceipts(request, reportId, buffers) {
     multipart: form,
   });
 
-  await readData(response, 'enviar comprovantes');
-  return waitForReceipts(request, reportId);
+  return readData(response, 'enviar comprovantes');
 }
 
 /** Espera nenhum comprovante do relatorio estar mais na fila de extracao. */
@@ -174,6 +183,7 @@ module.exports = {
   clearReports,
   createReport,
   addReceipts,
+  sendReceipts,
   createUser,
   deleteUser,
 };
