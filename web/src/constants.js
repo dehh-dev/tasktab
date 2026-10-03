@@ -42,6 +42,22 @@ export function categoryLabel(value) {
   );
 }
 
+/**
+ * A classificacao do procedimento nos alertas da conferencia (issue 48), na
+ * ordem em que a tela os agrupa. Espelha `LEVELS` do servico de conferencia.
+ */
+export const ALERT_LEVELS = [
+  { value: 'pendente', label: 'Pendente' },
+  { value: 'decisao', label: 'Decisao' },
+  { value: 'atencao', label: 'Atencao' },
+  { value: 'verificado', label: 'Verificado' },
+  { value: 'informativo', label: 'Informativo' },
+];
+
+export function alertLevelLabel(value) {
+  return ALERT_LEVELS.find((level) => level.value === value)?.label ?? value;
+}
+
 /** Espelha o enum receipt_status do banco. */
 export const RECEIPT_STATUSES = {
   pending: 'Pendente',

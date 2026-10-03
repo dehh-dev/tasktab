@@ -2061,9 +2061,21 @@ Observações da planilha (#53).
 
 **Critérios de aceite**
 
-- [ ] Cada regra com a sua classe, documentada
-- [ ] A tela agrupa pela classe
-- [ ] Mudança de contrato da `/validation` registrada no README
+- [x] Cada regra com a sua classe, documentada
+- [x] A tela agrupa pela classe
+- [x] Mudança de contrato da `/validation` registrada no README
+
+**Como ficou**
+
+`severity` saiu, e `level` entrou com as cinco classes; o `meta` conta cada
+uma. O critério da classe: **atenção** é o dado provavelmente lido ou lançado
+errado (DV, soma dos itens, combustível, mês e UF da chave, período, faixa do
+emitente); **decisão** é o que pode estar certo e alguém precisa julgar
+(suspeita de duplicata, contingência); **pendente** é o que falta (comprovante
+incompleto); **informativo** é contexto (despesas acima do adiantamento). Para
+**verificado** entrou uma regra: a duplicata exata que a ferramenta consolidou
+pela chave. Na tela, o painel de conferência mostrou de quebra o alerta do
+relatório inteiro, que até aqui não aparecia em lugar nenhum.
 
 ---
 

@@ -5,8 +5,10 @@ const {
   insertReport,
   insertReceipt,
   insertMerchant,
+  updateColumnDirectly,
 } = require('../../orchestrator');
 const { checkDigit } = require('../../../src/services/extraction/access-key');
+const { LEVELS, RULE_LEVEL } = require('../../../src/services/validation');
 
 const CHAVE = '52260626048802000165650010001631601303284889';
 
@@ -39,16 +41,82 @@ describe('GET /api/reports/:id/validation', () => {
     const body = await validar(report.id);
 
     expect(body.data).toEqual([]);
-    expect(body.meta).toEqual({ total: 0, erros: 0, avisos: 0 });
+    expect(body.meta).toEqual({
+      total: 0,
+      pendente: 0,
+      decisao: 0,
+      atencao: 0,
+      verificado: 0,
+      informativo: 0,
+    });
   });
 
-  it('separa erro de aviso na contagem', async () => {
+  it('conta os alertas pela classe do procedimento', async () => {
     const report = await insertReport();
+    // Sem data, valor nem categoria: falta algo para a prestacao ficar
+    // completa.
     await insertReceipt(report.id, { status: 'needs_review' });
 
     const body = await validar(report.id);
 
-    expect(body.meta.total).toBe(body.meta.erros + body.meta.avisos);
+    expect(porRegra(body, 'incompleto')).toMatchObject([{ level: 'pendente' }]);
+    const { total, ...porClasse } = body.meta;
+    expect(porClasse.pendente).toBe(1);
+    expect(total).toBe(
+      Object.values(porClasse).reduce((soma, quantos) => soma + quantos, 0),
+    );
+  });
+
+  it('toda regra tem uma das cinco classes', () => {
+    // Uma regra nova sem classe sairia com `level` indefinido — e a tela,
+    // que agrupa pela classe, a esconderia.
+    const classes = Object.values(RULE_LEVEL);
+
+    expect(classes.every((level) => LEVELS.includes(level))).toBe(true);
+    expect(new Set(classes)).toEqual(new Set(LEVELS));
+  });
+});
+
+describe('regra: duplicata exata', () => {
+  it('a consolidada pela chave sai como verificada, ligando os dois', async () => {
+    const report = await insertReport();
+    const original = await insertReceipt(report.id, {
+      page_number: 1,
+      status: 'confirmed',
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
+      category: 'alimentacao',
+      access_key: CHAVE,
+    });
+    const repetido = await insertReceipt(report.id, {
+      page_number: 2,
+      status: 'duplicate',
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
+      category: 'alimentacao',
+      access_key: CHAVE,
+    });
+    await updateColumnDirectly(
+      'receipts',
+      repetido.id,
+      'duplicate_of_id',
+      original.id,
+    );
+
+    expect(porRegra(await validar(report.id), 'duplicata_exata')).toEqual([
+      expect.objectContaining({
+        level: 'verificado',
+        receipt_id: repetido.id,
+        related_id: original.id,
+      }),
+    ]);
+  });
+
+  it('a marcada a mao nao entra: quem decidiu foi uma pessoa', async () => {
+    const report = await insertReport();
+    await insertReceipt(report.id, { status: 'duplicate' });
+
+    expect(porRegra(await validar(report.id), 'duplicata_exata')).toEqual([]);
   });
 });
 
@@ -68,7 +136,7 @@ describe('regra: soma dos itens', () => {
     const alertas = porRegra(await validar(report.id), 'soma_itens');
 
     expect(alertas).toHaveLength(1);
-    expect(alertas[0].severity).toBe('erro');
+    expect(alertas[0].level).toBe('atencao');
     expect(alertas[0].message).toMatch(/3760/);
   });
 
@@ -120,7 +188,7 @@ describe('regra: periodo', () => {
     const alertas = porRegra(await validar(report.id), 'periodo');
 
     expect(alertas).toHaveLength(1);
-    expect(alertas[0].severity).toBe('erro');
+    expect(alertas[0].level).toBe('atencao');
   });
 
   it('aceita comprovante do primeiro e do ultimo dia', async () => {
@@ -166,7 +234,7 @@ describe('regra: chave de acesso', () => {
     const alertas = porRegra(await validar(report.id), 'chave_acesso');
 
     expect(alertas).toHaveLength(1);
-    expect(alertas[0].severity).toBe('erro');
+    expect(alertas[0].level).toBe('atencao');
   });
 
   it('aceita chave valida', async () => {
@@ -220,7 +288,7 @@ describe('regra: faixa do emitente', () => {
     const alertas = porRegra(await validar(report.id), 'faixa_emitente');
 
     expect(alertas).toHaveLength(1);
-    expect(alertas[0].severity).toBe('aviso');
+    expect(alertas[0].level).toBe('atencao');
   });
 
   it('fica calada sem amostra suficiente do emitente', async () => {
@@ -260,7 +328,7 @@ describe('alerta nao bloqueia', () => {
     });
 
     const body = await validar(report.id);
-    expect(body.meta.erros).toBeGreaterThan(0);
+    expect(body.meta.atencao).toBeGreaterThan(0);
 
     // Quem assina a prestacao de contas decide. A ferramenta aponta, nao veta.
     const lista = await request('GET', `/api/reports/${report.id}/receipts`);
@@ -356,7 +424,7 @@ describe('regra: combustivel', () => {
     const alertas = await combustivel(ITAPIPOCA, 222549);
 
     expect(alertas).toHaveLength(1);
-    expect(alertas[0].severity).toBe('erro');
+    expect(alertas[0].level).toBe('atencao');
     expect(alertas[0].message).toMatch(/22549 centavos/);
   });
 
@@ -420,7 +488,7 @@ describe('regras: o que a chave de acesso ja diz', () => {
 
     const alertas = porRegra(body, 'chave_mes');
     expect(alertas).toHaveLength(1);
-    expect(alertas[0].severity).toBe('erro');
+    expect(alertas[0].level).toBe('atencao');
   });
 
   it('mes da chave igual ao da data nao acusa', async () => {
@@ -435,7 +503,7 @@ describe('regras: o que a chave de acesso ja diz', () => {
 
     expect(porRegra(normal, 'contingencia')).toHaveLength(0);
     expect(porRegra(contingencia, 'contingencia')).toMatchObject([
-      { severity: 'aviso' },
+      { level: 'decisao' },
     ]);
   });
 
@@ -450,7 +518,7 @@ describe('regras: o que a chave de acesso ja diz', () => {
     });
 
     expect(porRegra(ceara, 'chave_uf')).toMatchObject([
-      { severity: 'aviso', message: expect.stringMatching(/CE.*GO/) },
+      { level: 'atencao', message: expect.stringMatching(/CE.*GO/) },
     ]);
     expect(porRegra(goias, 'chave_uf')).toHaveLength(0);
   });

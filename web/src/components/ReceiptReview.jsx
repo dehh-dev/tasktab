@@ -3,6 +3,7 @@ import * as api from '../api';
 import { ApiError } from '../api';
 import {
   EXPENSE_CATEGORIES,
+  alertLevelLabel,
   centsToInputValue,
   formatDate,
   parseMoneyToCents,
@@ -513,11 +514,9 @@ export default function ReceiptReview({
               key={alertKey(alert)}
               className="alert"
               role="alert"
-              data-severity={alert.severity}
+              data-level={alert.level}
             >
-              <div className="alert__title">
-                {alert.severity === 'erro' ? 'Erro' : 'Aviso'}
-              </div>
+              <div className="alert__title">{alertLevelLabel(alert.level)}</div>
               <div>{alert.message}</div>
               <div className="alert__actions">
                 {canWrite && alert.rule === 'possivel_duplicata' && (

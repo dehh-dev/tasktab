@@ -694,6 +694,14 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 
 - **Alerta nao bloqueia.** `GET /api/reports/:id/validation` aponta; quem
   decide e a pessoa que assina.
+- **Cada alerta leva a classe do procedimento** em `level` (issue 48):
+  pendente, decisao, atencao, verificado, informativo — a mesma da aba de
+  Observacoes da planilha. A classe de cada regra mora em `RULE_LEVEL`, num
+  lugar so, e ha teste que barra regra sem classe. A tela do relatorio agrupa
+  a conferencia inteira por ela (`ValidationPanel`), inclusive o alerta sem
+  comprovante, que antes nao aparecia em lugar nenhum. A duplicata exata
+  consolidada pela chave sai como `verificado`: quem assina fica sabendo por
+  que aquele comprovante esta fora da soma.
 - So **mesma chave de acesso** colapsa como duplicata automatica. Mesma data
   com mesmo valor e **suspeita**, e vira alerta.
 - A duplicata exata e decidida **antes** de a pagina sair de `processing`:

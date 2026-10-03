@@ -15,16 +15,47 @@ const normalize = require('../extraction/normalize');
  * transformaria um aviso util em obstaculo, e a saida seria contornar a
  * ferramenta.
  *
- * Severidade: `erro` para o que e comprovadamente inconsistente, `aviso` para
- * o que merece um olhar.
+ * Cada alerta leva a classe do procedimento (`level`, ver `RULE_LEVEL`). Ate a
+ * issue 48 eram so `erro` e `aviso`, e o que pede decisao se confundia com o
+ * que provavelmente esta errado.
  */
 
 // Amostra minima para falar em "faixa historica" de um emitente. Abaixo disso
 // qualquer valor parece fora da faixa, e o alerta vira ruido.
 const MIN_HISTORY = 3;
 
-function alert(rule, severity, message, extra = {}) {
-  return { rule, severity, message, ...extra };
+/**
+ * A classe de cada regra, na classificacao do procedimento de prestacao de
+ * contas (issue 48) — a mesma da aba de Observacoes da planilha:
+ *
+ * - **pendente**: falta algo para a prestacao ficar completa;
+ * - **decisao**: o dado pode estar certo, e uma pessoa precisa decidir;
+ * - **atencao**: o dado provavelmente foi lido ou lancado errado;
+ * - **verificado**: a ferramenta conferiu e resolveu sozinha;
+ * - **informativo**: nada a corrigir, so contexto para quem assina.
+ *
+ * Num lugar so, e nao em cada chamada: e aqui que se le a classe de tudo, e
+ * uma regra nova sem classe falha no teste que percorre o mapa.
+ */
+const LEVELS = ['pendente', 'decisao', 'atencao', 'verificado', 'informativo'];
+
+const RULE_LEVEL = {
+  incompleto: 'pendente',
+  possivel_duplicata: 'decisao',
+  contingencia: 'decisao',
+  periodo: 'atencao',
+  chave_acesso: 'atencao',
+  chave_mes: 'atencao',
+  chave_uf: 'atencao',
+  soma_itens: 'atencao',
+  combustivel: 'atencao',
+  faixa_emitente: 'atencao',
+  duplicata_exata: 'verificado',
+  adiantamento: 'informativo',
+};
+
+function alert(rule, message, extra = {}) {
+  return { rule, level: RULE_LEVEL[rule], message, ...extra };
 }
 
 /** Comprovante com data fora do periodo declarado no relatorio. */
@@ -39,7 +70,6 @@ function checkPeriod(report, receipts) {
     .map((receipt) =>
       alert(
         'periodo',
-        'erro',
         `Comprovante de ${receipt.issued_at} esta fora do periodo ${report.period_start} a ${report.period_end}.`,
         { receipt_id: receipt.id },
       ),
@@ -61,7 +91,6 @@ function checkAccessKeys(receipts) {
     .map((receipt) =>
       alert(
         'chave_acesso',
-        'erro',
         'A chave de acesso informada nao passa no digito verificador.',
         { receipt_id: receipt.id },
       ),
@@ -103,7 +132,6 @@ function checkAccessKeyFields(receipts) {
       alerts.push(
         alert(
           'chave_mes',
-          'erro',
           `A chave de acesso diz que o cupom e de ${parsed.issuedPeriod}, e a data lida e ${receipt.issued_at}.`,
           { receipt_id: receipt.id },
         ),
@@ -114,7 +142,6 @@ function checkAccessKeyFields(receipts) {
       alerts.push(
         alert(
           'contingencia',
-          'aviso',
           `Cupom emitido em contingencia (tipo de emissao ${parsed.emissionType}): confira se foi autorizado depois.`,
           { receipt_id: receipt.id },
         ),
@@ -127,7 +154,6 @@ function checkAccessKeyFields(receipts) {
       alerts.push(
         alert(
           'chave_uf',
-          'aviso',
           `A chave de acesso e de ${parsed.state}, e a cidade do emitente e de ${cityState}.`,
           { receipt_id: receipt.id },
         ),
@@ -167,7 +193,6 @@ function checkItemSum(receipts) {
     return [
       alert(
         'soma_itens',
-        'erro',
         `A soma dos itens (${sum} centavos) difere do total do comprovante (${receipt.amount_cents} centavos).`,
         { receipt_id: receipt.id },
       ),
@@ -214,7 +239,6 @@ function checkFuelArithmetic(receipts) {
     return [
       alert(
         'combustivel',
-        'erro',
         `Litros vezes preco unitario dao ${fuel} centavos, e o total do comprovante e ${receipt.amount_cents} centavos.`,
         { receipt_id: receipt.id },
       ),
@@ -258,7 +282,6 @@ async function checkMerchantRange(receipts) {
       alerts.push(
         alert(
           'faixa_emitente',
-          'aviso',
           `Valor fora da faixa historica deste emitente (${minimo} a ${maximo} centavos).`,
           { receipt_id: receipt.id },
         ),
@@ -267,6 +290,28 @@ async function checkMerchantRange(receipts) {
   }
 
   return alerts;
+}
+
+/**
+ * Duplicata exata consolidada sozinha: mesma chave de acesso, o mesmo
+ * documento fiscal. O procedimento manda manter os dois documentos e contar o
+ * valor uma vez — e dizer que fez isso, para quem assina saber por que um
+ * comprovante esta fora da soma. A marcada a mao nao entra: ali quem decidiu
+ * foi uma pessoa.
+ */
+function checkExactDuplicates(receipts) {
+  return receipts
+    .filter(
+      (receipt) =>
+        receipt.status === 'duplicate' && receipt.duplicate_of_id !== null,
+    )
+    .map((receipt) =>
+      alert(
+        'duplicata_exata',
+        `Mesmo documento fiscal do comprovante ${receipt.duplicate_of_id}, pela chave de acesso: o valor conta uma vez so.`,
+        { receipt_id: receipt.id, related_id: receipt.duplicate_of_id },
+      ),
+    );
 }
 
 /** Suspeitas de duplicata que exigem decisao humana. */
@@ -292,7 +337,6 @@ async function checkDuplicates(receipts) {
       alerts.push(
         alert(
           'possivel_duplicata',
-          'aviso',
           `Mesma data e mesmo valor do comprovante ${other.id}. Confira antes de decidir — dois almocos iguais em dias diferentes nao sao duplicata.`,
           { receipt_id: receipt.id, related_id: other.id },
         ),
@@ -316,7 +360,6 @@ function checkIncomplete(receipts) {
     .map((receipt) =>
       alert(
         'incompleto',
-        'aviso',
         'Comprovante sem data, valor ou categoria — nao entra na prestacao de contas assim.',
         { receipt_id: receipt.id },
       ),
@@ -340,7 +383,6 @@ function checkAdvance(report, totals) {
   return [
     alert(
       'adiantamento',
-      'aviso',
       `As despesas passam do adiantamento em ${difference} centavos.`,
     ),
   ];
@@ -374,6 +416,7 @@ async function validateReport(reportId) {
     ...checkItemSum(receipts),
     ...checkFuelArithmetic(receipts),
     ...(await checkMerchantRange(receipts)),
+    ...checkExactDuplicates(receipts),
     ...(await checkDuplicates(receipts)),
     ...checkIncomplete(receipts),
     ...checkAdvance(report, totals),
@@ -383,10 +426,14 @@ async function validateReport(reportId) {
     alerts,
     meta: {
       total: alerts.length,
-      erros: alerts.filter((item) => item.severity === 'erro').length,
-      avisos: alerts.filter((item) => item.severity === 'aviso').length,
+      ...Object.fromEntries(
+        LEVELS.map((level) => [
+          level,
+          alerts.filter((item) => item.level === level).length,
+        ]),
+      ),
     },
   };
 }
 
-module.exports = { validateReport, MIN_HISTORY };
+module.exports = { validateReport, MIN_HISTORY, LEVELS, RULE_LEVEL };

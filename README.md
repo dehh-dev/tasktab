@@ -295,9 +295,22 @@ trabalho ja e "uma pagina, um registro", a migracao e local.
 
 ### Conferencia
 
-`GET /api/reports/:id/validation` devolve alertas com severidade (`erro` ou
-`aviso`). **Alerta nao bloqueia nada** — quem assina a prestacao de contas
-decide; a ferramenta aponta, nao veta.
+`GET /api/reports/:id/validation` devolve alertas com a **classe do
+procedimento** em `level`, e o `meta` conta cada uma:
+
+| `level`       | Quando                                                |
+| ------------- | ----------------------------------------------------- |
+| `pendente`    | falta algo para a prestacao ficar completa            |
+| `decisao`     | o dado pode estar certo, e uma pessoa precisa decidir |
+| `atencao`     | o dado provavelmente foi lido ou lancado errado       |
+| `verificado`  | a ferramenta conferiu e resolveu sozinha              |
+| `informativo` | nada a corrigir, so contexto para quem assina         |
+
+Ate a issue 48 o campo era `severity`, com `erro` e `aviso`; o `meta` trazia
+`erros` e `avisos`. A classe de cada regra esta em `RULE_LEVEL`
+(`src/services/validation/index.js`), e a tela do relatorio agrupa a
+conferencia por ela. **Alerta nao bloqueia nada** — quem assina a prestacao de
+contas decide; a ferramenta aponta, nao veta.
 
 Regras: soma dos itens contra o total impresso, litros vezes preco unitario
 no combustivel, digito verificador da chave, mes, UF e tipo de emissao da

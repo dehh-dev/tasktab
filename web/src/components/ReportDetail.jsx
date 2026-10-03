@@ -7,6 +7,7 @@ import ReceiptList from './ReceiptList';
 import ReceiptReview from './ReceiptReview';
 import ConfirmDialog from './ConfirmDialog';
 import ReportForm from './ReportForm';
+import ValidationPanel from './ValidationPanel';
 import { formatDate, formatMoney, reportStatusLabel } from '../constants';
 
 const POLL_INTERVAL_MS = 1500;
@@ -528,6 +529,7 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
         editable && <ReceiptUpload reportId={reportId} onUploaded={load} />
       }
       <ReceiptSummary meta={meta} />
+      <ValidationPanel alerts={alerts} onOpen={setReviewingId} />
       <ReceiptList
         receipts={receipts}
         onOpen={setReviewingId}

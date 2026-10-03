@@ -185,7 +185,8 @@ describe('duplicata provavel', () => {
     );
 
     expect(suspeitas).toHaveLength(1);
-    expect(suspeitas[0].severity).toBe('aviso');
+    // Pode ser o mesmo gasto, pode nao ser: quem decide e uma pessoa.
+    expect(suspeitas[0].level).toBe('decisao');
     // O alerta liga os dois comprovantes, e nao so traz o campo preenchido.
     expect([suspeitas[0].receipt_id, suspeitas[0].related_id].sort()).toEqual(
       [first.id, second.id].sort(),
