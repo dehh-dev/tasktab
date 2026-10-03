@@ -11,6 +11,12 @@ que assina. **Alerta nao bloqueia nada.**
 - Regra so dispara com evidencia suficiente: a de itens exige ao menos dois
   itens legiveis, a de faixa um historico minimo (`MIN_HISTORY`). Alarme falso
   destroi a confianca mais rapido que um erro nao detectado.
+- **Nenhuma regra vai ao banco** (issue 52). O que precisa dele vem numa
+  consulta do relatorio inteiro, no `Promise.all` do `validateReport`, e a
+  regra recebe o resultado. Uma consulta por comprovante eram 80 num
+  relatorio de 40, a cada abertura da tela. O
+  `tests/api/reports/validation-queries.test.js` conta as consultas de verdade
+  e falha se o numero crescer com o relatorio.
 
 ## Duplicatas (`src/services/dedup.service.js`)
 

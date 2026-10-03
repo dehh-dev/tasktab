@@ -94,3 +94,7 @@ de teste cai na integracao, o lado seguro.
 - `tests/helpers/pdf-text.js` e `pdf-render.js` rodam a leitura de PDF num
   subprocesso `node`: o `unpdf` usa import dinamico, que a VM do Jest recusa.
 - `tests/helpers/xlsx-formula.js` resolve formula contra as celulas.
+- `tests/helpers/query-counter.js` e um repasse TCP entre uma API de teste
+  (`startApiInstance` com o `DB_HOST`/`DB_PORT` dele) e o Postgres, que conta
+  as consultas sem alterar nada no caminho. E como se prova "numero de
+  consultas constante" sem mock.

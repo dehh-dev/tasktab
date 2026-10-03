@@ -133,6 +133,34 @@ async function summarizeByReport(reportId, { status, category } = {}) {
 }
 
 /**
+ * Historico do emitente de cada comprovante do relatorio: menor e maior
+ * valor, e quantos confirmados ha dele em qualquer relatorio, fora o proprio
+ * comprovante. Um `Map` por `id`, sem entrada para quem nao tem historico.
+ *
+ * Uma consulta para o relatorio inteiro: uma por comprovante eram 40 a cada
+ * abertura da conferencia de um relatorio de 40 (issue 52).
+ */
+async function merchantHistoryByReport(reportId) {
+  const { rows } = await db.query(
+    `SELECT r.id,
+            MIN(o.amount_cents)::int AS min_cents,
+            MAX(o.amount_cents)::int AS max_cents,
+            COUNT(*)::int AS total
+     FROM receipts r
+     JOIN receipts o
+       ON o.merchant_id = r.merchant_id
+      AND o.id <> r.id
+      AND o.amount_cents IS NOT NULL
+      AND o.status = 'confirmed'
+     WHERE r.report_id = $1
+     GROUP BY r.id`,
+    [reportId],
+  );
+
+  return new Map(rows.map(({ id, ...history }) => [id, history]));
+}
+
+/**
  * Comprovantes de um relatorio para exportacao, com nome e cidade do
  * emitente ja resolvidos.
  *
@@ -308,6 +336,7 @@ module.exports = {
   UPDATABLE_COLUMNS,
   findByReport,
   summarizeByReport,
+  merchantHistoryByReport,
   findForExport,
   findById,
   findByReportAndHash,

@@ -2193,8 +2193,24 @@ fora, porque nenhum parser lê a hora.
 
 **Critérios de aceite**
 
-- [ ] Número de consultas constante no tamanho do relatório
-- [ ] Os testes de conferência passam sem alteração
+- [x] Número de consultas constante no tamanho do relatório
+- [x] Os testes de conferência passam sem alteração
+
+**Como ficou**
+
+O histórico do emitente (`merchantHistoryByReport`, no model) e os pares de
+mesma data e valor (`findProbableDuplicates`, agora do relatório inteiro) saem
+cada um numa consulta, no mesmo `Promise.all` que busca os comprovantes. As
+regras recebem o resultado e não vão mais ao banco. A conferência inteira faz
+7 consultas, com 2 comprovantes ou com 20; antes eram 9 e 45. Os alertas de
+duplicata saem na mesma ordem e com o mesmo comprovante de cada lado, porque o
+laço percorre a lista na ordem de antes e os parceiros de cada um em ordem de
+`id`, como a consulta antiga.
+
+Para provar sem mock, o teste novo sobe uma API própria ligada ao Postgres por
+um repasse TCP (`tests/helpers/query-counter.js`). O repasse conta as mensagens
+do protocolo que executam SQL, sem alterar nada no caminho. O teste falhou com
+o código antigo antes da correção: 9 contra 45.
 
 ---
 

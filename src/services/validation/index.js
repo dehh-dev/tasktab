@@ -1,6 +1,5 @@
 'use strict';
 
-const db = require('../../config/database');
 const Receipt = require('../../models/receipt.model');
 const Report = require('../../models/report.model');
 const accessKey = require('../extraction/access-key');
@@ -292,50 +291,35 @@ function checkFuelArithmetic(receipts) {
   });
 }
 
-/** Valor muito fora do que aquele emitente costuma cobrar. */
-async function checkMerchantRange(receipts) {
-  const alerts = [];
+/**
+ * Valor muito fora do que aquele emitente costuma cobrar. O historico vem do
+ * relatorio inteiro numa consulta so (`merchantHistoryByReport`).
+ */
+function checkMerchantRange(receipts, history) {
+  return receipts.flatMap((receipt) => {
+    const range = history.get(receipt.id);
 
-  for (const receipt of receipts) {
-    if (!receipt.merchant_id || receipt.amount_cents === null) {
-      continue;
-    }
-
-    const { rows } = await db.query(
-      `SELECT MIN(amount_cents)::int AS minimo,
-              MAX(amount_cents)::int AS maximo,
-              COUNT(*)::int AS total
-       FROM receipts
-       WHERE merchant_id = $1
-         AND id <> $2
-         AND amount_cents IS NOT NULL
-         AND status = 'confirmed'`,
-      [receipt.merchant_id, receipt.id],
-    );
-
-    const { minimo, maximo, total } = rows[0];
-
-    if (total < MIN_HISTORY) {
-      continue;
+    if (receipt.amount_cents === null || !range || range.total < MIN_HISTORY) {
+      return [];
     }
 
     // Uma ordem de grandeza fora da faixa e o sintoma de digito a mais ou a
     // menos, que e o erro que esta regra procura.
     if (
-      receipt.amount_cents > maximo * 10 ||
-      receipt.amount_cents * 10 < minimo
+      receipt.amount_cents <= range.max_cents * 10 &&
+      receipt.amount_cents * 10 >= range.min_cents
     ) {
-      alerts.push(
-        alert(
-          'faixa_emitente',
-          `Valor fora da faixa historica deste emitente (${minimo} a ${maximo} centavos).`,
-          { receipt_id: receipt.id },
-        ),
-      );
+      return [];
     }
-  }
 
-  return alerts;
+    return [
+      alert(
+        'faixa_emitente',
+        `Valor fora da faixa historica deste emitente (${range.min_cents} a ${range.max_cents} centavos).`,
+        { receipt_id: receipt.id },
+      ),
+    ];
+  });
 }
 
 function median(values) {
@@ -571,20 +555,27 @@ function checkRepeatedValues(receipts) {
   });
 }
 
-/** Suspeitas de duplicata que exigem decisao humana. */
-async function checkDuplicates(receipts) {
+/**
+ * Suspeitas de duplicata que exigem decisao humana. Os pares vem do
+ * relatorio inteiro numa consulta so; o alerta sai no comprovante que vem
+ * primeiro na lista, apontando para o outro.
+ */
+function checkDuplicates(receipts, pairs) {
+  const partners = new Map();
+
+  for (const { id, other_id: otherId } of pairs) {
+    partners.set(id, [...(partners.get(id) ?? []), otherId]);
+    partners.set(otherId, [...(partners.get(otherId) ?? []), id]);
+  }
+
   const alerts = [];
   const seen = new Set();
 
   for (const receipt of receipts) {
-    if (receipt.status === 'duplicate') {
-      continue;
-    }
+    const others = (partners.get(receipt.id) ?? []).sort((a, b) => a - b);
 
-    const probable = await dedup.findProbableDuplicates(receipt);
-
-    for (const other of probable) {
-      const pair = [receipt.id, other.id].sort((a, b) => a - b).join(':');
+    for (const otherId of others) {
+      const pair = [receipt.id, otherId].sort((a, b) => a - b).join(':');
 
       if (seen.has(pair)) {
         continue;
@@ -594,8 +585,8 @@ async function checkDuplicates(receipts) {
       alerts.push(
         alert(
           'possivel_duplicata',
-          `Mesma data e mesmo valor do comprovante ${other.id}. Confira antes de decidir — dois almocos iguais em dias diferentes nao sao duplicata.`,
-          { receipt_id: receipt.id, related_id: other.id },
+          `Mesma data e mesmo valor do comprovante ${otherId}. Confira antes de decidir — dois almocos iguais em dias diferentes nao sao duplicata.`,
+          { receipt_id: receipt.id, related_id: otherId },
         ),
       );
     }
@@ -723,9 +714,13 @@ async function validateReport(reportId) {
     return null;
   }
 
-  const [receipts, totals] = await Promise.all([
+  // Um numero fixo de consultas, qualquer que seja o tamanho do relatorio
+  // (issue 52): nenhuma regra abaixo vai ao banco.
+  const [receipts, totals, history, pairs] = await Promise.all([
     Receipt.findByReport(reportId),
     Receipt.summarizeByReport(reportId),
+    Receipt.merchantHistoryByReport(reportId),
+    dedup.findProbableDuplicates(reportId),
   ]);
 
   const alerts = [
@@ -734,14 +729,14 @@ async function validateReport(reportId) {
     ...checkAccessKeyFields(receipts),
     ...checkItemSum(receipts),
     ...checkFuelArithmetic(receipts),
-    ...(await checkMerchantRange(receipts)),
+    ...checkMerchantRange(receipts, history),
     ...checkCategoryPattern(receipts),
     ...checkOtherCategory(receipts),
     ...checkOutsideMainCity(report, receipts),
     ...checkCitiesPerDay(receipts),
     ...checkExactDuplicates(receipts),
     ...checkRepeatedValues(receipts),
-    ...(await checkDuplicates(receipts)),
+    ...checkDuplicates(receipts, pairs),
     ...checkIncomplete(receipts),
     ...checkAdvanceInformed(report),
     ...checkAdvance(report, totals),
