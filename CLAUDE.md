@@ -674,9 +674,13 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
 
 - **O template em `assets/anexo-i-template.xlsx` e SINTETICO.** Nao existe
   neste projeto o arquivo real do Anexo I. Antes de qualquer uso em producao,
-  troque pelo formulario oficial e revise `CATEGORY_COLUMN` em
-  `anexo-i.service.js` — o mapa de 8 categorias para 3 colunas (S/W/X) e
-  placeholder, criado sem o layout real.
+  troque pelo formulario oficial e confira `CATEGORY_COLUMN` em
+  `anexo-i.service.js`. O mapa ja e o da versao 19 descrita pelo procedimento
+  de prestacao de contas (O Passagens, Q Taxi/Conducoes, S Alimentacao,
+  U Hospedagem, W Combustivel, X Outras; estacionamento e lavanderia em X), e
+  o sintetico tem as mesmas seis colunas, com o total da linha cobrindo todas.
+  Ate a issue 38 o mapa era placeholder e o taxi caia em W, a coluna do
+  combustivel.
 - **Nunca abra-e-regrave o `.xlsx` do Anexo I com exceljs (ou qualquer lib
   parse-and-rebuild).** Foi assim que a validacao de dados (lista suspensa) de
   um template oficial se perdeu, na conferencia manual que originou este
