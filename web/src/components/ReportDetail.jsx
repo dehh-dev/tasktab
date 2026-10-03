@@ -8,7 +8,14 @@ import ConfirmDialog from './ConfirmDialog';
 import { formatDate, formatMoney, reportStatusLabel } from '../constants';
 
 const POLL_INTERVAL_MS = 1500;
+// Teto da espera depois de falhas seguidas: o bastante para nao insistir num
+// servidor que respondeu 429, curto o bastante para a tela voltar sozinha.
+const POLL_MAX_INTERVAL_MS = 15000;
 const EMPTY_META = { total: 0, total_cents: 0, by_category: {} };
+
+function isProcessing(receipt) {
+  return receipt.status === 'pending' || receipt.status === 'processing';
+}
 
 /** Ids dos comprovantes que ainda precisam de revisao, na ordem da lista. */
 function needsReviewQueue(receipts) {
@@ -62,6 +69,8 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
 
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [pollError, setPollError] = useState(null);
+  const [pollFailures, setPollFailures] = useState(0);
   const [changingStatus, setChangingStatus] = useState(false);
 
   /**
@@ -82,6 +91,10 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
     setReceipts(receiptsResponse.data);
     setMeta(receiptsResponse.meta);
     setAlerts(validationResponse.data);
+    // A tela acabou de ser recarregada inteira: um aviso de falha do
+    // acompanhamento, se havia, ja nao diz a verdade.
+    setPollError(null);
+    setPollFailures(0);
 
     return receiptsResponse.data;
   }, [reportId]);
@@ -107,21 +120,52 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
     }
   }, [reviewingId, receipts]);
 
-  // Poll so enquanto houver comprovante ainda em processamento; para sozinho
+  /**
+   * Um ciclo do acompanhamento: so a lista, que e o que muda enquanto a
+   * extracao roda. Relatorio e conferencia so mudam quando ela termina, e
+   * busca-los a cada 1,5 s gastava o teto de leitura — tres requisicoes por
+   * ciclo esgotavam os 600 da janela em cinco minutos de OCR, e a conferencia
+   * ainda custa consultas por comprovante.
+   */
+  const poll = useCallback(async () => {
+    try {
+      const response = await api.listReceipts(reportId);
+
+      // Terminou: recarrega tudo de uma vez. Se essa recarga falhar, a lista
+      // de antes continua dizendo "em processamento", e o ciclo seguinte tenta
+      // de novo — em vez de parar com a conferencia desatualizada.
+      if (response.data.some(isProcessing)) {
+        setReceipts(response.data);
+        setMeta(response.meta);
+      } else {
+        await load();
+      }
+
+      setPollError(null);
+      setPollFailures(0);
+    } catch (caught) {
+      // Antes, o erro era engolido e nenhum ciclo novo era agendado: a tela
+      // ficava em "processando" para sempre, sem dizer nada. Agora avisa e
+      // tenta de novo, cada vez esperando mais.
+      setPollError({ message: caught.message, action: caught.action });
+      setPollFailures((failures) => failures + 1);
+    }
+  }, [reportId, load]);
+
+  // Acompanha so enquanto houver comprovante em processamento; para sozinho
   // quando nao ha mais nenhum, para nao ficar batendo a toa.
   useEffect(() => {
-    const stillProcessing = receipts.some(
-      (receipt) =>
-        receipt.status === 'pending' || receipt.status === 'processing',
-    );
-
-    if (!stillProcessing) {
+    if (!receipts.some(isProcessing)) {
       return undefined;
     }
 
-    const timer = setTimeout(() => load().catch(() => {}), POLL_INTERVAL_MS);
+    const delay = Math.min(
+      POLL_INTERVAL_MS * 2 ** pollFailures,
+      POLL_MAX_INTERVAL_MS,
+    );
+    const timer = setTimeout(poll, delay);
     return () => clearTimeout(timer);
-  }, [receipts, load]);
+  }, [receipts, pollFailures, poll]);
 
   /** Recarrega e avanca para o proximo pendente — ou fecha, se a fila esvaziou. */
   async function handleAction() {
@@ -335,6 +379,17 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
         <div className="alert" role="alert">
           <div className="alert__title">{error.message}</div>
           {error.action && <div>{error.action}</div>}
+        </div>
+      )}
+
+      {pollError && (
+        <div className="alert" role="status">
+          <div className="alert__title">
+            Nao foi possivel acompanhar o processamento: {pollError.message}
+          </div>
+          <div>
+            {pollError.action} A tela tenta de novo sozinha em instantes.
+          </div>
         </div>
       )}
 

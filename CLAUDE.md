@@ -392,6 +392,8 @@ nova de teste cai na integracao por padrao, que e o lado seguro.
   extracao pronta. Subir pela tela fica para as specs cujo assunto e o upload:
   nas outras, esperar o poll de 1,5 s da `ReportDetail` custava quase dois
   segundos por spec, e o E2E caiu de 60 s para 35 s quando isso mudou.
+  `sendReceipts` volta com a extracao ainda rodando, e e so para as specs do
+  acompanhamento (`expenses-polling.spec.js`).
 - Locators acessiveis (`getByRole`, `getByLabel`) — de quebra, cobrem a11y.
   Escope ao formulario (`page.locator('form.form')`): "Status" tambem casa com
   o `aria-label` do grupo de filtros, e "Cancelar" existe no form e no dialogo.
@@ -400,7 +402,10 @@ nova de teste cai na integracao por padrao, que e o lado seguro.
   `npm run dev` aberto, que faz proxy para a API de dev. **Nunca** deixe a
   suite tocar o banco de desenvolvimento.
 - Vale a mesma regra de nao mockar. A unica excecao esta anotada em
-  `form-validation.spec.js` e explicada la.
+  `form-validation.spec.js` e explicada la. Queda de rede **nao** e excecao:
+  `context.setOffline(true)` derruba a rede do navegador de verdade, sem
+  inventar resposta nenhuma — e assim que `expenses-polling.spec.js` prova que
+  o acompanhamento avisa e retoma.
 - O `ConfirmDialog` usa a tag `<dialog>` nativa com `showModal()`. **Nao volte
   para uma `div` com `aria-modal`**: era uma promessa de isolamento que o
   browser nao cumpria. O `close()` roda em `useLayoutEffect`, porque uma
@@ -624,6 +629,12 @@ completo esta em `docs/backlog-prestacao-de-contas.md`.
   `orchestrator.waitForProcessing`, e o `tests/setup.js` drena a fila antes de
   truncar — sem isso, trabalho de um teste escreve no banco ja limpo do
   seguinte. Aconteceu.
+- Enquanto ha pagina em processamento, a `ReportDetail` consulta **so a
+  lista**; relatorio e conferencia recarregam uma vez, quando nada mais esta
+  em processamento. Buscar os tres a cada 1,5 s esgotava o teto de leitura
+  em cinco minutos de OCR. Ciclo que falha mostra o motivo e tenta de novo
+  com espera crescente — o `.catch(() => {})` de antes parava a tela em
+  "processando" para sempre, sem aviso.
 - Os testes puros de extracao vivem em `tests/services/`. E excecao estreita a
   regra de so integracao, e vale so para funcao pura: uma tabela de 48 casos de
   parsing nao cabe em 48 PDFs. Rodam num projeto do Jest sem banco
