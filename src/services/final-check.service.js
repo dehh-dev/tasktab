@@ -56,7 +56,10 @@ async function checkSums(reportId, receipts) {
  */
 async function checkPages(receipts) {
   const received = receipts.length;
-  const built = await pdfPorCategoria.buildCategoryPdfs(receipts);
+  // Montados de verdade, mas sem serializar: daqui so saem as paginas.
+  const built = await pdfPorCategoria.buildCategoryPdfs(receipts, {
+    save: false,
+  });
   const { files } = built;
 
   if (hasProblems(built)) {
@@ -129,12 +132,14 @@ function checkConfirmed(receipts) {
 async function checkReport(reportId) {
   const receipts = await Receipt.findForExport(reportId);
 
-  return [
-    await checkSums(reportId, receipts),
-    await checkPages(receipts),
-    checkKeys(receipts),
-    checkConfirmed(receipts),
-  ];
+  // As duas que custam — a consulta do total e a montagem dos PDFs — nao
+  // dependem uma da outra.
+  const [sums, pages] = await Promise.all([
+    checkSums(reportId, receipts),
+    checkPages(receipts),
+  ]);
+
+  return [sums, pages, checkKeys(receipts), checkConfirmed(receipts)];
 }
 
 module.exports = { checkReport };

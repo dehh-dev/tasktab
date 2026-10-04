@@ -45,7 +45,7 @@ function slug(label) {
  * comprovantes faltaram (`missing`, `unreadable`): sem todas as paginas, a
  * regra acima nao vale.
  */
-async function buildCategoryPdfs(receipts) {
+async function buildCategoryPdfs(receipts, { save = true } = {}) {
   // Cada arquivo enviado e lido uma vez, por mais paginas que tenha.
   const { sources, missing, unreadable } = await openOriginals(receipts);
   const files = [];
@@ -95,7 +95,10 @@ async function buildCategoryPdfs(receipts) {
       name: `${String(index + 1).padStart(2, '0')}_${slug(group.label)}.pdf`,
       receiptIds: group.receipts.map((receipt) => receipt.id),
       pageCount: doc.getPageCount(),
-      bytes: await doc.save(),
+      // A checagem final so conta paginas. Serializar cada PDF para jogar
+      // fora custava, num relatorio de cupons escaneados, dezenas de MB a
+      // cada clique em "Fechar relatorio".
+      bytes: save ? await doc.save() : null,
     });
   }
 
