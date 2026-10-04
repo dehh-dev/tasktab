@@ -97,6 +97,7 @@ export default function ReceiptReview({
   onNavigate,
   onBack,
   onAction,
+  onRotated,
   onDelete,
   canWrite = true,
   readOnlyReason,
@@ -395,6 +396,7 @@ export default function ReceiptReview({
     try {
       await api.updateReceipt(receipt.id, { rotation: next });
       setRotation(next);
+      onRotated(next);
     } catch (caught) {
       setError({ message: caught.message, action: caught.action });
     } finally {

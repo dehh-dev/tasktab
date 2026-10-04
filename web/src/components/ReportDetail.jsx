@@ -318,6 +318,17 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
     }
   }
 
+  /**
+   * O giro gravado na revisao volta para a lista. Sem isto, reabrir o mesmo
+   * comprovante partia do giro antigo — a revisao remonta com o `receipt` da
+   * lista —, e girar para o outro lado para desfazer gravava 270 em vez de 0.
+   */
+  function handleRotated(id, rotation) {
+    setReceipts((current) =>
+      current.map((item) => (item.id === id ? { ...item, rotation } : item)),
+    );
+  }
+
   /** Prev/anterior dentro da fila, sem mutar nada — usa o estado atual. */
   function handleNavigate(direction) {
     const queue = needsReviewQueue(receipts);
@@ -415,6 +426,7 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
           onNavigate={handleNavigate}
           onBack={() => setReviewingId(null)}
           onAction={handleAction}
+          onRotated={(rotation) => handleRotated(receipt.id, rotation)}
           onDelete={setPendingDelete}
           canWrite={editable}
           readOnlyReason={
