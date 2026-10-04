@@ -53,7 +53,9 @@ nao por deixar de olhar.
   Digitada, vale o mesmo que a lida do QR (`typed-issuer.service.js`): vincula
   o emitente pelo `classify`, a categoria do cadastro substitui um palpite
   (nunca uma escolha de pessoa), e a mesma chave em outro comprovante do
-  relatorio faz deste a duplicata, por cima de um "confirmar".
+  relatorio faz deste a duplicata, por cima de um "confirmar". A tela manda a
+  categoria inteira ao confirmar: **o palpite devolvido igual continua
+  palpite**, senao o cupom de posto saia confirmado como Alimentacao.
 - Sem chave, o `PATCH` aceita `cnpj` e vincula pelo mesmo `classify`;
   `cnpj: null` desvincula, porque o CNPJ do texto pode ser o da credenciadora.
   Com chave, o CNPJ vem dela, e um digitado e `422`.

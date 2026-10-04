@@ -18,7 +18,8 @@ const dedup = require('./dedup.service');
  *   nome e a cidade que o comprovante traz;
  * - a categoria do cadastro do emitente substitui um palpite, nunca uma
  *   escolha de pessoa: nem a que veio neste mesmo PATCH, nem a ja gravada sem
- *   a marca de palpite;
+ *   a marca de palpite. O palpite devolvido igual, como a tela faz ao
+ *   confirmar, continua palpite;
  * - a mesma chave em outro comprovante do relatorio e o mesmo documento
  *   fiscal, e este vira a duplicata dele, como na extracao — por cima de um
  *   "confirmar" que viesse junto.
@@ -66,8 +67,16 @@ async function linkMerchant(current, data, cnpj) {
       ? {}
       : { merchant_id: classified.merchant_id };
 
+  // A revisao manda a categoria inteira ao confirmar, mexendo nela ou nao:
+  // devolver o mesmo palpite nao e escolher. Contado como escolha, o cupom
+  // de posto confirmado com a chave digitada saia como Alimentacao, o piso
+  // do palpite, mesmo com o emitente cadastrado como Combustivel.
+  const keptGuess =
+    'category' in data &&
+    current.category_guessed &&
+    data.category === current.category;
   const personChose =
-    'category' in data ||
+    ('category' in data && !keptGuess) ||
     (current.category !== null && !current.category_guessed);
 
   if (!personChose && !classified.category_guessed) {
