@@ -107,17 +107,15 @@ function withTimeout(promise, ms, onTimeout) {
 }
 
 /**
- * Texto e confianca de uma pagina.
+ * Texto e confianca de uma pagina pelo OCR.
  *
  * A confianca vem em 0..100 do tesseract e sai daqui em 0..1, na mesma escala
  * dos demais campos — comparar 87 com 0.9 na tela de revisao nao ajudaria
  * ninguem.
- */
-/**
- * Texto da pagina pelo OCR. `rotation` e o giro escolhido na revisao (issue
- * 43): o Tesseract nao endireita a pagina sozinho, e um cupom de cabeca para
- * baixo sai como ruido. O QR nao precisa disso — o zxing acha o codigo em
- * qualquer orientacao.
+ *
+ * `rotation` e o giro escolhido na revisao (issue 43): o Tesseract nao
+ * endireita a pagina sozinho, e um cupom de cabeca para baixo sai como ruido.
+ * O QR nao precisa disso — o zxing acha o codigo em qualquer orientacao.
  */
 async function readPage(buffer, pageNumber, { rotation = 0 } = {}) {
   if (!env.ocr.enabled) {
