@@ -92,7 +92,8 @@ o cadastro.
 Pagina **sem camada de texto** (cupom escaneado) desce para o **OCR**, o
 degrau mais caro e menos confiavel da cascata: cerca de 0,2 a 0,5 s por pagina
 depois do primeiro reconhecimento, mais uns 400 ms na primeira execucao, que
-baixa 2,4 MB de dados de idioma para `OCR_CACHE_DIR`. Pagina de cabeca para
+carrega os dados de idioma do pacote instalado (`@tesseract.js-data/por`) — a
+extracao nao depende de rede, nem para o OCR nem para o QR. Pagina de cabeca para
 baixo se endireita na revisao: `rotation` no `PATCH`, em quarto de volta, vale
 para a imagem, para o OCR do reprocessamento e para o PDF consolidado — o
 arquivo original nunca e regravado.

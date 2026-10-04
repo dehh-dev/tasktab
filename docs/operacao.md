@@ -23,7 +23,7 @@ ambiente (nao existe `env.production` versionado).
 | `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao                   |
 | `OCR_ENABLED`                                         | `false` desliga o degrau de OCR           |
 | `OCR_LANGUAGE`                                        | Idioma do tesseract (padrao `por`)        |
-| `OCR_CACHE_DIR`                                       | Cache dos dados de idioma                 |
+| `OCR_LANG_PATH`                                       | Dados do idioma (padrao: o pacote `por`)  |
 | `OCR_TIMEOUT_MS`                                      | Teto por pagina (padrao 20s)              |
 | `SESSION_COOKIE_NAME`                                 | Nome do cookie (padrao `tasktab_session`) |
 | `SESSION_TTL_HOURS`                                   | Validade da sessao (padrao 168h)          |
@@ -34,6 +34,12 @@ ambiente (nao existe `env.production` versionado).
 
 O `.npmrc` liga `engine-strict`: sem ele o campo `engines` seria so um aviso e a
 instalacao seguiria numa versao de Node incompativel.
+
+A extracao nao usa rede: o `.wasm` do leitor de QR e os dados de idioma do OCR
+vem dos pacotes instalados. Se o OCR nao subir — outro `OCR_LANGUAGE` sem os
+dados dele em `OCR_LANG_PATH`, por exemplo —, a API segue no ar, o log registra
+`o OCR nao subiu` e as paginas sem texto vao para a revisao sem leitura ate o
+processo reiniciar.
 
 O `services:wait:database` abre uma conexao real com o banco da aplicacao em
 vez de so checar se o container subiu — assim valida tambem as credenciais e a

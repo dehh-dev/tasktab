@@ -37,7 +37,10 @@ function startWorker() {
     let started = false;
 
     createWorker(env.ocr.language, 1, {
-      cachePath: env.ocr.cachePath,
+      langPath: env.ocr.langPath,
+      // Os dados ja estao no disco. O cache padrao gravaria mais uma copia
+      // deles no diretorio de trabalho do processo.
+      cacheMethod: 'none',
       logger: () => {},
       errorHandler: (error) => {
         if (!started) {

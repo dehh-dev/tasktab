@@ -1,6 +1,7 @@
 'use strict';
 
 const { PDFDocument, StandardFonts, degrees, rgb } = require('pdf-lib');
+const { zxing } = require('../../src/services/extraction/zxing');
 
 /**
  * PDFs sinteticos para a suite.
@@ -69,7 +70,7 @@ function makeReceiptPdf(options = {}) {
  * dentro da URL.
  */
 async function makeQrReceiptPdf({ accessKey, ...rest } = {}) {
-  const { writeBarcode } = require('zxing-wasm');
+  const { writeBarcode } = zxing();
 
   const url = `https://nfe.sefaz.go.gov.br/nfeweb/consulta?p=${accessKey}|2|1|1`;
   const { image } = await writeBarcode(url, { format: 'QRCode', scale: 8 });

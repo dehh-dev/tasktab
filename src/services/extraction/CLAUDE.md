@@ -95,6 +95,12 @@ nao por deixar de olhar.
 - A cascata inteira e conferida num upload so, com um cupom digital e um
   escaneado. O Tesseract e a parte mais cara da suite: **nao suba outro
   escaneado** para provar um pedaco que esse teste ja prova.
+- **Nada de CDN em tempo de execucao.** O `.wasm` do zxing vem do pacote
+  (`zxing.js`, que leitura e fixture usam) e o idioma do Tesseract, de
+  `@tesseract.js-data/por` (`OCR_LANG_PATH`), com `cacheMethod: 'none'`. Os
+  dois buscavam no jsDelivr na primeira pagina de cada processo: sem rede o QR
+  sumia, o OCR derrubava a API e a suite nao rodava. Nao chame
+  `require('zxing-wasm')` direto.
 - O worker do OCR sobe com `errorHandler` (`ocr.service.js`). **Nao tire**:
   sem ele o tesseract.js relanca o erro do worker fora de qualquer promise, e
   a API inteira cai. A falha na subida (idioma que nao carrega) e rejeitada a
