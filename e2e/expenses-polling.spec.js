@@ -1,7 +1,12 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport, sendReceipts } = require('./helpers');
+const {
+  openSection,
+  clearReports,
+  createReport,
+  sendReceipts,
+} = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 
 // Um lote que leva varios ciclos de 1,5 s para processar, sem OCR: cada
@@ -22,7 +27,7 @@ async function openWhileProcessing(page, request, title) {
   ]);
 
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
   await page.getByRole('button', { name: title }).click();
 
   // Sem nada em processamento ao abrir, nao ha acompanhamento a observar.

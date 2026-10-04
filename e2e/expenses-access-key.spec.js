@@ -1,7 +1,12 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport, addReceipts } = require('./helpers');
+const {
+  openSection,
+  clearReports,
+  createReport,
+  addReceipts,
+} = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 
 const CHAVE = '52260626048802000165650010001631601303284889';
@@ -21,7 +26,7 @@ async function openReviewWithoutKey(page, request, title) {
   ]);
 
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
   await page.getByRole('button', { name: title }).click();
   await page.locator('.list-item .link-button').first().click();
   await page.waitForSelector('.review__fields');

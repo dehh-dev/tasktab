@@ -1,7 +1,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport } = require('./helpers');
+const { openSection, clearReports, createReport } = require('./helpers');
 
 test.beforeEach(async ({ request }) => {
   await clearReports(request);
@@ -9,7 +9,7 @@ test.beforeEach(async ({ request }) => {
 
 async function openReport(page, report) {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
   await page.getByRole('button', { name: report.title }).click();
 }
 

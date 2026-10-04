@@ -1,7 +1,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearTasks } = require('./helpers');
+const { openSection, clearTasks } = require('./helpers');
 
 test.beforeEach(async ({ request }) => {
   await clearTasks(request);
@@ -9,6 +9,7 @@ test.beforeEach(async ({ request }) => {
 
 test('acusa titulo vazio sem chamar a API', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await page.getByRole('button', { name: 'Nova tarefa' }).click();
 
   let requested = false;
@@ -32,6 +33,7 @@ test('acusa titulo vazio sem chamar a API', async ({ page }) => {
 
 test('limpa o erro local assim que o campo e corrigido', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await page.getByRole('button', { name: 'Nova tarefa' }).click();
   await page.getByRole('button', { name: 'Criar tarefa' }).click();
 
@@ -48,6 +50,7 @@ test('exibe o erro do servidor no campo certo e o descarta ao editar', async ({
   page,
 }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
 
   // Excecao deliberada ao "sem mock" do projeto: hoje a validacao do cliente
   // cobre todas as regras do servidor, entao um 422 e inalcancavel pela

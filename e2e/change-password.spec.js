@@ -1,7 +1,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { createUser, deleteUser } = require('./helpers');
+const { openSection, createUser, deleteUser } = require('./helpers');
 
 /**
  * Pessoa propria, e nao o usuario do E2E: trocar a senha dele quebraria o
@@ -37,8 +37,12 @@ test('troca a propria senha, e a nova passa a valer no login', async ({
   const newPassword = 'outra-senha-do-e2e-456';
 
   await enter(page, person.email, person.password);
-  await expect(page.getByText(person.name)).toBeVisible();
+  await expect(
+    page.getByRole('complementary').getByText(person.name),
+  ).toBeVisible();
 
+  // A troca de senha mora nos Ajustes, junto dos dados da conta.
+  await openSection(page, 'Ajustes');
   await page.getByRole('button', { name: 'Alterar senha' }).click();
   const form = page.locator('form.form', { hasText: 'Alterar senha' });
 
@@ -53,5 +57,7 @@ test('troca a propria senha, e a nova passa a valer no login', async ({
   await expect(page.getByRole('status')).toHaveText(/Senha alterada/);
 
   await enter(page, person.email, newPassword);
-  await expect(page.getByText(person.name)).toBeVisible();
+  await expect(
+    page.getByRole('complementary').getByText(person.name),
+  ).toBeVisible();
 });

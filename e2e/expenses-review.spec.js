@@ -1,7 +1,12 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport, addReceipts } = require('./helpers');
+const {
+  openSection,
+  clearReports,
+  createReport,
+  addReceipts,
+} = require('./helpers');
 const { makeReceiptPdf, makeQrReceiptPdf } = require('../tests/fixtures/pdf');
 
 test.beforeEach(async ({ request }) => {
@@ -10,7 +15,7 @@ test.beforeEach(async ({ request }) => {
 
 async function openExpensesTab(page) {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
 }
 
 async function uploadAndOpenReview(page, request, report, buffers) {

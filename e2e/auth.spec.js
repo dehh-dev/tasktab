@@ -2,6 +2,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { E2E_USER } = require('./constants');
+const { openSection } = require('./helpers');
 
 /**
  * Todo este arquivo roda **sem** o estado gravado pelo projeto de setup, e
@@ -22,9 +23,14 @@ async function entrar(page) {
   await form.getByLabel('Senha').fill(E2E_USER.password);
   await form.getByRole('button', { name: 'Entrar' }).click();
 
-  // Entrou de verdade: a aplicacao aparece, com o nome de quem esta nela.
-  await expect(page.getByRole('tab', { name: 'Tarefas' })).toBeVisible();
-  await expect(page.getByText(E2E_USER.name)).toBeVisible();
+  // Entrou de verdade: a aplicacao aparece, com o nome de quem esta nela na
+  // barra lateral (o Inicio tambem cumprimenta pelo nome).
+  await expect(
+    page.getByRole('navigation', { name: 'Principal' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('complementary').getByText(E2E_USER.name),
+  ).toBeVisible();
 }
 
 test.describe('sessao', () => {
@@ -37,8 +43,10 @@ test.describe('sessao', () => {
       page.getByRole('heading', { name: 'Entrar no tasktab' }),
     ).toBeVisible();
 
-    // O que a autenticacao existe para impedir: nenhuma aba, nenhuma lista.
-    await expect(page.getByRole('tab', { name: 'Tarefas' })).toHaveCount(0);
+    // O que a autenticacao existe para impedir: nenhum menu, nenhuma lista.
+    await expect(
+      page.getByRole('navigation', { name: 'Principal' }),
+    ).toHaveCount(0);
   });
 
   test('senha errada mostra a mensagem e mantem o e-mail digitado', async ({
@@ -67,7 +75,7 @@ test.describe('sessao', () => {
     await page.request.post('/api/auth/logout');
 
     // E a proxima conversa com a API que descobre a queda.
-    await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+    await openSection(page, 'Prestacao de Contas');
 
     await expect(
       page.getByRole('heading', { name: 'Entrar no tasktab' }),

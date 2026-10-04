@@ -33,6 +33,14 @@ export default function LoginScreen({ onAuthenticated, notice = null }) {
 
   return (
     <div className="login">
+      <div className="login__brand">
+        <span className="brand-mark brand-mark--lg" aria-hidden="true">
+          t
+        </span>
+        <h1 className="login__name">tasktab</h1>
+        <p className="login__tagline">Tarefas e prestacao de contas</p>
+      </div>
+
       <form className="login__form form" onSubmit={handleSubmit}>
         <h2 className="login__title">Entrar no tasktab</h2>
 

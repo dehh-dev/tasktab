@@ -1,7 +1,12 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport, addReceipts } = require('./helpers');
+const {
+  openSection,
+  clearReports,
+  createReport,
+  addReceipts,
+} = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 
 test.beforeEach(async ({ request }) => {
@@ -19,7 +24,7 @@ test('girar a pagina troca a imagem e nao perde o zoom', async ({
   ]);
 
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
   await page.getByRole('button', { name: report.title }).click();
   await page.locator('.list-item .link-button').first().click();
   await page.waitForFunction(
@@ -64,7 +69,7 @@ test('reabrir a revisao parte do giro gravado, e desfazer volta a zero', async (
   };
 
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
   await page.getByRole('button', { name: report.title }).click();
   await abrir();
 

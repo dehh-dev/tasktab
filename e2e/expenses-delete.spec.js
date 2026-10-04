@@ -1,7 +1,12 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport, addReceipts } = require('./helpers');
+const {
+  openSection,
+  clearReports,
+  createReport,
+  addReceipts,
+} = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 
 test.beforeEach(async ({ request }) => {
@@ -14,7 +19,7 @@ async function openReportWithReceipts(page, request, report, buffers) {
   await addReceipts(request, report.id, buffers);
 
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
   await page.getByRole('button', { name: report.title }).click();
   await expect(page.locator('.list-item')).toHaveCount(buffers.length);
 }

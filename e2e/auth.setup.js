@@ -24,7 +24,9 @@ setup('autentica e guarda a sessao', async ({ page }) => {
   // A sessao so esta de pe quando a aplicacao aparece — esperar pelo cookie
   // passaria antes de o `me` responder e a proxima spec pegaria a tela ainda
   // no login.
-  await expect(page.getByRole('tab', { name: 'Tarefas' })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Principal' }),
+  ).toBeVisible();
 
   await page.context().storageState({ path: STORAGE_STATE });
 });

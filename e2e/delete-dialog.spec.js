@@ -1,7 +1,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearTasks, createTask } = require('./helpers');
+const { openSection, clearTasks, createTask } = require('./helpers');
 
 test.beforeEach(async ({ request }) => {
   await clearTasks(request);
@@ -10,6 +10,7 @@ test.beforeEach(async ({ request }) => {
 
 test('exige confirmacao antes de deletar', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await page.getByRole('button', { name: 'Deletar' }).click();
 
   const dialog = page.getByRole('dialog');
@@ -27,6 +28,7 @@ test('exige confirmacao antes de deletar', async ({ page }) => {
 
 test('o foco comeca no botao seguro', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await page.getByRole('button', { name: 'Deletar' }).click();
 
   const dialog = page.getByRole('dialog');
@@ -42,6 +44,7 @@ test('o foco comeca no botao seguro', async ({ page }) => {
 
 test('Escape cancela sem deletar', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await page.getByRole('button', { name: 'Deletar' }).click();
 
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -54,6 +57,7 @@ test('Escape cancela sem deletar', async ({ page }) => {
 
 test('prende o foco dentro do dialogo', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await page.getByRole('button', { name: 'Deletar' }).click();
 
   const dialog = page.getByRole('dialog');
@@ -78,6 +82,7 @@ test('prende o foco dentro do dialogo', async ({ page }) => {
 
 test('devolve o foco ao botao que abriu', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
 
   const trigger = page.getByRole('button', { name: 'Deletar' });
   await trigger.click();
@@ -91,6 +96,7 @@ test('devolve o foco ao botao que abriu', async ({ page }) => {
 
 test('clique fora cancela sem deletar', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await page.getByRole('button', { name: 'Deletar' }).click();
 
   // Canto superior esquerdo da tela: fora da caixa, sobre o overlay.
