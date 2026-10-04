@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import LoginScreen from './components/LoginScreen';
 import Shell from './shell/Shell';
@@ -8,6 +8,11 @@ export default function App() {
   const [user, setUser] = useState(undefined);
   // Por que a pessoa voltou ao login, quando nao foi ela quem saiu.
   const [notice, setNotice] = useState(null);
+  // Ligado do clique em "Sair" ate o proximo login. O Inicio busca o resumo
+  // de cada modulo ao abrir, e uma dessas respostas pode voltar 401 depois de
+  // o logout derrubar a sessao: sem isto, quem saiu por vontade propria
+  // caia no login com aviso de sessao perdida.
+  const leaving = useRef(false);
 
   const loadSession = useCallback(async () => {
     try {
@@ -33,17 +38,23 @@ export default function App() {
     }
 
     return api.onSessionLost((error) => {
+      if (leaving.current) {
+        return;
+      }
+
       setNotice({ message: error.message, action: error.action });
       setUser(null);
     });
   }, [user]);
 
   function handleAuthenticated(authenticated) {
+    leaving.current = false;
     setNotice(null);
     setUser(authenticated);
   }
 
   async function handleLogout() {
+    leaving.current = true;
     await api.logout().catch(() => {});
     setUser(null);
   }
