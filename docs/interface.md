@@ -1,15 +1,59 @@
 # Interface web
 
-React 19 com Vite, sem router e sem biblioteca de estado — a tela e unica e o
-estado vive no `App`. O CSS e proprio, sem framework externo.
+React 19 com Vite, sem router e sem biblioteca de estado: a sessao vive no
+`App`, e o que esta aberto, na casca. O CSS e proprio, sem framework externo, e
+os icones sao do `lucide-react`. A organizacao em casca e modulos segue a do
+[lifeboard](https://github.com/lucianodiisouza/lifeboard), usado como
+referencia de desenho — o codigo daqui e proprio.
 
-Duas abas dividem a interface: **Tarefas** e **Prestacao de Contas**
-(`TabNav.jsx`), no padrao WAI-ARIA de `tablist` com tabindex circulante — seta
-esquerda/direita move o foco **e** ja seleciona a aba, com retorno ao
-inicio/fim nas pontas. A aba inativa e **desmontada**, nao so escondida: as
-duas telas reusavam nomes de classe parecidos, e manter as duas no DOM vazava
-linha de uma aba para a contagem da outra em teste E2E. Por isso tambem
-`ReportList` e `ReceiptList` usam `.list-item*`, e nao `.task*`.
+## Casca
+
+A tela logada e uma casca (`web/src/shell/`) com os modulos dentro.
+
+- **Barra lateral**, na tela larga: a marca, o **Inicio**, os **modulos** que
+  a sessao alcanca, os **Ajustes** e quem esta logado, com o "Sair". O destino
+  aberto leva `aria-current="page"`, pintado com fundo e peso, e nao so cor.
+- **Barra superior**: onde se esta e o botao de tema, que alterna Sistema,
+  Claro e Escuro.
+- **Menu inferior**, abaixo de 768px: os mesmos destinos, ao alcance do
+  polegar; o "Sair" passa para a barra superior. So um dos dois menus e
+  montado por vez — os dois na pagina seriam dois menus "Principal" para o
+  leitor de tela.
+- Clicar no modulo aberto volta para o comeco dele, a lista. Cada destino abre
+  do topo, e quando o botao clicado some junto com a pagina (o "Abrir" de um
+  widget) o foco vai para o titulo da pagina nova.
+
+### Modulos
+
+`web/src/modules/registry.js` lista os modulos, na ordem da barra lateral.
+Cada um declara nome, descricao, icone, o escopo de leitura que o torna
+visivel, o de escrita que vira `canWrite`, a view, carregada sob demanda, e o
+widget do Inicio. Quem nao tem o escopo de leitura nao ve o modulo: a tela nao
+oferece o que a API so responderia com 403. Modulo novo e uma entrada no
+registro, a view e o widget — a casca nao muda.
+
+O modulo que sai e **desmontado**, nao so escondido: as telas reusam nomes de
+classe parecidos, e manter duas no DOM vazava linha de uma para a contagem da
+outra em teste E2E. Por isso tambem `ReportList` e `ReceiptList` usam
+`.list-item*`, e nao `.task*`.
+
+### Inicio
+
+Um widget por modulo, com o resumo do proprio modulo e o "Abrir":
+
+- **Tarefas**: quantas estao pendentes, em andamento e concluidas — o
+  `meta.total` de cada filtro, e nao a contagem da primeira pagina — e as
+  abertas, as em andamento primeiro.
+- **Prestacao de Contas**: quantos relatorios estao abertos e fechados, e os
+  abertos. O titulo abre direto o detalhe do relatorio.
+
+### Ajustes
+
+- **Tema**: Sistema, Claro ou Escuro, guardado no navegador (`localStorage`,
+  chave `tasktab:tema`). O do sistema segue o aparelho pela media query do
+  CSS; a escolha explicita vira `data-theme` no `<html>`, aplicada na carga por
+  `web/public/tema.js`, antes do React, para nao piscar o outro tema.
+- **Conta**: nome, e-mail, papel e a troca da propria senha.
 
 ## Tarefas
 
@@ -34,6 +78,9 @@ linha de uma aba para a contagem da outra em teste E2E. Por isso tambem
   filtrar extensao no cliente: o servidor ja confere os magic bytes, e filtrar
   de novo esconderia a mensagem de erro especifica que a API devolve. Enquanto
   a extracao roda, a tela acompanha sozinha e avisa se perder a conexao.
+- **Entregas** no rodape do cartao do relatorio: Excel e Anexo I, que so
+  levam o confirmado e ficam desligados ate haver um, e o PDF consolidado e os
+  PDFs por categoria, que levam toda pagina.
 - **Conferencia** do relatorio inteiro no detalhe (`ValidationPanel`),
   agrupada pela classe do procedimento, com "Ver comprovante" em cada alerta
   que tem um.
@@ -75,7 +122,8 @@ linha de uma aba para a contagem da outra em teste E2E. Por isso tambem
 
 ## Paleta
 
-Baseada no tema **GitHub Dark Colorblind** (Protanopia & Deuteranopia), cuja
+A base e neutra, em tons de zinco, com tema claro e escuro. Os tons de status
+seguem o **GitHub Dark Colorblind** (Protanopia & Deuteranopia), cuja
 troca central em relacao ao dark padrao e substituir verde por azul e vermelho
 por laranja — justamente o par que esses tipos de daltonismo confundem. Por
 isso as acoes destrutivas sao laranja (`#ec8e2c`), nao vermelhas.

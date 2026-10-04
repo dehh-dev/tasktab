@@ -6,11 +6,12 @@ import ReportForm from './ReportForm';
 import ReportDetail from './ReportDetail';
 
 /**
- * Conteudo da aba "Prestacao de Contas". `react-router` fica fora de escopo
- * de proposito (backlog Issue 19) — a navegacao entre lista e detalhe e so
- * estado local, sem URL propria por relatorio.
+ * O modulo "Prestacao de Contas". `react-router` fica fora de escopo de
+ * proposito (backlog Issue 19) — a navegacao entre lista e detalhe e so
+ * estado local, sem URL propria por relatorio. `initialReportId` e o atalho
+ * do Inicio: o modulo ja abre no detalhe daquele relatorio.
  */
-export default function ExpensesApp({ canWrite = true }) {
+export default function ExpensesApp({ canWrite = true, initialReportId }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,7 +21,7 @@ export default function ExpensesApp({ canWrite = true }) {
   const [fieldErrors, setFieldErrors] = useState({});
 
   // null = lista | id = detalhe daquele relatorio
-  const [openReportId, setOpenReportId] = useState(null);
+  const [openReportId, setOpenReportId] = useState(initialReportId ?? null);
 
   const load = useCallback(async () => {
     setLoading(true);

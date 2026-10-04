@@ -2,6 +2,7 @@
 
 const { test, expect } = require('@playwright/test');
 const {
+  openSection,
   clearReports,
   createReport,
   addReceipts,
@@ -47,18 +48,26 @@ async function enterAs(page, user) {
   await form.getByLabel('Senha').fill(user.password);
   await form.getByRole('button', { name: 'Entrar' }).click();
 
-  await expect(page.getByText(user.name)).toBeVisible();
+  await expect(
+    page.getByRole('complementary').getByText(user.name),
+  ).toBeVisible();
 }
 
 test('o auditor nao ve os botoes de criar', async ({ page }) => {
   await enterAs(page, auditor);
 
+  // A ausencia so prova algo com o modulo ja montado: espera a barra de
+  // ferramentas de cada um antes de conferir o que falta nela.
+  await openSection(page, 'Tarefas');
+  await expect(
+    page.getByRole('group', { name: 'Filtrar por status' }),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Nova tarefa' })).toHaveCount(
     0,
   );
 
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
-
+  await openSection(page, 'Prestacao de Contas');
+  await expect(page.getByText(/^\d+ relatorios?$/)).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Novo relatorio' }),
   ).toHaveCount(0);
@@ -76,7 +85,7 @@ test('o auditor le o relatorio e o comprovante, sem nada que os altere', async (
   ]);
 
   await enterAs(page, auditor);
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
   await page.getByRole('button', { name: report.title }).click();
 
   await expect(

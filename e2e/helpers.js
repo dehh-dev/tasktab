@@ -25,6 +25,18 @@ async function readData(response, what) {
   return data;
 }
 
+/**
+ * Abre um destino da navegacao principal: "Inicio", um modulo ("Tarefas",
+ * "Prestacao de Contas") ou "Ajustes". A tela logada abre no Inicio, entao a
+ * spec de um modulo comeca por aqui, depois do `goto`.
+ */
+async function openSection(page, name) {
+  await page
+    .getByRole('navigation', { name: 'Principal' })
+    .getByRole('button', { name, exact: true })
+    .click();
+}
+
 /** Remove todas as tarefas. Chamado antes de cada teste. */
 async function clearTasks(request) {
   const response = await request.get('/api/tasks?limit=100');
@@ -178,6 +190,7 @@ async function deleteUser(request, id) {
 }
 
 module.exports = {
+  openSection,
   clearTasks,
   createTask,
   clearReports,

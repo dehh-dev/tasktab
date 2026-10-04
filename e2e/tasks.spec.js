@@ -1,7 +1,7 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearTasks, createTask } = require('./helpers');
+const { openSection, clearTasks, createTask } = require('./helpers');
 
 test.beforeEach(async ({ request }) => {
   await clearTasks(request);
@@ -9,6 +9,7 @@ test.beforeEach(async ({ request }) => {
 
 test('mostra o estado vazio quando nao ha tarefas', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
 
   await expect(page.getByRole('heading', { name: 'tasktab' })).toBeVisible();
   await expect(page.getByText('Nenhuma tarefa encontrada')).toBeVisible();
@@ -17,6 +18,7 @@ test('mostra o estado vazio quando nao ha tarefas', async ({ page }) => {
 
 test('cria uma tarefa e a exibe na lista', async ({ page }) => {
   await page.goto('/');
+  await openSection(page, 'Tarefas');
 
   await page.getByRole('button', { name: 'Nova tarefa' }).click();
 
@@ -56,6 +58,7 @@ test('edita uma tarefa a partir dos valores atuais', async ({
   });
 
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await page.getByRole('button', { name: 'Editar' }).click();
 
   const form = page.locator('form.form');
@@ -81,6 +84,7 @@ test('filtra por status e atualiza a contagem', async ({ page, request }) => {
   await createTask(request, { title: 'Uma concluida', status: 'done' });
 
   await page.goto('/');
+  await openSection(page, 'Tarefas');
   await expect(page.getByText('2 tarefas')).toBeVisible();
 
   await page.getByRole('button', { name: 'Concluida' }).click();

@@ -97,9 +97,9 @@ export default function ReportForm({
 
   return (
     <form className="form" onSubmit={handleSubmit} noValidate>
-      <h2 className="form__title">
+      <h3 className="form__title">
         {editing ? 'Editar relatorio' : 'Novo relatorio'}
-      </h2>
+      </h3>
 
       <div className="form__grid">
         <div className="field field--full">

@@ -12,6 +12,9 @@ banco de desenvolvimento. Uma spec so: `npm run test:e2e -- arquivo.spec.js`.
   pronta. Subir pela tela fica para as specs cujo assunto e o upload: esperar
   o poll da `ReportDetail` custava quase 2 s por spec. `sendReceipts` volta
   com a extracao ainda rodando, so para `expenses-polling.spec.js`.
+- A tela logada abre no **Inicio**. Depois do `goto('/')`, a spec abre o
+  modulo dela com `openSection(page, 'Tarefas')` (`helpers.js`), que clica no
+  menu "Principal" — barra lateral ou menu inferior, conforme a largura.
 - Locators acessiveis (`getByRole`, `getByLabel`), escopados ao formulario
   (`page.locator('form.form')`): "Status" casa tambem com o grupo de filtros,
   e "Cancelar" existe no form e no dialogo.

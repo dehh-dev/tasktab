@@ -1,4 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Minus,
+  Plus,
+  RotateCcw,
+  RotateCw,
+  Trash2,
+} from 'lucide-react';
 import * as api from '../api';
 import { ApiError } from '../api';
 import {
@@ -279,6 +289,13 @@ export default function ReceiptReview({
     }
   }
 
+  // Cada comprovante abre do topo — a imagem e os campos. A lista de onde se
+  // veio podia estar rolada, e com a barra superior fixa a pagina nova abria
+  // pelo meio, com o "Voltar a lista" escondido acima.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // No document, nao num onKeyDown de div: um atalho que so funciona quando
   // o foco por acaso esta dentro de um container nao-focavel e fragil demais
   // — apos trocar de comprovante (o componente remonta via `key`), o foco
@@ -468,7 +485,8 @@ export default function ReceiptReview({
   return (
     <div className="review">
       <div className="toolbar">
-        <button type="button" className="btn" onClick={onBack}>
+        <button type="button" className="btn btn--ghost" onClick={onBack}>
+          <ArrowLeft size={16} aria-hidden="true" />
           Voltar a lista
         </button>
         {queueTotal > 0 && (
@@ -479,7 +497,8 @@ export default function ReceiptReview({
               onClick={() => onNavigate('previous')}
               disabled={queueTotal <= 1}
             >
-              ← Anterior
+              <ChevronLeft size={14} aria-hidden="true" />
+              Anterior
             </button>
             <span className="filter__count">
               {queuePosition} de {queueTotal} pendentes
@@ -490,7 +509,8 @@ export default function ReceiptReview({
               onClick={() => onNavigate('next')}
               disabled={queueTotal <= 1}
             >
-              Proximo →
+              Proximo
+              <ChevronRight size={14} aria-hidden="true" />
             </button>
           </div>
         )}
@@ -504,6 +524,7 @@ export default function ReceiptReview({
             onClick={() => onDelete(receipt)}
             disabled={submitting}
           >
+            <Trash2 size={14} aria-hidden="true" />
             Deletar
           </button>
         )}
@@ -560,7 +581,7 @@ export default function ReceiptReview({
               onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))}
               aria-label="Diminuir zoom"
             >
-              −
+              <Minus size={14} aria-hidden="true" />
             </button>
             <span className="filter__count">{Math.round(zoom * 100)}%</span>
             <button
@@ -569,7 +590,7 @@ export default function ReceiptReview({
               onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))}
               aria-label="Aumentar zoom"
             >
-              +
+              <Plus size={14} aria-hidden="true" />
             </button>
             {zoom !== 1 && (
               <button
@@ -589,7 +610,7 @@ export default function ReceiptReview({
                   disabled={rotating}
                   aria-label="Girar para a esquerda"
                 >
-                  ↺
+                  <RotateCcw size={14} aria-hidden="true" />
                 </button>
                 <button
                   type="button"
@@ -598,7 +619,7 @@ export default function ReceiptReview({
                   disabled={rotating}
                   aria-label="Girar para a direita"
                 >
-                  ↻
+                  <RotateCw size={14} aria-hidden="true" />
                 </button>
               </>
             )}

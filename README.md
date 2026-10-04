@@ -42,7 +42,7 @@ scripts/                   # users:create, espera do banco, template sintetico
 assets/                    # template SINTETICO do Anexo I
 tests/                     # integracao (orchestrator) e testes puros
 e2e/                       # Playwright
-web/src/                   # interface React (App, api.js, components/)
+web/src/                   # interface React (shell/, modules/, components/)
 docs/                      # documentacao e backlog
 ```
 

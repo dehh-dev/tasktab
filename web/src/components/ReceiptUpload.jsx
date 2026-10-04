@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Upload } from 'lucide-react';
 import * as api from '../api';
 
 /**
@@ -60,6 +61,7 @@ export default function ReceiptUpload({ reportId, onUploaded }) {
           disabled={uploading}
           onChange={(event) => submitFiles(event.target.files)}
         />
+        <Upload className="dropzone__icon" size={20} aria-hidden="true" />
         <span className="dropzone__text">
           {uploading
             ? 'Enviando...'

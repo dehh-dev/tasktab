@@ -94,9 +94,9 @@ export default function TaskForm({
 
   return (
     <form className="form" onSubmit={handleSubmit} noValidate>
-      <h2 className="form__title">
+      <h3 className="form__title">
         {isEditing ? `Editando tarefa #${task.id}` : 'Nova tarefa'}
-      </h2>
+      </h3>
 
       <div className="form__grid">
         <div className="field field--full">

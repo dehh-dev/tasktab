@@ -1,24 +1,49 @@
 # Interface (React 19 + Vite)
 
-Tela unica, sem router e sem biblioteca de estado: o estado vive no `App`. CSS
-proprio em `src/styles.css`, sem framework. ESM com JSX — o backend e que e
-CommonJS.
+Sem router e sem biblioteca de estado: a sessao vive no `App`, e o que esta
+aberto, na casca (`src/shell/Shell.jsx`). CSS proprio em `src/styles.css`, sem
+framework; icones do `lucide-react`, a unica dependencia alem do React. ESM com
+JSX — o backend e que e CommonJS.
 
 - Em dev o Vite faz proxy de `/api`; em producao o Express serve `web/dist` com
   fallback de SPA, so com o build no disco e fora do teste. Mesma origem
   sempre: **nao adicione CORS**.
-- Paleta **GitHub Dark Colorblind**: acao destrutiva e laranja, e os status
-  evitam o eixo verde/vermelho. **Cor nunca e o unico canal** — todo badge leva
-  o texto do status.
+- Base neutra em zinco, com tema claro e escuro; os tons semanticos sao os do
+  **GitHub Dark Colorblind**: acao destrutiva e laranja, e os status evitam o
+  eixo verde/vermelho. **Cor nunca e o unico canal** — todo badge leva o texto
+  do status.
 - `src/constants.js` espelha os enums do banco (`task_status`,
   `expense_category`, `receipt_status`, `report_status`) e os `LEVELS` da
   conferencia. Mudou la, mude aqui.
 - Data `YYYY-MM-DD` se formata com `split('-')`, nunca com `Date`.
 
+## Casca e modulos
+
+- O desenho segue o [lifeboard](https://github.com/lucianodiisouza/lifeboard),
+  que **nao tem licenca**: e referencia visual e de arquitetura. Nao copie
+  arquivo, trecho nem asset de la.
+- Modulo novo e uma entrada em `src/modules/registry.js`, a view e o widget
+  do Inicio. A casca nao muda. O `readScope` esconde o modulo de quem nao o
+  tem, e o `writeScope` vira o `canWrite` da view.
+- Barra lateral **ou** menu inferior, nunca os dois: `useMediaQuery` escolhe
+  qual montar. Esconder um por CSS deixaria dois menus "Principal" na pagina,
+  e cada destino seria achado duas vezes pelo leitor de tela e pelo teste.
+- O destino aberto e `aria-current="page"`. Clicar no modulo aberto o
+  remonta (`visit` na `key`) e volta para a lista.
+- Titulos: `h1` e a marca, `h2` o titulo da pagina (`PageHeader`) e `h3` as
+  secoes dentro do modulo. O `h2` e o alvo do foco quando a navegacao tira de
+  baixo dele o botao clicado.
+- Icone e enfeite: `aria-hidden`, com o nome vindo do texto do botao. Botao
+  so de icone leva `aria-label`. Trocar texto por icone muda o nome
+  acessivel, e as specs acham botao pelo nome.
+- O tema escolhido em Ajustes e aplicado na carga por `public/tema.js`, antes
+  do React. Arquivo, e nao script inline: a CSP so aceita script da propria
+  origem. Chave e valores espelham `src/shell/theme.js`.
+
 ## Sessao
 
 - `App.jsx` pergunta `GET /api/auth/me` ao abrir; sem sessao, `LoginScreen`.
-  Abas e botoes de escrita seguem os escopos (o auditor nao ve "Novo
+  Modulos e botoes de escrita seguem os escopos (o auditor nao ve "Novo
   relatorio"), mas isso e conveniencia: quem autoriza e o servidor.
 - Um 401 no meio do uso volta ao login com o motivo: o `request` de `api.js`
   avisa por `onSessionLost`, menos nas rotas de `/api/auth`, que tratam o

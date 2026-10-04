@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
 import * as api from '../api';
 import { ApiError } from '../api';
 import StatusFilter from './StatusFilter';
@@ -7,10 +8,8 @@ import TaskList from './TaskList';
 import ConfirmDialog from './ConfirmDialog';
 
 /**
- * Conteudo da aba "Tarefas". Extraido do antigo App.jsx sem mudar
- * comportamento nenhum, para a troca de abas (Issue 19) nao exigir tocar em
- * nada aqui — as specs de e2e/tasks.spec.js e companhia continuam valendo
- * como estavam.
+ * O modulo "Tarefas". Saiu do antigo App.jsx sem mudar comportamento nenhum
+ * quando a tela ganhou abas (Issue 19), e assim entrou na casca.
  */
 export default function TasksApp({ canWrite = true }) {
   const [tasks, setTasks] = useState([]);
@@ -133,6 +132,7 @@ export default function TasksApp({ canWrite = true }) {
               onClick={openCreate}
               disabled={editing === 'new'}
             >
+              <Plus size={16} aria-hidden="true" />
               Nova tarefa
             </button>
           )

@@ -1,7 +1,12 @@
 'use strict';
 
 const { test, expect } = require('@playwright/test');
-const { clearReports, createReport, addReceipts } = require('./helpers');
+const {
+  openSection,
+  clearReports,
+  createReport,
+  addReceipts,
+} = require('./helpers');
 const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 
 const SCROLL = '.review__image-scroll';
@@ -22,7 +27,7 @@ async function openReviewWithImage(page, request, title, pdfOptions = {}) {
   await addReceipts(request, report.id, [pdf]);
 
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await openSection(page, 'Prestacao de Contas');
   await page.getByRole('button', { name: report.title }).click();
 
   await page.locator('.list-item .link-button').first().click();

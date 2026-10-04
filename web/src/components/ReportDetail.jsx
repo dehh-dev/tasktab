@@ -1,4 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
+import {
+  ArrowLeft,
+  FileSpreadsheet,
+  FileText,
+  FolderArchive,
+  Lock,
+  LockOpen,
+  Pencil,
+  Table2,
+} from 'lucide-react';
 import * as api from '../api';
 import { ApiError } from '../api';
 import ReceiptUpload from './ReceiptUpload';
@@ -44,18 +54,25 @@ function receiptLabel(receipt) {
 }
 
 /** Link de download que vira botao desabilitado quando nao ha o que exportar. */
-function ExportLink({ href, download, enabled, children }) {
+function ExportLink({ href, download, enabled, icon: Icon, children }) {
+  const content = (
+    <>
+      <Icon size={16} aria-hidden="true" />
+      {children}
+    </>
+  );
+
   if (!enabled) {
     return (
-      <button type="button" className="btn" disabled>
-        {children}
+      <button type="button" className="btn btn--sm" disabled>
+        {content}
       </button>
     );
   }
 
   return (
-    <a className="btn" href={href} download={download}>
-      {children}
+    <a className="btn btn--sm" href={href} download={download}>
+      {content}
     </a>
   );
 }
@@ -450,62 +467,24 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
   return (
     <>
       <div className="toolbar">
-        <button type="button" className="btn" onClick={onBack}>
+        <button type="button" className="btn btn--ghost" onClick={onBack}>
+          <ArrowLeft size={16} aria-hidden="true" />
           Voltar
         </button>
 
-        <div className="toolbar__group">
-          {confirmedCount === 0 && (
-            <span className="field__hint">
-              Confirme um comprovante para poder exportar.
-            </span>
-          )}
+        {canWrite && (
+          <div className="toolbar__group">
+            {editable && !editingReport && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setEditingReport(true)}
+              >
+                <Pencil size={16} aria-hidden="true" />
+                Editar relatorio
+              </button>
+            )}
 
-          {
-            // Download por <a href>, nao por fetch: entregar o arquivo baixado
-            // exigiria um `blob:`, que a CSP do projeto nao libera. Excel e
-            // Anexo I so levam o confirmado; os PDFs levam todo comprovante.
-          }
-          <ExportLink
-            href={api.reportXlsxUrl(reportId)}
-            download={`relatorio-${reportId}.xlsx`}
-            enabled={confirmedCount > 0}
-          >
-            Exportar Excel
-          </ExportLink>
-          <ExportLink
-            href={api.reportAnexoIUrl(reportId)}
-            download={`anexo-i-${reportId}.xlsx`}
-            enabled={confirmedCount > 0}
-          >
-            Anexo I
-          </ExportLink>
-          <ExportLink
-            href={api.reportPdfUrl(reportId)}
-            download={`relatorio-${reportId}.pdf`}
-            enabled={receipts.length > 0}
-          >
-            PDF consolidado
-          </ExportLink>
-          <ExportLink
-            href={api.reportCategoryPdfsUrl(reportId)}
-            download={`comprovantes-${reportId}.zip`}
-            enabled={receipts.length > 0}
-          >
-            PDFs por categoria
-          </ExportLink>
-
-          {editable && !editingReport && (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setEditingReport(true)}
-            >
-              Editar relatorio
-            </button>
-          )}
-
-          {canWrite && (
             <button
               type="button"
               className="btn"
@@ -514,10 +493,15 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
               }
               disabled={changingStatus || checking}
             >
+              {closed ? (
+                <LockOpen size={16} aria-hidden="true" />
+              ) : (
+                <Lock size={16} aria-hidden="true" />
+              )}
               {closed ? 'Reabrir relatorio' : 'Fechar relatorio'}
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -552,8 +536,8 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
       )}
 
       {report && !editingReport && (
-        <div className="form" aria-label="Dados do relatorio">
-          <h2 className="form__title">{report.title}</h2>
+        <div className="form report-card" aria-label="Dados do relatorio">
+          <h3 className="form__title">{report.title}</h3>
           <div className="task__meta">
             <span className={`badge badge--${report.status}`}>
               {reportStatusLabel(report.status)}
@@ -575,6 +559,53 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
             </span>
             {report.main_city && (
               <span>Cidade principal: {report.main_city}</span>
+            )}
+          </div>
+
+          {
+            // As entregas do procedimento, no rodape do cartao do relatorio.
+            // Download por <a href>, nao por fetch: entregar o arquivo baixado
+            // exigiria um `blob:`, que a CSP do projeto nao libera. Excel e
+            // Anexo I so levam o confirmado; os PDFs levam todo comprovante.
+          }
+          <div className="report-card__exports">
+            <span className="report-card__label">Entregas</span>
+            <ExportLink
+              href={api.reportXlsxUrl(reportId)}
+              download={`relatorio-${reportId}.xlsx`}
+              enabled={confirmedCount > 0}
+              icon={FileSpreadsheet}
+            >
+              Exportar Excel
+            </ExportLink>
+            <ExportLink
+              href={api.reportAnexoIUrl(reportId)}
+              download={`anexo-i-${reportId}.xlsx`}
+              enabled={confirmedCount > 0}
+              icon={Table2}
+            >
+              Anexo I
+            </ExportLink>
+            <ExportLink
+              href={api.reportPdfUrl(reportId)}
+              download={`relatorio-${reportId}.pdf`}
+              enabled={receipts.length > 0}
+              icon={FileText}
+            >
+              PDF consolidado
+            </ExportLink>
+            <ExportLink
+              href={api.reportCategoryPdfsUrl(reportId)}
+              download={`comprovantes-${reportId}.zip`}
+              enabled={receipts.length > 0}
+              icon={FolderArchive}
+            >
+              PDFs por categoria
+            </ExportLink>
+            {confirmedCount === 0 && (
+              <span className="field__hint">
+                Confirme um comprovante para poder exportar.
+              </span>
             )}
           </div>
         </div>
