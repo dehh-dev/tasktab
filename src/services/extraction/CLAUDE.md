@@ -34,8 +34,9 @@ nao por deixar de olhar.
   uso real: ninguem os consultava. Voltam por pedido, nao por completude.
 - **Manuscrito fica de fora**, por decisao consciente: o Tesseract nao le
   caneta sobre formulario.
-- `extractFuelLines` le litros, preco e total da linha de combustivel; a regra
-  que os usa esta em `src/services/validation/CLAUDE.md`.
+- `extractFuelLines` le litros, preco e total da linha de combustivel, e
+  `extractDiscounts`, as linhas que comecam por desconto; a regra que os usa
+  esta em `src/services/validation/CLAUDE.md`.
 
 ## Chave de acesso e CNPJ
 

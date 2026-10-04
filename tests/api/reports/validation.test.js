@@ -993,6 +993,30 @@ describe('regra: combustivel', () => {
 
     expect(await combustivel(mercado, 4590, 'alimentacao')).toHaveLength(0);
   });
+
+  it('desconto impresso no cupom nao vira alarme falso', async () => {
+    // Desconto de aplicativo: o abastecimento sai cheio e o valor a pagar,
+    // menor. O total pago estava certo, e a regra mandava trocar por 225,49.
+    const comDesconto =
+      '39,56 L x 5,70 225,49\nDESCONTO 5,00\nVALOR A PAGAR R$ 220,49';
+
+    expect(await combustivel(comDesconto, 22049)).toHaveLength(0);
+    expect(await combustivel(comDesconto, 22549)).toHaveLength(0);
+  });
+
+  it('o mesmo desconto no item e no resumo conta uma vez', async () => {
+    const duasVezes =
+      '39,56 L x 5,70 225,49\nDESC ITEM 5,00\nDescontos R$ 5,00\nValor a pagar R$ 220,49';
+
+    expect(await combustivel(duasVezes, 22049)).toHaveLength(0);
+  });
+
+  it('com desconto, o digito a mais continua acusado', async () => {
+    const comDesconto =
+      '39,56 L x 5,70 225,49\nDESCONTO 5,00\nVALOR A PAGAR R$ 2.220,49';
+
+    expect(await combustivel(comDesconto, 222049)).toHaveLength(1);
+  });
 });
 
 describe('regras: o que a chave de acesso ja diz', () => {

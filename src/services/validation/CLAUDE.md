@@ -72,4 +72,8 @@ que assina. **Alerta nao bloqueia nada.**
   arredonda) e so em comprovante de combustivel — a garrafa de 1,5 L do
   mercado tem o mesmo desenho. Foi a regra que pegou R$ 2.225,49 lido onde a
   linha dizia 39,56 L x R$ 5,70 = R$ 225,49. No leitor, o separador unico dos
-  litros e decimal: `18.461` sao litros.
+  litros e decimal: `18.461` sao litros. **Desconto impresso**
+  (`extractDiscounts`) entra na conta: o total pode ser o das linhas, o das
+  linhas menos a soma dos descontos ou menos cada um deles, porque o mesmo
+  desconto aparece no item e no resumo. Sem isso, o desconto de aplicativo
+  virava atencao num total certo.
