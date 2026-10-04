@@ -2445,3 +2445,42 @@ dono fica com os outros sem dono.
 
 Ficou de fora: a falha de processamento que vira `failed` (só com injeção de
 falha no banco) e o timeout do OCR continuam sem teste.
+
+---
+
+# M15 — Interface em casca
+
+## Issue 58 — Casca com módulos, no desenho do lifeboard
+
+`area:web`
+
+A interface deixa de ser um cabeçalho com duas abas e vira uma casca no
+desenho do [lifeboard](https://github.com/lucianodiisouza/lifeboard): barra
+lateral, barra superior, Início com um widget por módulo e Ajustes. Tarefas e
+Prestação de Contas viram dois módulos da casca, e o próximo módulo entra sem
+mexer nela.
+
+**Critérios de aceite**
+
+- [x] Barra lateral na tela larga e menu inferior abaixo de 768px, um só
+      montado por vez, com o destino aberto em `aria-current="page"`
+- [x] Registro de módulos (`web/src/modules/registry.js`): nome, ícone,
+      escopo de leitura e de escrita, view carregada sob demanda e widget do
+      Início
+- [x] Início com o resumo de cada módulo; o relatório aberto no widget abre
+      direto no detalhe
+- [x] Ajustes com o tema (Sistema, Claro, Escuro) e a conta, onde mora a
+      troca de senha
+- [x] Tema escolhido aplicado antes do React, sem piscar o outro
+- [x] Ações com ícone sem mudar o nome acessível, e as entregas do relatório
+      agrupadas no rodapé do cartão dele
+- [x] Specs E2E na navegação nova, e `e2e/shell.spec.js` cobrindo menu,
+      Início, tema e tela estreita
+
+**Decidido:** CSS próprio, sem framework, e `lucide-react` como única
+dependência nova. O lifeboard não tem licença, então serve de referência de
+desenho e de arquitetura — nenhum arquivo foi copiado de lá. Continua sem
+router (Issue 19): o que está aberto é estado da casca.
+
+**Fora desta issue:** URL própria por módulo ou relatório, que entra junto
+com o router.
