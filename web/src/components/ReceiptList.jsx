@@ -1,3 +1,4 @@
+import { RefreshCw, Trash2 } from 'lucide-react';
 import {
   categoryLabel,
   formatDate,
@@ -57,6 +58,7 @@ function ReceiptRow({ receipt, onOpen, onDelete, onReprocess, busy }) {
                 onClick={() => onReprocess(receipt)}
                 disabled={busy}
               >
+                <RefreshCw size={14} aria-hidden="true" />
                 Reprocessar
               </button>
             )}
@@ -66,6 +68,7 @@ function ReceiptRow({ receipt, onOpen, onDelete, onReprocess, busy }) {
               onClick={() => onDelete(receipt)}
               disabled={busy}
             >
+              <Trash2 size={14} aria-hidden="true" />
               Deletar
             </button>
           </div>

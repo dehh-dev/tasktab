@@ -21,7 +21,7 @@ export default function ValidationPanel({ alerts, onOpen }) {
 
   return (
     <section className="validation" aria-label="Conferencia">
-      <h2 className="validation__title">Conferencia</h2>
+      <h3 className="validation__title">Conferencia</h3>
 
       {groups.map((group) => (
         <details

@@ -42,7 +42,7 @@ export default function ChangePassword({ userId, onDone }) {
 
   return (
     <form className="form" onSubmit={handleSubmit} noValidate>
-      <h2 className="form__title">Alterar senha</h2>
+      <h3 className="form__title">Alterar senha</h3>
 
       {error && (
         <div className="alert" role="alert">
@@ -51,44 +51,46 @@ export default function ChangePassword({ userId, onDone }) {
         </div>
       )}
 
-      <div className="field">
-        <label className="field__label" htmlFor="password-current">
-          Senha atual
-        </label>
-        <input
-          id="password-current"
-          className="field__input"
-          type="password"
-          autoComplete="current-password"
-          value={current}
-          aria-invalid={Boolean(fieldErrors.current_password)}
-          onChange={(event) => setCurrent(event.target.value)}
-        />
-        {fieldErrors.current_password && (
-          <span className="field__error" role="alert">
-            {fieldErrors.current_password}
-          </span>
-        )}
-      </div>
+      <div className="form__grid">
+        <div className="field">
+          <label className="field__label" htmlFor="password-current">
+            Senha atual
+          </label>
+          <input
+            id="password-current"
+            className="field__input"
+            type="password"
+            autoComplete="current-password"
+            value={current}
+            aria-invalid={Boolean(fieldErrors.current_password)}
+            onChange={(event) => setCurrent(event.target.value)}
+          />
+          {fieldErrors.current_password && (
+            <span className="field__error" role="alert">
+              {fieldErrors.current_password}
+            </span>
+          )}
+        </div>
 
-      <div className="field">
-        <label className="field__label" htmlFor="password-new">
-          Nova senha
-        </label>
-        <input
-          id="password-new"
-          className="field__input"
-          type="password"
-          autoComplete="new-password"
-          value={next}
-          aria-invalid={Boolean(fieldErrors.password)}
-          onChange={(event) => setNext(event.target.value)}
-        />
-        {fieldErrors.password && (
-          <span className="field__error" role="alert">
-            {fieldErrors.password}
-          </span>
-        )}
+        <div className="field">
+          <label className="field__label" htmlFor="password-new">
+            Nova senha
+          </label>
+          <input
+            id="password-new"
+            className="field__input"
+            type="password"
+            autoComplete="new-password"
+            value={next}
+            aria-invalid={Boolean(fieldErrors.password)}
+            onChange={(event) => setNext(event.target.value)}
+          />
+          {fieldErrors.password && (
+            <span className="field__error" role="alert">
+              {fieldErrors.password}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="form__actions">

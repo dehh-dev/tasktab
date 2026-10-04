@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from 'lucide-react';
 import { statusLabel, formatDate } from '../constants';
 
 function TaskItem({ task, onEdit, onDelete, busy }) {
@@ -32,6 +33,7 @@ function TaskItem({ task, onEdit, onDelete, busy }) {
                 onClick={() => onEdit(task)}
                 disabled={busy}
               >
+                <Pencil size={14} aria-hidden="true" />
                 Editar
               </button>
             )}
@@ -42,6 +44,7 @@ function TaskItem({ task, onEdit, onDelete, busy }) {
                 onClick={() => onDelete(task)}
                 disabled={busy}
               >
+                <Trash2 size={14} aria-hidden="true" />
                 Deletar
               </button>
             )}

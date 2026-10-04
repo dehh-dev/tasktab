@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { formatDate, formatMoney, reportStatusLabel } from '../constants';
 
 export default function ReportList({ reports, onOpen, onCreate }) {
@@ -15,6 +16,7 @@ export default function ReportList({ reports, onOpen, onCreate }) {
               className="btn btn--primary"
               onClick={onCreate}
             >
+              <Plus size={16} aria-hidden="true" />
               Novo relatorio
             </button>
           )
