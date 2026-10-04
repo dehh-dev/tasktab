@@ -134,8 +134,15 @@ async function summarizeByReport(reportId, { status, category } = {}) {
 
 /**
  * Historico do emitente de cada comprovante do relatorio: menor e maior
- * valor, e quantos confirmados ha dele em qualquer relatorio, fora o proprio
- * comprovante. Um `Map` por `id`, sem entrada para quem nao tem historico.
+ * valor, e quantos confirmados ha dele nos relatorios do mesmo dono, fora o
+ * proprio comprovante. Um `Map` por `id`, sem entrada para quem nao tem
+ * historico.
+ *
+ * So o mesmo dono: o alerta escreve a faixa na conferencia e na planilha
+ * exportada, e com os relatorios de todos ela mostrava valores de outra
+ * pessoa a quem nao pode abrir os relatorios dela. O emitente e compartilhado
+ * por causa da categoria; o valor gasto nele, nao. Relatorio sem dono (o
+ * legado, que so `reports:read:any` enxerga) fica com os outros sem dono.
  *
  * Uma consulta para o relatorio inteiro: uma por comprovante eram 40 a cada
  * abertura da conferencia de um relatorio de 40 (issue 52).
@@ -147,11 +154,15 @@ async function merchantHistoryByReport(reportId) {
             MAX(o.amount_cents)::int AS max_cents,
             COUNT(*)::int AS total
      FROM receipts r
+     JOIN reports dono ON dono.id = r.report_id
      JOIN receipts o
        ON o.merchant_id = r.merchant_id
       AND o.id <> r.id
       AND o.amount_cents IS NOT NULL
       AND o.status = 'confirmed'
+     JOIN reports outro
+       ON outro.id = o.report_id
+      AND outro.owner_id IS NOT DISTINCT FROM dono.owner_id
      WHERE r.report_id = $1
      GROUP BY r.id`,
     [reportId],

@@ -141,7 +141,8 @@ contas decide; a ferramenta aponta, nao veta.
 Regras: soma dos itens contra o total impresso, litros vezes preco unitario no
 combustivel, digito verificador da chave, mes, UF e tipo de emissao da chave
 (contingencia), data dentro do periodo, valor fora da faixa historica do
-emitente, comprovante incompleto, despesas acima do adiantamento, suspeita de
+emitente (a faixa vem so dos relatorios da mesma pessoa), comprovante
+incompleto, despesas acima do adiantamento, suspeita de
 duplicata, valor repetido em documentos diferentes e documentos sem chave de
 acesso somados a parte.
 

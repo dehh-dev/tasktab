@@ -45,6 +45,12 @@ que assina. **Alerta nao bloqueia nada.**
   `summarizeByReport`: em revisao entra, duplicata e comprovante sem valor
   nao. Se uma mudar, mude a outra: o numero e uma parte do total da tela, e ha
   teste comparando os dois.
+- **Faixa do emitente** (`faixa_emitente`, atencao): o historico vem **so
+  dos relatorios do mesmo dono** (`merchantHistoryByReport`), e o sem dono
+  fica com os sem dono. A mensagem traz o minimo e o maximo, e ela sai na
+  conferencia e na planilha: com os relatorios de todos, mostrava valores de
+  quem a pessoa nem pode consultar. O emitente e compartilhado pela
+  categoria, nao pelo valor gasto nele. Ha teste com duas pessoas.
 - **Padrao da categoria** (issue 51, `acima_do_padrao`, decisao): 3x a mediana
   dos **outros** da categoria, com ao menos 3 deles. So o confirmado, dos dois
   lados — a categoria em revisao e palpite, com piso em alimentacao, e um
