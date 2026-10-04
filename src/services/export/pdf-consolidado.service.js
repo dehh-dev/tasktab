@@ -1,7 +1,5 @@
 'use strict';
 
-const fs = require('fs/promises');
-const path = require('path');
 const {
   PDFDocument,
   StandardFonts,
@@ -11,8 +9,8 @@ const {
   PDFString,
   PDFNumber,
 } = require('pdf-lib');
-const env = require('../../config/env');
 const { categoryLabel } = require('./labels');
+const { openOriginals, assertAllOpen } = require('./pdf-originais');
 
 // Faixa reservada no rodape para o carimbo. E uma pagina NOVA, adicionada
 // abaixo do conteudo original embutido — nunca um retangulo desenhado por
@@ -228,10 +226,14 @@ function firstOccurrencePerKey(items, keyFn, labelFn) {
 /**
  * PDF consolidado do relatorio: sumario navegavel, carimbo por pagina, ordem
  * cronologica. Junta as paginas originais dos arquivos enviados — nao gera
- * imagem nova do cupom, so embute a pagina de origem.
+ * imagem nova do cupom, so embute a pagina de origem. Sem todas elas (arquivo
+ * fora do disco, PDF que nao abre), 422 dizendo quais comprovantes faltaram.
  */
 async function buildConsolidatedPdf(report, receipts) {
   const ordered = chronological(receipts);
+  const opened = await openOriginals(ordered);
+
+  assertAllOpen(opened, 'o PDF consolidado');
 
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -242,9 +244,7 @@ async function buildConsolidatedPdf(report, receipts) {
   const contentPages = [];
 
   for (const receipt of ordered) {
-    const filePath = path.join(env.upload.dir, receipt.file_path);
-    const bytes = await fs.readFile(filePath);
-    const source = await PDFDocument.load(bytes);
+    const source = opened.sources.get(receipt.file_path);
     const index = receipt.page_number - 1;
     const [embedded] = await doc.embedPdf(source, [index]);
 

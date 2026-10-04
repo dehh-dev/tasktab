@@ -6,8 +6,13 @@ const {
   insertReport,
   waitForProcessing,
   updateColumnDirectly,
+  startApiInstance,
 } = require('../../orchestrator');
-const { makeScannedReceiptPdf, makeReceiptPdf } = require('../../fixtures/pdf');
+const {
+  makePdf,
+  makeScannedReceiptPdf,
+  makeReceiptPdf,
+} = require('../../fixtures/pdf');
 
 async function upload(reportId, files) {
   return requestUpload(`/api/reports/${reportId}/receipts`, files);
@@ -175,4 +180,51 @@ describe('processamento assincrono', () => {
     const [reprocessado] = await listReceipts(report.id);
     expect(reprocessado.amount_cents).toBe(4860);
   });
+});
+
+/**
+ * O OCR que nao sobe — idioma inexistente, dados que nao carregaram — nao
+ * pode levar a API junto. Sem `errorHandler`, o tesseract.js relancava o erro
+ * fora de qualquer promise e o processo caia no meio do lote.
+ *
+ * Instancia propria, para o idioma quebrado nao valer para o resto da suite.
+ * As paginas sao em branco: o worker falha ao subir, antes de ler qualquer
+ * coisa, e o teste nao paga o Tesseract.
+ */
+describe('OCR que nao sobe', () => {
+  let instance = null;
+
+  afterEach(async () => {
+    await instance?.stop();
+    instance = null;
+  });
+
+  it('a pagina vai para a revisao sem leitura, e a API segue de pe', async () => {
+    instance = await startApiInstance({ OCR_LANGUAGE: 'xyz' });
+    const report = await insertReport();
+
+    // Duas paginas: a segunda prova que a falha da subida nao deixa a fila
+    // parada esperando um worker que nunca vem.
+    const response = await requestUpload(
+      `/api/reports/${report.id}/receipts`,
+      [
+        { buffer: await makePdf({ lines: [] }), filename: 'branca.pdf' },
+        {
+          buffer: await makePdf({ lines: [], size: [310, 400] }),
+          filename: 'outra-branca.pdf',
+        },
+      ],
+      { baseUrl: instance.baseUrl },
+    );
+    expect(response.status).toBe(202);
+
+    const receipts = await listReceipts(report.id);
+    const health = await fetch(`${instance.baseUrl}/api/health`);
+
+    expect(receipts.map((r) => [r.status, r.extraction_source])).toEqual([
+      ['needs_review', null],
+      ['needs_review', null],
+    ]);
+    expect(health.status).toBe(200);
+  }, 70000);
 });

@@ -1,6 +1,7 @@
 'use strict';
 
 const accessKey = require('./access-key');
+const { zxing } = require('./zxing');
 
 /**
  * Leitura de QR Code da pagina de um cupom.
@@ -76,7 +77,7 @@ async function preprocess(png) {
 }
 
 async function decode(imageData) {
-  const { readBarcodesFromImageData } = require('zxing-wasm');
+  const { readBarcodesFromImageData } = zxing();
 
   const results = await readBarcodesFromImageData(imageData, {
     formats: ['QRCode'],

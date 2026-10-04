@@ -7,9 +7,18 @@ import {
 
 // Onde reprocessar faz sentido: a pagina que falhou, a que ficou presa na
 // fila — a fila vive na memoria do processo, e um reinicio no meio do lote
-// deixa linhas em `pending`/`processing` para sempre — e a ja confirmada,
-// atras de um dialogo, porque reprocessa-la descarta a conferencia.
-const REPROCESSABLE = new Set(['failed', 'pending', 'processing', 'confirmed']);
+// deixa linhas em `pending`/`processing` para sempre —, a que espera revisao
+// e a ja confirmada, atras de um dialogo, porque reprocessa-la descarta a
+// conferencia. A em revisao e onde para o escaneado de cabeca para baixo:
+// girar na revisao e o passo antes de reprocessar, e sem o botao aqui a
+// leitura da pagina girada so saia pela API.
+const REPROCESSABLE = new Set([
+  'failed',
+  'pending',
+  'processing',
+  'needs_review',
+  'confirmed',
+]);
 
 function ReceiptRow({ receipt, onOpen, onDelete, onReprocess, busy }) {
   const issuedAt = formatDate(receipt.issued_at);

@@ -42,7 +42,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 | Funcao                                                             | Para que                                                   |
 | ------------------------------------------------------------------ | ---------------------------------------------------------- |
 | `request(m, path, body, { token, baseUrl })`                       | HTTP; `body` string vai cru, `token: null` = sem sessao    |
-| `requestUpload` / `requestBinary`                                  | multipart; resposta binaria (planilha, PDF, imagem)        |
+| `requestUpload` / `requestBinary`                                  | multipart (`baseUrl`, `field`); resposta binaria           |
 | `insertTask` / `insertReport` / `insertReceipt` / `insertMerchant` | arranjo direto no banco, sem passar pela API               |
 | `insertUser` / `insertSession` / `createUserWithSession`           | usuario e sessao; o ultimo devolve `{ user, token }`       |
 | `updateColumnDirectly(t, id, c, v)`                                | escrita crua; diz se o `updated_at` andou, medido no banco |

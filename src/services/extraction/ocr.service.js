@@ -20,13 +20,54 @@ const qrService = require('./qr.service');
 // fila processa uma pagina por vez.
 let workerPromise = null;
 
-async function getWorker() {
-  if (!workerPromise) {
-    const { createWorker } = require('tesseract.js');
+/**
+ * Sobe o worker, e rejeita quando ele nao sobe.
+ *
+ * Sem `errorHandler`, o tesseract.js relanca o erro do worker fora de qualquer
+ * promise e o processo inteiro cai: foi o que aconteceu quando o idioma nao
+ * baixou, e a API saiu do ar no meio do lote. Com ele, o erro de uma leitura
+ * volta pela promise do `recognize`. O da subida, nao: o `createWorker` o
+ * engole e ficaria pendente para sempre, com a fila parada atras dele. Por
+ * isso o `reject` sai daqui.
+ */
+function startWorker() {
+  const { createWorker } = require('tesseract.js');
 
-    workerPromise = createWorker(env.ocr.language, 1, {
-      cachePath: env.ocr.cachePath,
+  return new Promise((resolve, reject) => {
+    let started = false;
+
+    createWorker(env.ocr.language, 1, {
+      langPath: env.ocr.langPath,
+      // Os dados ja estao no disco. O cache padrao gravaria mais uma copia
+      // deles no diretorio de trabalho do processo.
+      cacheMethod: 'none',
       logger: () => {},
+      errorHandler: (error) => {
+        if (!started) {
+          reject(new Error(`o OCR nao subiu: ${error}`));
+        }
+      },
+    }).then((worker) => {
+      started = true;
+      resolve(worker);
+    }, reject);
+  });
+}
+
+/**
+ * O worker da fila. Se a subida falha, a falha fica guardada ate o processo
+ * reiniciar: entre uma pagina e outra nada muda nos dados do idioma, e cada
+ * tentativa deixaria mais uma thread parada. As paginas sem texto seguem para
+ * a revisao sem leitura.
+ */
+function getWorker() {
+  if (!workerPromise) {
+    workerPromise = startWorker();
+    workerPromise.catch((error) => {
+      logger.error(
+        { err: error },
+        'o OCR nao subiu: paginas sem texto vao para a revisao sem leitura',
+      );
     });
   }
 
@@ -66,17 +107,15 @@ function withTimeout(promise, ms, onTimeout) {
 }
 
 /**
- * Texto e confianca de uma pagina.
+ * Texto e confianca de uma pagina pelo OCR.
  *
  * A confianca vem em 0..100 do tesseract e sai daqui em 0..1, na mesma escala
  * dos demais campos — comparar 87 com 0.9 na tela de revisao nao ajudaria
  * ninguem.
- */
-/**
- * Texto da pagina pelo OCR. `rotation` e o giro escolhido na revisao (issue
- * 43): o Tesseract nao endireita a pagina sozinho, e um cupom de cabeca para
- * baixo sai como ruido. O QR nao precisa disso — o zxing acha o codigo em
- * qualquer orientacao.
+ *
+ * `rotation` e o giro escolhido na revisao (issue 43): o Tesseract nao
+ * endireita a pagina sozinho, e um cupom de cabeca para baixo sai como ruido.
+ * O QR nao precisa disso — o zxing acha o codigo em qualquer orientacao.
  */
 async function readPage(buffer, pageNumber, { rotation = 0 } = {}) {
   if (!env.ocr.enabled) {

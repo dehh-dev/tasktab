@@ -70,6 +70,23 @@ describe('POST /api/users', () => {
     expect(response.body.details[0].field).toBe('password');
   });
 
+  it.each([
+    ['email', 'sem arroba', { email: 'ana.tasktab.test' }],
+    ['email', 'em branco', { email: '  ' }],
+    ['name', 'em branco', { name: '   ' }],
+    ['name', 'que nao e texto', { name: 42 }],
+  ])('recusa %s %s com 422 no campo', async (campo, caso, override) => {
+    const response = await request('POST', '/api/users', {
+      ...NOVO,
+      ...override,
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      expect.objectContaining({ field: campo }),
+    ]);
+  });
+
   it('recusa papel fora do enum', async () => {
     const response = await request('POST', '/api/users', {
       ...NOVO,

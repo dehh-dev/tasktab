@@ -102,7 +102,7 @@ const EXCLUDED_STATUSES = [
 ];
 
 // Ordem dos tipos: a do enum, com "Sem categoria" no fim. Ordenar por valor
-// faria dois relatorios da mesma pessoa saírem com layout diferente, e
+// faria dois relatorios da mesma pessoa sairem com layout diferente, e
 // comparar um mes com o outro viraria procurar a linha toda vez.
 const CATEGORY_ORDER = [...Object.keys(CATEGORY_LABELS), null];
 

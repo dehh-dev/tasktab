@@ -34,8 +34,9 @@ nao por deixar de olhar.
   uso real: ninguem os consultava. Voltam por pedido, nao por completude.
 - **Manuscrito fica de fora**, por decisao consciente: o Tesseract nao le
   caneta sobre formulario.
-- `extractFuelLines` le litros, preco e total da linha de combustivel; a regra
-  que os usa esta em `src/services/validation/CLAUDE.md`.
+- `extractFuelLines` le litros, preco e total da linha de combustivel, e
+  `extractDiscounts`, as linhas que comecam por desconto; a regra que os usa
+  esta em `src/services/validation/CLAUDE.md`.
 
 ## Chave de acesso e CNPJ
 
@@ -53,10 +54,13 @@ nao por deixar de olhar.
   Digitada, vale o mesmo que a lida do QR (`typed-issuer.service.js`): vincula
   o emitente pelo `classify`, a categoria do cadastro substitui um palpite
   (nunca uma escolha de pessoa), e a mesma chave em outro comprovante do
-  relatorio faz deste a duplicata, por cima de um "confirmar".
+  relatorio faz deste a duplicata, por cima de um "confirmar". A tela manda a
+  categoria inteira ao confirmar: **o palpite devolvido igual continua
+  palpite**, senao o cupom de posto saia confirmado como Alimentacao.
 - Sem chave, o `PATCH` aceita `cnpj` e vincula pelo mesmo `classify`;
   `cnpj: null` desvincula, porque o CNPJ do texto pode ser o da credenciadora.
-  Com chave, o CNPJ vem dela, e um digitado e `422`.
+  Com chave, o CNPJ vem dela, e um digitado e `422` — a chave de depois do
+  PATCH: o que remove a chave (`access_key: null`) pode trazer o CNPJ.
 
 ## Categoria
 
@@ -95,3 +99,17 @@ nao por deixar de olhar.
 - A cascata inteira e conferida num upload so, com um cupom digital e um
   escaneado. O Tesseract e a parte mais cara da suite: **nao suba outro
   escaneado** para provar um pedaco que esse teste ja prova.
+- **Nada de CDN em tempo de execucao.** O `.wasm` do zxing vem do pacote
+  (`zxing.js`, que leitura e fixture usam) e o idioma do Tesseract, de
+  `@tesseract.js-data/por` (`OCR_LANG_PATH`), com `cacheMethod: 'none'`. Os
+  dois buscavam no jsDelivr na primeira pagina de cada processo: sem rede o QR
+  sumia, o OCR derrubava a API e a suite nao rodava. Nao chame
+  `require('zxing-wasm')` direto.
+- O worker do OCR sobe com `errorHandler` (`ocr.service.js`). **Nao tire**:
+  sem ele o tesseract.js relanca o erro do worker fora de qualquer promise, e
+  a API inteira cai. A falha na subida (idioma que nao carrega) e rejeitada a
+  mao, porque o `createWorker` a engole e ficaria pendente com a fila parada
+  atras dele. Ela fica guardada ate o processo reiniciar, com um `error` no
+  log, e as paginas sem texto seguem para a revisao. O teste sobe uma
+  instancia com idioma inexistente e paginas em branco, sem pagar o
+  Tesseract.

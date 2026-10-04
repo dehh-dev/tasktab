@@ -113,7 +113,8 @@ describe('GET /api/receipts/:id/image', () => {
 
   it('arquivo ausente no disco e 422: reenviar e o que resolve', async () => {
     const report = await insertReport();
-    const receipt = await uploadOne(report.id, await makeReceiptPdf());
+    const buffer = await makeReceiptPdf();
+    const receipt = await uploadOne(report.id, buffer);
     await fs.unlink(uploadedFilePath(receipt.file_path));
 
     const response = await request('GET', `/api/receipts/${receipt.id}/image`);
@@ -123,6 +124,19 @@ describe('GET /api/receipts/:id/image', () => {
     expect(response.body.details).toEqual([
       { field: 'file_path', message: 'arquivo ausente' },
     ]);
+
+    // O reenvio do mesmo arquivo nao cria linha nova: devolve o que sumiu.
+    // Antes ele descartava a copia, e a orientacao acima nao resolvia nada.
+    const reenvio = await requestUpload(`/api/reports/${report.id}/receipts`, [
+      { buffer, filename: 'de-novo.pdf' },
+    ]);
+    const depois = await requestBinary(
+      'GET',
+      `/api/receipts/${receipt.id}/image`,
+    );
+
+    expect(reenvio.body.meta).toEqual({ created: 0, existing: 1 });
+    expect(depois.status).toBe(200);
   });
 
   it('PDF que o pdf.js recusa e 422, sem a mensagem interna no corpo', async () => {

@@ -62,5 +62,8 @@ CommonJS.
   recibo manuscrito (Valor, Data), retrato a partir de 1,6:1 e cupom (tres
   fatias com 3% de sobreposicao), e o Cabecalho vale para qualquer pagina.
   Zoom igual ao atual rola na hora; senao, depois que o zoom novo pinta.
+- O giro gravado volta para a lista da `ReportDetail` (`onRotated`): a
+  revisao remonta com o `receipt` da lista, e sem isso reabrir partia do giro
+  antigo — desfazer gravava 270 em vez de 0. Ha spec de reabrir e desfazer.
 - Girar (issue 43) muda a URL da imagem com `?rotacao=`, para o navegador nao
   reaproveitar a copia de antes.

@@ -19,6 +19,10 @@ por categoria (`pdf-por-categoria.service.js`).
 - O regex de `setCell` usa quantificador **preguicoso** nos atributos
   (`[^>]*?`). O guloso consome o `/` de uma celula autofechada e apaga a
   seguinte — ja aconteceu. **Nao volte para guloso.**
+- **Adiantamento nulo nao vira zero**: C3 recebe "Não informado" e o saldo
+  (C4, formula no template) recebe "—". Com o zero, o formulario assinado
+  mostrava o total inteiro como saldo devido. Ao trocar pelo oficial, confira
+  onde ficam essas duas celulas.
 
 ## Planilhas
 
@@ -60,6 +64,17 @@ por categoria (`pdf-por-categoria.service.js`).
   (`tests/helpers/xlsx-formula.js`): foi a comparacao de string que deixou
   passar um subtotal apontando para rotulo nenhum. O avaliador cobre so as
   funcoes que a planilha usa; funcao nova entra nele junto.
+
+## Paginas originais
+
+- Os dois PDFs abrem os originais por `pdf-originais.js`: cada arquivo uma
+  vez, e **todas** as faltas juntas — arquivo fora do disco (`ENOENT`) e PDF
+  que nao abre. Faltou pagina, a saida responde `422` com a lista, e a
+  checagem final a mostra antes de fechar. Parar na primeira falta custava uma
+  volta por arquivo, e o PDF ilegivel virava 500.
+- "Abre" e `PDFDocument.load` **mais** `getPageCount()`, o mesmo teste do
+  upload: o `load` e tolerante e aceita arquivo sem catalogo, que so quebra ao
+  chegar nas paginas. Outra falha de leitura (permissao, disco) estoura.
 
 ## PDF consolidado
 

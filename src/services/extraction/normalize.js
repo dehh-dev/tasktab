@@ -528,6 +528,32 @@ function extractFuelLines(text) {
     });
 }
 
+// Linha de desconto: `DESCONTO 5,00`, `Desconto R$ -5,00`, `(-) Desc. 0,50`,
+// `Descontos R$ 12,30`. A palavra abre a linha — "Descricao" nao casa, nem o
+// "ganhe desconto de 10% no proximo" — e o valor a fecha.
+const DISCOUNT_LINE =
+  /^[^\S\n]*(?:\(-\)[^\S\n]*)?(?:valor[^\S\n]+(?:do[^\S\n]+)?)?desc(?:ontos?|\.)?(?![a-z])[^\d\n]*?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})[^\S\n]*$/i;
+
+/**
+ * Descontos impressos no cupom, em centavos.
+ *
+ * No posto, o desconto de aplicativo sai numa linha propria: o abastecimento
+ * fica cheio e o valor a pagar, menor. Sem isto a regra de combustivel
+ * acusava como erro de leitura um total que estava certo.
+ */
+function extractDiscounts(text) {
+  if (typeof text !== 'string') {
+    return [];
+  }
+
+  return text
+    .split('\n')
+    .map((line) => line.match(DISCOUNT_LINE))
+    .filter(Boolean)
+    .map((match) => parseAmountToCents(match[1]))
+    .filter((cents) => cents !== null);
+}
+
 module.exports = {
   parseAmountToCents,
   parseDate,
@@ -538,4 +564,5 @@ module.exports = {
   extractCnpj,
   extractItemTotals,
   extractFuelLines,
+  extractDiscounts,
 };

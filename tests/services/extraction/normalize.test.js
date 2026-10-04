@@ -7,6 +7,7 @@ const {
   extractDate,
   extractCnpj,
   extractFuelLines,
+  extractDiscounts,
 } = require('../../../src/services/extraction/normalize');
 
 describe('parseAmountToCents', () => {
@@ -208,5 +209,36 @@ describe('extractFuelLines', () => {
   it('a ancora nao atravessa a quebra de linha', () => {
     // Litros numa linha e preco e total na seguinte nao sao uma linha so.
     expect(extractFuelLines('39,56 L\n5,70 225,49')).toEqual([]);
+  });
+});
+
+describe('extractDiscounts', () => {
+  const casos = [
+    ['DESCONTO 5,00', [500]],
+    ['Desconto R$ -5,00', [500]],
+    ['(-) Desc. 0,50', [50]],
+    ['VALOR DESCONTO: R$ 12,30', [1230]],
+    ['Descontos R$ 1.000,00', [100000]],
+  ];
+
+  it.each(casos)('%s', (linha, esperado) => {
+    expect(extractDiscounts(linha)).toEqual(esperado);
+  });
+
+  it('ignora o que nao e linha de desconto', () => {
+    const texto = [
+      'DESCRICAO QTD UN VL TOTAL 225,49',
+      'Ganhe desconto de 10% no proximo abastecimento',
+      'Desconto no proximo abastecimento',
+      'VALOR A PAGAR R$ 220,49',
+    ].join('\n');
+
+    expect(extractDiscounts(texto)).toEqual([]);
+  });
+
+  it('devolve um valor por linha de desconto', () => {
+    expect(extractDiscounts('DESC ITEM 5,00\nDescontos R$ 5,00')).toEqual([
+      500, 500,
+    ]);
   });
 });

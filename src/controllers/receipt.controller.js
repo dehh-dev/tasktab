@@ -50,6 +50,29 @@ async function discard(filePath) {
 }
 
 /**
+ * Reenvio de um arquivo que o relatorio ja tem: as linhas existem, e a copia
+ * nova so serve se o arquivo guardado sumiu do disco — ai e ela que o devolve.
+ * "Envie o PDF de novo" e o que a imagem e as exportacoes mandam fazer, e sem
+ * isto o reenvio descartava a copia e nada mudava.
+ */
+async function restoreOrDiscard(tempPath, storedName) {
+  const stored = path.join(env.upload.dir, storedName);
+
+  try {
+    await fs.access(stored);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+
+    await fs.rename(tempPath, stored);
+    return;
+  }
+
+  await discard(tempPath);
+}
+
+/**
  * POST /api/reports/:id/receipts
  *
  * Recebe 1..N PDFs e transforma cada pagina numa linha. O trabalho de extrair
@@ -108,8 +131,9 @@ async function upload(req, res) {
     const already = await Receipt.findByReportAndHash(reportId, hash);
 
     if (already.length > 0) {
-      // Mesmo arquivo, mesmo report: o conteudo ja esta no disco sob o hash.
-      await discard(file.path);
+      // Mesmo arquivo, mesmo report: o conteudo ja esta no disco sob o hash —
+      // ou volta para ele agora, se tinha sumido.
+      await restoreOrDiscard(file.path, already[0].file_path);
       existing.push(...already);
       continue;
     }

@@ -74,13 +74,16 @@ module.exports = {
     // idioma nem do reconhecimento.
     enabled: process.env.OCR_ENABLED !== 'false',
     language: process.env.OCR_LANGUAGE || 'por',
-    // O tesseract baixa ~2,4 MB de dados de idioma na primeira execucao e
-    // guarda aqui. Fora do versionamento.
-    cachePath: path.resolve(
-      __dirname,
-      '../..',
-      process.env.OCR_CACHE_DIR || '.cache/tesseract',
-    ),
+    // Dados do idioma: os do pacote `@tesseract.js-data/por`, os mesmos bytes
+    // que o tesseract.js baixaria do jsDelivr na primeira pagina escaneada —
+    // o que deixava o OCR refem da rede. Outro idioma pede o diretorio (ou
+    // URL) com o `<idioma>.traineddata.gz` dele.
+    langPath:
+      process.env.OCR_LANG_PATH ||
+      path.join(
+        path.dirname(require.resolve('@tesseract.js-data/por')),
+        '4.0.0_best_int',
+      ),
     // Teto por pagina: uma imagem ruim nao pode travar o lote inteiro.
     timeoutMs: Number(process.env.OCR_TIMEOUT_MS || 20000),
   },

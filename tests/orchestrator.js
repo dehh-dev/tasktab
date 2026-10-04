@@ -593,18 +593,22 @@ async function request(
  * Envio multipart, para as rotas de upload. O `fetch` monta o boundary sozinho
  * a partir do FormData — definir Content-Type na mao quebraria isso.
  */
-async function requestUpload(pathname, files, { token } = {}) {
+async function requestUpload(
+  pathname,
+  files,
+  { token, baseUrl = BASE_URL, field = 'files' } = {},
+) {
   const form = new FormData();
 
   for (const { buffer, filename } of files) {
     form.append(
-      'files',
+      field,
       new Blob([buffer], { type: 'application/pdf' }),
       filename,
     );
   }
 
-  const response = await fetch(apiUrl(pathname), {
+  const response = await fetch(`${baseUrl}${pathname}`, {
     method: 'POST',
     headers: authHeaders(token),
     body: form,

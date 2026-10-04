@@ -19,6 +19,23 @@ describe('PATCH /api/reports/:id', () => {
     });
   });
 
+  it.each([
+    ['em branco', '   '],
+    ['que nao e texto', 123],
+    ['longo demais', 'x'.repeat(256)],
+  ])('recusa titulo %s com 422 no campo', async (caso, titulo) => {
+    const created = await insertReport();
+
+    const response = await request('PATCH', `/api/reports/${created.id}`, {
+      title: titulo,
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      expect.objectContaining({ field: 'title' }),
+    ]);
+  });
+
   it('corrige adiantamento e cidade principal; nulo volta a nao informado', async () => {
     const created = await insertReport();
     const path = `/api/reports/${created.id}`;

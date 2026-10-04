@@ -7,7 +7,7 @@ const {
   renderPdfPage,
   maxPixelDifference,
 } = require('../../helpers/pdf-render');
-const { makeRotatedPdf } = require('../../fixtures/pdf');
+const { makeCorruptPdf, makeRotatedPdf } = require('../../fixtures/pdf');
 const {
   request,
   requestBinary,
@@ -216,5 +216,44 @@ describe('GET /api/reports/:id/export/pdfs-por-categoria.zip', () => {
 
     expect(response.status).toBe(200);
     expect(files).toEqual({});
+  });
+
+  it('sem todas as paginas, 422 dizendo quais comprovantes faltaram', async () => {
+    const report = await insertReport();
+    await insertReceipt(
+      report.id,
+      pagina(saveUpload(await makeMarkedPdf('A')), 1),
+    );
+    // Como o upload guarda o PDF protegido ou corrompido: linha `failed`, com
+    // o arquivo no disco. Era um 500 para o relatorio inteiro.
+    const ilegivel = await insertReceipt(report.id, {
+      ...saveUpload(makeCorruptPdf()),
+      page_number: 1,
+      status: 'failed',
+    });
+    const sumido = await insertReceipt(
+      report.id,
+      pagina({ file_path: 'sumiu.pdf', file_hash: 'b'.repeat(64) }, 1),
+    );
+
+    const response = await request(
+      'GET',
+      `/api/reports/${report.id}/export/pdfs-por-categoria.zip`,
+    );
+
+    expect(response.status).toBe(422);
+    expect(response.body.message).toBe(
+      `O arquivo do comprovante ${sumido.id} nao esta no disco, e o PDF do comprovante ${ilegivel.id} nao abre: o ZIP dos PDFs por categoria nao sai sem todas as paginas.`,
+    );
+    expect(response.body.details).toEqual([
+      {
+        field: 'receipts',
+        message: `comprovante ${sumido.id}: arquivo fora do disco`,
+      },
+      {
+        field: 'receipts',
+        message: `comprovante ${ilegivel.id}: PDF que nao abre`,
+      },
+    ]);
   });
 });

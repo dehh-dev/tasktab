@@ -6,6 +6,7 @@ const {
   insertReceipt,
   insertMerchant,
   updateColumnDirectly,
+  createUserWithSession,
 } = require('../../orchestrator');
 const { checkDigit } = require('../../../src/services/extraction/access-key');
 const { LEVELS, RULE_LEVEL } = require('../../../src/services/validation');
@@ -467,6 +468,107 @@ describe('regra: faixa do emitente', () => {
     expect(porRegra(await validar(report.id), 'faixa_emitente')).toHaveLength(
       0,
     );
+  });
+
+  it('acusa valor com um digito a menos', async () => {
+    const merchant = await insertMerchant({ default_category: 'alimentacao' });
+    const report = await insertReport();
+    const pagina = await comHistorico(report, merchant.id, [3760, 4860, 4200]);
+
+    // O 3,60 lancado onde o cupom dizia 37,60.
+    await insertReceipt(report.id, {
+      page_number: pagina + 1,
+      merchant_id: merchant.id,
+      amount_cents: 360,
+      status: 'needs_review',
+      issued_at: '2026-06-11',
+      category: 'alimentacao',
+    });
+
+    expect(porRegra(await validar(report.id), 'faixa_emitente')).toHaveLength(
+      1,
+    );
+  });
+
+  it('fica calada com o valor dentro da faixa', async () => {
+    const merchant = await insertMerchant({ default_category: 'alimentacao' });
+    const report = await insertReport();
+    const pagina = await comHistorico(report, merchant.id, [3760, 4860, 4200]);
+
+    // Sem este caso, uma regra que acusasse todo valor com historico passava:
+    // os testes so tinham o digito a mais e a amostra pequena.
+    await insertReceipt(report.id, {
+      page_number: pagina + 1,
+      merchant_id: merchant.id,
+      amount_cents: 5200,
+      status: 'needs_review',
+      issued_at: '2026-06-11',
+      category: 'alimentacao',
+    });
+
+    expect(porRegra(await validar(report.id), 'faixa_emitente')).toHaveLength(
+      0,
+    );
+  });
+
+  it('o historico de outra pessoa nao conta, e os valores dela nao aparecem', async () => {
+    const merchant = await insertMerchant({ default_category: 'alimentacao' });
+    const outra = await createUserWithSession();
+    const dona = await createUserWithSession();
+    const alheio = await insertReport({
+      owner_id: outra.user.id,
+      title: 'Viagem de outra pessoa',
+    });
+    await comHistorico(alheio, merchant.id, [3760, 4860, 4200]);
+    const report = await insertReport({ owner_id: dona.user.id });
+    await insertReceipt(report.id, {
+      merchant_id: merchant.id,
+      amount_cents: 376000,
+      status: 'needs_review',
+      issued_at: '2026-06-11',
+      category: 'alimentacao',
+    });
+
+    const response = await request(
+      'GET',
+      `/api/reports/${report.id}/validation`,
+      undefined,
+      { token: dona.token },
+    );
+
+    // A faixa sai escrita na conferencia e na planilha exportada: eram os
+    // valores de quem esta pessoa nem pode consultar.
+    expect(response.status).toBe(200);
+    expect(porRegra(response.body, 'faixa_emitente')).toEqual([]);
+  });
+
+  it('o historico da mesma pessoa em outro relatorio conta', async () => {
+    const merchant = await insertMerchant({ default_category: 'alimentacao' });
+    const dona = await createUserWithSession();
+    const anterior = await insertReport({
+      owner_id: dona.user.id,
+      title: 'Viagem anterior',
+    });
+    await comHistorico(anterior, merchant.id, [3760, 4860, 4200]);
+    const report = await insertReport({ owner_id: dona.user.id });
+    await insertReceipt(report.id, {
+      merchant_id: merchant.id,
+      amount_cents: 376000,
+      status: 'needs_review',
+      issued_at: '2026-06-11',
+      category: 'alimentacao',
+    });
+
+    const response = await request(
+      'GET',
+      `/api/reports/${report.id}/validation`,
+      undefined,
+      { token: dona.token },
+    );
+    const alertas = porRegra(response.body, 'faixa_emitente');
+
+    expect(alertas).toHaveLength(1);
+    expect(alertas[0].message).toContain('(3760 a 4860 centavos)');
   });
 });
 
@@ -931,6 +1033,30 @@ describe('regra: combustivel', () => {
     const mercado = 'AGUA MINERAL 1,500 L 2,49 3,74\nVALOR TOTAL R$ 45,90';
 
     expect(await combustivel(mercado, 4590, 'alimentacao')).toHaveLength(0);
+  });
+
+  it('desconto impresso no cupom nao vira alarme falso', async () => {
+    // Desconto de aplicativo: o abastecimento sai cheio e o valor a pagar,
+    // menor. O total pago estava certo, e a regra mandava trocar por 225,49.
+    const comDesconto =
+      '39,56 L x 5,70 225,49\nDESCONTO 5,00\nVALOR A PAGAR R$ 220,49';
+
+    expect(await combustivel(comDesconto, 22049)).toHaveLength(0);
+    expect(await combustivel(comDesconto, 22549)).toHaveLength(0);
+  });
+
+  it('o mesmo desconto no item e no resumo conta uma vez', async () => {
+    const duasVezes =
+      '39,56 L x 5,70 225,49\nDESC ITEM 5,00\nDescontos R$ 5,00\nValor a pagar R$ 220,49';
+
+    expect(await combustivel(duasVezes, 22049)).toHaveLength(0);
+  });
+
+  it('com desconto, o digito a mais continua acusado', async () => {
+    const comDesconto =
+      '39,56 L x 5,70 225,49\nDESCONTO 5,00\nVALOR A PAGAR R$ 2.220,49';
+
+    expect(await combustivel(comDesconto, 222049)).toHaveLength(1);
   });
 });
 

@@ -277,7 +277,18 @@ function checkFuelArithmetic(receipts) {
 
     const fuel = lines.reduce((sum, line) => sum + line.totalCents, 0);
 
-    if (fuel === receipt.amount_cents) {
+    // Com desconto no cupom (aplicativo de posto), a linha sai cheia e o
+    // valor pago, menor: os dois totais estao certos. O mesmo desconto as
+    // vezes vem duas vezes — no item e no resumo —, entao vale tambem cada
+    // um sozinho. Um digito a mais continua longe de todos eles.
+    const discounts = normalize.extractDiscounts(receipt.raw_text);
+    const accepted = [
+      fuel,
+      fuel - discounts.reduce((sum, cents) => sum + cents, 0),
+      ...discounts.map((cents) => fuel - cents),
+    ];
+
+    if (accepted.includes(receipt.amount_cents)) {
       return [];
     }
 

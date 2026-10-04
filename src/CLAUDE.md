@@ -9,7 +9,8 @@
   exportacao.
 - O upload confere **magic bytes** (`%PDF`), nao extensao, e grava o arquivo
   com o proprio SHA-256 como nome. Reenviar o mesmo arquivo responde `200` com
-  o que ja existe — e idempotente, nao erro de unique.
+  o que ja existe — e idempotente, nao erro de unique — e devolve ao disco o
+  arquivo que tinha sumido: e o que a imagem e as exportacoes mandam fazer.
 - PDF ilegivel vira uma linha `failed` com o motivo em `raw_text`: um arquivo
   ruim nao derruba o lote.
 - Confirmar exige `issued_at`, `amount_cents` e `category`, conferidos sobre o
@@ -37,7 +38,8 @@
   confere as entregas de verdade — somas pelos grupos da planilha
   (`conferenceTotals`) contra o total do banco, paginas pelos PDFs por
   categoria montados (`buildCategoryPdfs`). Nao troque por uma conta paralela:
-  ela concordaria com o banco e esconderia o grupo que perdeu linha.
+  ela concordaria com o banco e esconderia o grupo que perdeu linha. Arquivo
+  fora do disco e PDF que nao abre aparecem **todos de uma vez**, sem 500.
 - As rotas usam o `batchWriteLimiter`, nao o teto geral de escrita.
 - **O giro e do comprovante, nao do arquivo** (`receipts.rotation`, quarto de
   volta): vale para a imagem, o OCR do reprocessamento e o PDF consolidado.

@@ -11,7 +11,8 @@ em [api.md](api.md); o backlog e as decisoes, em
 O upload aceita multipart no campo `files`, confere os **magic bytes** (`%PDF`)
 em vez da extensao, e separa o arquivo em uma linha por pagina. O arquivo e
 gravado com o proprio SHA-256 como nome, entao o mesmo PDF ocupa um lugar so no
-disco; reenviar responde `200` com o que ja existe, e nao erro.
+disco; reenviar responde `200` com o que ja existe, e nao erro — e, se o
+arquivo tinha sumido do disco, o reenvio o devolve.
 
 **Dinheiro e sempre inteiro em centavos.** Somar float produziu
 `219.98000000000002` na conferencia manual que originou este projeto, e a
@@ -92,7 +93,8 @@ o cadastro.
 Pagina **sem camada de texto** (cupom escaneado) desce para o **OCR**, o
 degrau mais caro e menos confiavel da cascata: cerca de 0,2 a 0,5 s por pagina
 depois do primeiro reconhecimento, mais uns 400 ms na primeira execucao, que
-baixa 2,4 MB de dados de idioma para `OCR_CACHE_DIR`. Pagina de cabeca para
+carrega os dados de idioma do pacote instalado (`@tesseract.js-data/por`) — a
+extracao nao depende de rede, nem para o OCR nem para o QR. Pagina de cabeca para
 baixo se endireita na revisao: `rotation` no `PATCH`, em quarto de volta, vale
 para a imagem, para o OCR do reprocessamento e para o PDF consolidado — o
 arquivo original nunca e regravado.
@@ -139,7 +141,8 @@ contas decide; a ferramenta aponta, nao veta.
 Regras: soma dos itens contra o total impresso, litros vezes preco unitario no
 combustivel, digito verificador da chave, mes, UF e tipo de emissao da chave
 (contingencia), data dentro do periodo, valor fora da faixa historica do
-emitente, comprovante incompleto, despesas acima do adiantamento, suspeita de
+emitente (a faixa vem so dos relatorios da mesma pessoa), comprovante
+incompleto, despesas acima do adiantamento, suspeita de
 duplicata, valor repetido em documentos diferentes e documentos sem chave de
 acesso somados a parte.
 
@@ -236,7 +239,9 @@ abrem-e-regravam um `.xlsx` perdem o que nao sabem representar — foi assim que
 a lista suspensa de um template oficial sumiu, na conferencia manual que
 originou este projeto. Aqui `src/services/export/xlsx-cell-patch.js` troca so
 as celulas de dado direto no XML da planilha; estilo, formula,
-`dataValidations` e `mergeCells` sobrevivem byte a byte.
+`dataValidations` e `mergeCells` sobrevivem byte a byte. Com o adiantamento
+nao informado, o formulario diz "Não informado" e deixa o saldo sem conta, como
+a planilha — o zero no lugar fazia o saldo mostrar o total inteiro como devido.
 
 > **O template em `assets/anexo-i-template.xlsx` e SINTETICO, nao o formulario
 > oficial**, que nao existe neste projeto. O sintetico (gerado por
@@ -266,3 +271,8 @@ rasterizar, nunca recortar". O giro escolhido na revisao soma ao `/Rotate`,
 que e atributo da pagina, sem tocar no conteudo. Toda pagina do relatorio vai
 para exatamente um arquivo: a duplicata vai junto, como comprovacao, e o que
 nao tem categoria vai em `sem-categoria`.
+
+Sem todas as paginas, nem o consolidado nem o ZIP saem: um arquivo que sumiu
+do disco, ou um PDF que nao abre (o protegido ou corrompido que o upload guarda
+como `failed`), faz a exportacao responder `422` dizendo quais comprovantes
+faltaram, todos de uma vez. A checagem final aponta o mesmo antes de fechar.

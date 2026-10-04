@@ -251,8 +251,11 @@ function validateUpdate(body, current = {}) {
   }
 
   // O CNPJ confiavel e o das posicoes 7 a 20 da chave. Com ela no comprovante,
-  // um CNPJ digitado so poderia contradize-la.
-  if ('cnpj' in data && (current.access_key || data.access_key)) {
+  // um CNPJ digitado so poderia contradize-la. Vale a chave de depois deste
+  // PATCH: o que a remove (`access_key: null`) pode trazer o CNPJ junto.
+  const keyAfter = 'access_key' in data ? data.access_key : current.access_key;
+
+  if ('cnpj' in data && keyAfter) {
     throw new ValidationError({
       details: [
         {

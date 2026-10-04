@@ -211,6 +211,63 @@ describe('PATCH /api/receipts/:id com a chave de acesso digitada', () => {
     });
   });
 
+  it('confirmar pela tela com a chave digitada troca o palpite pela categoria do cadastro', async () => {
+    const merchant = await insertMerchant({
+      cnpj: CNPJ_DA_CHAVE,
+      default_category: 'combustivel',
+    });
+    const receipt = await insertReceipt((await insertReport()).id, {
+      category: 'alimentacao',
+    });
+    await updateColumnDirectly(
+      'receipts',
+      receipt.id,
+      'category_guessed',
+      true,
+    );
+
+    // O corpo que a revisao manda ao confirmar: a categoria vai junto, como
+    // veio da extracao, mesmo que ninguem tenha mexido nela.
+    const response = await patch(receipt, {
+      ...COMPLETO,
+      category: 'alimentacao',
+      status: 'confirmed',
+      access_key: CHAVE,
+    });
+
+    expect(response.body.data).toMatchObject({
+      merchant_id: merchant.id,
+      category: 'combustivel',
+      category_guessed: false,
+      status: 'confirmed',
+    });
+  });
+
+  it('outra categoria no mesmo PATCH e escolha da pessoa, e fica', async () => {
+    await insertMerchant({
+      cnpj: CNPJ_DA_CHAVE,
+      default_category: 'combustivel',
+    });
+    const receipt = await insertReceipt((await insertReport()).id, {
+      category: 'alimentacao',
+    });
+    await updateColumnDirectly(
+      'receipts',
+      receipt.id,
+      'category_guessed',
+      true,
+    );
+
+    const response = await patch(receipt, {
+      ...COMPLETO,
+      category: 'transporte',
+      status: 'confirmed',
+      access_key: CHAVE,
+    });
+
+    expect(response.body.data.category).toBe('transporte');
+  });
+
   it('a categoria escolhida por uma pessoa fica, mesmo com cadastro', async () => {
     await insertMerchant({
       cnpj: CNPJ_DA_CHAVE,
@@ -345,6 +402,26 @@ describe('PATCH /api/receipts/:id com o emitente lido do proprio comprovante', (
         message: 'cnpj vem da chave de acesso deste comprovante',
       },
     ]);
+  });
+
+  it('remover a chave e informar o cnpj no mesmo PATCH vale', async () => {
+    const receipt = await insertReceipt((await insertReport()).id, {
+      access_key: CHAVE,
+    });
+
+    // A guarda olhava a chave de antes do PATCH, que este mesmo PATCH remove.
+    const response = await patch(receipt, {
+      access_key: null,
+      cnpj: '58.080.015/0001-97',
+    });
+    const emitente = await request(
+      'GET',
+      `/api/merchants/${response.body.data.merchant_id}`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.access_key).toBeNull();
+    expect(emitente.body.data.cnpj).toBe('58080015000197');
   });
 
   it('cnpj nulo desvincula o emitente', async () => {
