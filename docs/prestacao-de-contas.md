@@ -11,7 +11,8 @@ em [api.md](api.md); o backlog e as decisoes, em
 O upload aceita multipart no campo `files`, confere os **magic bytes** (`%PDF`)
 em vez da extensao, e separa o arquivo em uma linha por pagina. O arquivo e
 gravado com o proprio SHA-256 como nome, entao o mesmo PDF ocupa um lugar so no
-disco; reenviar responde `200` com o que ja existe, e nao erro.
+disco; reenviar responde `200` com o que ja existe, e nao erro — e, se o
+arquivo tinha sumido do disco, o reenvio o devolve.
 
 **Dinheiro e sempre inteiro em centavos.** Somar float produziu
 `219.98000000000002` na conferencia manual que originou este projeto, e a
@@ -269,3 +270,8 @@ rasterizar, nunca recortar". O giro escolhido na revisao soma ao `/Rotate`,
 que e atributo da pagina, sem tocar no conteudo. Toda pagina do relatorio vai
 para exatamente um arquivo: a duplicata vai junto, como comprovacao, e o que
 nao tem categoria vai em `sem-categoria`.
+
+Sem todas as paginas, nem o consolidado nem o ZIP saem: um arquivo que sumiu
+do disco, ou um PDF que nao abre (o protegido ou corrompido que o upload guarda
+como `failed`), faz a exportacao responder `422` dizendo quais comprovantes
+faltaram, todos de uma vez. A checagem final aponta o mesmo antes de fechar.

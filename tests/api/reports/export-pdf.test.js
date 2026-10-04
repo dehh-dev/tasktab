@@ -19,6 +19,7 @@ const {
   waitForProcessing,
 } = require('../../orchestrator');
 const {
+  makeCorruptPdf,
   makeReceiptPdf,
   makeQrReceiptPdf,
   makeRotatedPdf,
@@ -234,6 +235,42 @@ describe('GET /api/reports/:id/export.pdf', () => {
     expect(response.status).toBe(200);
     const doc = await PDFDocument.load(response.buffer);
     expect(doc.getPageCount()).toBe(1);
+  });
+
+  it('sem todas as paginas, 422 dizendo quais comprovantes faltaram', async () => {
+    const report = await insertReport();
+    await insertConfirmedWithFile(report.id, await makeReceiptPdf());
+    // Como o upload guarda o PDF protegido ou corrompido: linha `failed`, com
+    // o arquivo no disco. Era um 500 sem dizer qual comprovante.
+    const ilegivel = await insertConfirmedWithFile(
+      report.id,
+      makeCorruptPdf(),
+      {
+        status: 'failed',
+      },
+    );
+    const sumido = await insertConfirmedWithFile(
+      report.id,
+      await makeReceiptPdf(),
+      { file_path: 'sumiu.pdf', file_hash: 'b'.repeat(64) },
+    );
+
+    const response = await request(
+      'GET',
+      `/api/reports/${report.id}/export.pdf`,
+    );
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      {
+        field: 'receipts',
+        message: `comprovante ${sumido.id}: arquivo fora do disco`,
+      },
+      {
+        field: 'receipts',
+        message: `comprovante ${ilegivel.id}: PDF que nao abre`,
+      },
+    ]);
   });
 });
 

@@ -1,12 +1,14 @@
 'use strict';
 
-const fs = require('fs/promises');
-const path = require('path');
 const JSZip = require('jszip');
 const { PDFDocument, degrees } = require('pdf-lib');
-const env = require('../../config/env');
 const { CATEGORY_LABELS, categoryKey, categoryLabel } = require('./labels');
 const { chronological, pageRotation } = require('./pdf-consolidado.service');
+const {
+  openOriginals,
+  hasProblems,
+  assertAllOpen,
+} = require('./pdf-originais');
 
 // A ordem dos arquivos e a das abas da planilha: a do enum, com "Sem
 // categoria" no fim.
@@ -38,24 +40,18 @@ function slug(label) {
  * faltou entre o 01 e o 03.
  *
  * Devolve cada arquivo com os comprovantes que levou e as paginas que saiu:
- * e o que a checagem final (issue 57) confere contra o que foi recebido.
+ * e o que a checagem final (issue 57) confere contra o que foi recebido. Com
+ * arquivo fora do disco ou PDF que nao abre, nao monta nada e devolve quais
+ * comprovantes faltaram (`missing`, `unreadable`): sem todas as paginas, a
+ * regra acima nao vale.
  */
 async function buildCategoryPdfs(receipts) {
-  const sources = new Map();
+  // Cada arquivo enviado e lido uma vez, por mais paginas que tenha.
+  const { sources, missing, unreadable } = await openOriginals(receipts);
   const files = [];
 
-  // Cada arquivo enviado e lido uma vez, por mais paginas que tenha.
-  function load(filePath) {
-    if (!sources.has(filePath)) {
-      sources.set(
-        filePath,
-        fs
-          .readFile(path.join(env.upload.dir, filePath))
-          .then((bytes) => PDFDocument.load(bytes)),
-      );
-    }
-
-    return sources.get(filePath);
+  if (hasProblems({ missing, unreadable })) {
+    return { files, missing, unreadable };
   }
 
   const groups = CATEGORY_ORDER.map((key) => ({
@@ -74,7 +70,7 @@ async function buildCategoryPdfs(receipts) {
     for (const filePath of new Set(group.receipts.map((r) => r.file_path))) {
       const items = group.receipts.filter((r) => r.file_path === filePath);
       const copied = await doc.copyPages(
-        await load(filePath),
+        sources.get(filePath),
         items.map((receipt) => receipt.page_number - 1),
       );
 
@@ -103,14 +99,21 @@ async function buildCategoryPdfs(receipts) {
     });
   }
 
-  return files;
+  return { files, missing, unreadable };
 }
 
-/** Os PDFs por categoria num ZIP, um arquivo por categoria com despesa. */
+/**
+ * Os PDFs por categoria num ZIP, um arquivo por categoria com despesa. Sem
+ * todas as paginas, 422 dizendo quais comprovantes faltaram.
+ */
 async function buildCategoryZip(receipts) {
+  const built = await buildCategoryPdfs(receipts);
+
+  assertAllOpen(built, 'o ZIP dos PDFs por categoria');
+
   const zip = new JSZip();
 
-  for (const file of await buildCategoryPdfs(receipts)) {
+  for (const file of built.files) {
     zip.file(file.name, file.bytes);
   }
 

@@ -1,11 +1,10 @@
 'use strict';
 
-const path = require('path');
-const env = require('../config/env');
 const Receipt = require('../models/receipt.model');
 const accessKey = require('./extraction/access-key');
 const planilha = require('./export/planilha.service');
 const pdfPorCategoria = require('./export/pdf-por-categoria.service');
+const { hasProblems, describeProblems } = require('./export/pdf-originais');
 
 /**
  * A checagem final do procedimento de prestacao de contas (issue 57), feita
@@ -51,31 +50,20 @@ async function checkSums(reportId, receipts) {
 
 /**
  * Toda pagina em exatamente um PDF de categoria, e as geradas iguais as
- * recebidas. Montar os PDFs de verdade e o que faz um arquivo de comprovante
- * que sumiu do disco aparecer aqui, e nao na hora de exportar.
+ * recebidas. Montar os PDFs de verdade e o que faz um arquivo que sumiu do
+ * disco, ou um PDF que nao abre, aparecer aqui — todos de uma vez —, e nao
+ * na hora de exportar.
  */
 async function checkPages(receipts) {
   const received = receipts.length;
-  let files;
+  const built = await pdfPorCategoria.buildCategoryPdfs(receipts);
+  const { files } = built;
 
-  try {
-    files = await pdfPorCategoria.buildCategoryPdfs(receipts);
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
-
-    const missing = receipts
-      .filter(
-        (receipt) =>
-          path.join(env.upload.dir, receipt.file_path) === error.path,
-      )
-      .map((receipt) => receipt.id);
-
+  if (hasProblems(built)) {
     return {
       check: 'paginas',
       ok: false,
-      message: `O arquivo ${missing.length === 1 ? 'do comprovante' : 'dos comprovantes'} ${missing.join(', ')} nao esta no disco: os PDFs por categoria nao saem.`,
+      message: `${describeProblems(built)}: os PDFs por categoria nao saem.`,
       received,
       generated: 0,
     };

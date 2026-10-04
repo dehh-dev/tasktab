@@ -1,7 +1,7 @@
 'use strict';
 
 const { checkDigit } = require('../../../src/services/extraction/access-key');
-const { makePdf } = require('../../fixtures/pdf');
+const { makeCorruptPdf, makePdf } = require('../../fixtures/pdf');
 const {
   request,
   insertReport,
@@ -149,6 +149,55 @@ describe('GET /api/reports/:id/final-check', () => {
       message: expect.stringContaining(`do comprovante ${perdido.id} `),
     });
     expect(itens(body).confirmados.ok).toBe(true);
+  });
+
+  it('PDF que nao abre aparece aqui, sem derrubar a checagem', async () => {
+    const report = await relatorio([{}]);
+    // Como o upload guarda o PDF protegido ou corrompido: linha `failed`, com
+    // o arquivo no disco. A checagem respondia 500 e o dialogo de fechar so
+    // dizia que ela nao tinha respondido.
+    const ilegivel = await insertReceipt(report.id, {
+      ...saveUpload(makeCorruptPdf()),
+      page_number: 1,
+      status: 'failed',
+    });
+
+    const { status, body } = await checagem(report.id);
+
+    expect(status).toBe(200);
+    expect(itens(body).paginas).toEqual({
+      check: 'paginas',
+      ok: false,
+      message: `O PDF do comprovante ${ilegivel.id} nao abre: os PDFs por categoria nao saem.`,
+      received: 2,
+      generated: 0,
+    });
+  });
+
+  it('todo arquivo fora do disco aparece de uma vez, e nao so o primeiro', async () => {
+    const report = await insertReport();
+    const perdidos = [];
+
+    for (const [index, arquivo] of ['sumiu-a.pdf', 'sumiu-b.pdf'].entries()) {
+      perdidos.push(
+        await insertReceipt(report.id, {
+          file_path: arquivo,
+          file_hash: String(index + 1).repeat(64),
+          page_number: 1,
+          status: 'confirmed',
+          category: 'alimentacao',
+          issued_at: '2026-06-19',
+          amount_cents: 1000,
+        }),
+      );
+    }
+
+    const { body } = await checagem(report.id);
+
+    // Parava no primeiro: uma volta de reenvio para cada arquivo sumido.
+    expect(itens(body).paginas.message).toBe(
+      `Os arquivos dos comprovantes ${perdidos[0].id} e ${perdidos[1].id} nao estao no disco: os PDFs por categoria nao saem.`,
+    );
   });
 
   it('aponta chave que nao fecha o digito verificador', async () => {
