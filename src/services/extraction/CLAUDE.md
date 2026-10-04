@@ -95,3 +95,11 @@ nao por deixar de olhar.
 - A cascata inteira e conferida num upload so, com um cupom digital e um
   escaneado. O Tesseract e a parte mais cara da suite: **nao suba outro
   escaneado** para provar um pedaco que esse teste ja prova.
+- O worker do OCR sobe com `errorHandler` (`ocr.service.js`). **Nao tire**:
+  sem ele o tesseract.js relanca o erro do worker fora de qualquer promise, e
+  a API inteira cai. A falha na subida (idioma que nao carrega) e rejeitada a
+  mao, porque o `createWorker` a engole e ficaria pendente com a fila parada
+  atras dele. Ela fica guardada ate o processo reiniciar, com um `error` no
+  log, e as paginas sem texto seguem para a revisao. O teste sobe uma
+  instancia com idioma inexistente e paginas em branco, sem pagar o
+  Tesseract.
