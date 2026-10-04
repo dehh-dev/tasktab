@@ -2390,3 +2390,58 @@ conta paralela que concordaria sempre com o banco.
   na hora de exportar.
 - Duplicata não conta como valor a confirmar. Chave ausente não é chave
   inválida: recibo e comanda não têm chave.
+
+---
+
+# M14 — Revisão da segunda rodada
+
+A revisão do PR #26 levantou nove problemas e alguns caminhos sem teste, e
+mediu a cobertura do processo da API durante a suíte (95% das linhas, 88% dos
+ramos). Cada item abaixo tem teste que cai sem a correção.
+
+**Critérios de aceite**
+
+- [x] Anexo I com adiantamento nulo: "Não informado" e saldo sem conta, como a
+      planilha — o zero fazia o formulário assinado mostrar o total inteiro
+      como devido
+- [x] Falha do worker do OCR não derruba a API, e a subida que falha não
+      deixa a fila parada
+- [x] QR e OCR sem rede: `.wasm` e idioma vêm dos pacotes instalados
+- [x] PDF que não abre ou arquivo sumido: a checagem final lista todos, sem
+      500, e as exportações respondem 422 dizendo quais comprovantes
+- [x] Reenviar o PDF devolve ao disco o arquivo que tinha sumido
+- [x] Chave digitada aplica a categoria do emitente sobre o palpite que a tela
+      reenvia ao confirmar
+- [x] Faixa do emitente só com o histórico do mesmo dono
+- [x] Desconto no cupom de posto não vira alarme falso na regra de
+      combustível
+- [x] Reabrir a revisão parte do giro gravado
+- [x] Reprocessar pela tela o que espera revisão
+- [x] `{ access_key: null, cnpj }` aceito no mesmo `PATCH`
+- [x] Testes dos limites do upload, da faixa dentro do intervalo e da
+      validação de campos pela API
+
+**Decidido:** a faixa histórica do emitente vem só dos relatórios do mesmo
+dono, e não de todos com os valores escondidos da mensagem. A mensagem
+continua com o mínimo e o máximo, agora da própria pessoa. O relatório sem
+dono fica com os outros sem dono.
+
+**Como ficou**
+
+- A extração não usa rede. O `.wasm` do zxing vem de `zxing.js`, usado pela
+  leitura e pela fixture, e o idioma vem de `@tesseract.js-data/por`, os mesmos
+  bytes que o jsDelivr servia. `OCR_LANG_PATH` substitui `OCR_CACHE_DIR`. Saiu
+  da raiz o `por.traineddata` de 15 MB, que nada lia. A suíte inteira passou
+  num ambiente em que o jsDelivr é bloqueado.
+- O worker do OCR sobe com `errorHandler`. Sem ele, o tesseract.js relançava o
+  erro fora de qualquer promise e o processo caía. Com ele, a falha na subida
+  é engolida pelo `createWorker`, então a subida rejeita pelo próprio handler.
+  Essa falha fica guardada até o processo reiniciar.
+- Os originais abrem por `pdf-originais.js`, cada arquivo uma vez. "Abre" é o
+  `load` mais o `getPageCount()`, como no upload. O `load` sozinho aceita
+  arquivo sem catálogo.
+- A checagem final monta os PDFs sem serializar e roda as duas partes caras em
+  paralelo.
+
+Ficou de fora: a falha de processamento que vira `failed` (só com injeção de
+falha no banco) e o timeout do OCR continuam sem teste.
