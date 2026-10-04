@@ -404,6 +404,26 @@ describe('PATCH /api/receipts/:id com o emitente lido do proprio comprovante', (
     ]);
   });
 
+  it('remover a chave e informar o cnpj no mesmo PATCH vale', async () => {
+    const receipt = await insertReceipt((await insertReport()).id, {
+      access_key: CHAVE,
+    });
+
+    // A guarda olhava a chave de antes do PATCH, que este mesmo PATCH remove.
+    const response = await patch(receipt, {
+      access_key: null,
+      cnpj: '58.080.015/0001-97',
+    });
+    const emitente = await request(
+      'GET',
+      `/api/merchants/${response.body.data.merchant_id}`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.access_key).toBeNull();
+    expect(emitente.body.data.cnpj).toBe('58080015000197');
+  });
+
   it('cnpj nulo desvincula o emitente', async () => {
     // O CNPJ lido do texto pode ser o da credenciadora do cartao.
     const merchant = await insertMerchant();

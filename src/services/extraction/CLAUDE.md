@@ -59,7 +59,8 @@ nao por deixar de olhar.
   palpite**, senao o cupom de posto saia confirmado como Alimentacao.
 - Sem chave, o `PATCH` aceita `cnpj` e vincula pelo mesmo `classify`;
   `cnpj: null` desvincula, porque o CNPJ do texto pode ser o da credenciadora.
-  Com chave, o CNPJ vem dela, e um digitado e `422`.
+  Com chave, o CNPJ vem dela, e um digitado e `422` — a chave de depois do
+  PATCH: o que remove a chave (`access_key: null`) pode trazer o CNPJ.
 
 ## Categoria
 
