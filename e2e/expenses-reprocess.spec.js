@@ -68,3 +68,34 @@ test('confirmado o descarte, volta a revisao com o que a extracao ler', async ({
   await expect(row).toContainText('Aguardando revisao', { timeout: 15000 });
   await expect(row).toContainText('R$ 37,60');
 });
+
+test('o que espera revisao reprocessa direto, sem dialogo', async ({
+  page,
+  request,
+}) => {
+  // O escaneado de cabeca para baixo chega aqui: gira-se na revisao, e o
+  // reprocessamento e o passo seguinte. Sem o botao, so pela API.
+  const report = await createReport(request, { title: 'Reprocessar revisao' });
+  await addReceipts(request, report.id, [
+    await makeReceiptPdf({ total: '37,60' }),
+  ]);
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Prestacao de Contas' }).click();
+  await page.getByRole('button', { name: report.title }).click();
+
+  const row = page.locator('.list-item');
+  await expect(row).toContainText('Aguardando revisao');
+
+  const reprocessed = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/reprocess') &&
+      response.request().method() === 'POST',
+  );
+  await row.getByRole('button', { name: 'Reprocessar' }).click();
+
+  // Nada foi conferido por uma pessoa: nao ha o que descartar.
+  expect((await reprocessed).status()).toBe(202);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(row).toContainText('Aguardando revisao', { timeout: 15000 });
+});

@@ -64,7 +64,9 @@ linha de uma aba para a contagem da outra em teste E2E. Por isso tambem
     `ConfirmDialog` aberto os dois ficam mudos: o `Escape` e do dialogo, e um
     toque so nao pode cancelar a exclusao **e** fechar a revisao.
   - Reprocessar o que ja foi conferido pede confirmacao antes, porque a
-    extracao regrava data, valor e categoria.
+    extracao regrava data, valor e categoria. O que espera revisao reprocessa
+    direto: e o passo depois de girar a pagina de cabeca para baixo, e o giro
+    gravado vale ao reabrir a revisao.
 - **Descartar um comprovante**: pagina em branco no fim do PDF ou cupom de
   outra viagem nao se resolve na revisao, e um `needs_review` insoluvel trava a
   fila. Nenhum status e bloqueado. A exclusao e definitiva e leva o PDF junto
