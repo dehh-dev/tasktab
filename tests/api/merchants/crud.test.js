@@ -59,6 +59,39 @@ describe('POST /api/merchants', () => {
     );
   });
 
+  it.each([
+    ['estacionamento', 'saiu do enum na issue 40'],
+    ['hospedagem', 'saiu do enum antes'],
+    ['nao_existe', 'nunca existiu'],
+  ])('recusa a categoria %p (%s) com 422 no campo', async (categoria) => {
+    const response = await request('POST', '/api/merchants', {
+      cnpj: CNPJ,
+      name: 'Categoria invalida',
+      default_category: categoria,
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      expect.objectContaining({ field: 'default_category' }),
+    ]);
+  });
+
+  it.each([
+    ['em branco', '   '],
+    ['que nao e texto', 123],
+    ['longo demais', 'x'.repeat(256)],
+  ])('recusa nome %s com 422 no campo', async (caso, nome) => {
+    const response = await request('POST', '/api/merchants', {
+      cnpj: CNPJ,
+      name: nome,
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      expect.objectContaining({ field: 'name' }),
+    ]);
+  });
+
   it('recusa sequencia repetida, que fecha a conta por acidente', async () => {
     const response = await request('POST', '/api/merchants', {
       cnpj: '11111111111111',

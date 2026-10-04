@@ -6,6 +6,7 @@ const {
   findReceipts,
   waitForProcessing,
   leftoverUploads,
+  startApiInstance,
 } = require('../../orchestrator');
 const { makePdf, makeCorruptPdf, makeNonPdf } = require('../../fixtures/pdf');
 
@@ -167,5 +168,78 @@ describe('POST /api/reports/:id/receipts', () => {
     expect(response.body.details).toContainEqual(
       expect.objectContaining({ field: 'files' }),
     );
+  });
+});
+
+/**
+ * Os limites do upload, numa instancia com tetos baixos: com os de verdade
+ * (20 MB, 20 arquivos), provar o estouro custaria mandar 20 MB. Nenhum caso
+ * chega a processar pagina, entao uma instancia serve o arquivo inteiro.
+ */
+describe('POST /api/reports/:id/receipts com os limites do upload', () => {
+  let instance = null;
+
+  beforeAll(async () => {
+    instance = await startApiInstance({
+      UPLOAD_MAX_BYTES: '2000',
+      UPLOAD_MAX_FILES: '2',
+    });
+  }, 70000);
+
+  afterAll(async () => {
+    await instance?.stop();
+  });
+
+  async function enviar(files, options = {}) {
+    const report = await insertReport();
+    const response = await requestUpload(
+      `/api/reports/${report.id}/receipts`,
+      files,
+      { baseUrl: instance.baseUrl, ...options },
+    );
+
+    return { response, receipts: await findReceipts(report.id) };
+  }
+
+  it('arquivo acima do limite e 422 no campo, e nada fica no disco', async () => {
+    const before = leftoverUploads();
+
+    const { response, receipts } = await enviar([
+      { buffer: await makePdf({ pages: 20 }), filename: 'grande.pdf' },
+    ]);
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      { field: 'files', message: 'LIMIT_FILE_SIZE' },
+    ]);
+    expect(receipts).toEqual([]);
+    expect(leftoverUploads()).toEqual(before);
+  });
+
+  it('mais arquivos que o limite e 422 dizendo quantos cabem', async () => {
+    const before = leftoverUploads();
+
+    const { response, receipts } = await enviar(
+      [1, 2, 3].map((page) => ({
+        buffer: Buffer.from(`%PDF-1.7\n% arquivo ${page}\n%%EOF`),
+        filename: `cupom-${page}.pdf`,
+      })),
+    );
+
+    expect(response.status).toBe(422);
+    expect(response.body.message).toBe('Envie no maximo 2 arquivos por vez.');
+    expect(receipts).toEqual([]);
+    expect(leftoverUploads()).toEqual(before);
+  });
+
+  it('arquivo fora do campo files e 422 dizendo o campo', async () => {
+    const { response, receipts } = await enviar(
+      [{ buffer: await makePdf(), filename: 'cupom.pdf' }],
+      { field: 'arquivo' },
+    );
+
+    expect(response.status).toBe(422);
+    expect(response.body.message).toBe('Envie os arquivos no campo "files".');
+    expect(receipts).toEqual([]);
   });
 });

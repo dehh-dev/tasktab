@@ -470,6 +470,47 @@ describe('regra: faixa do emitente', () => {
     );
   });
 
+  it('acusa valor com um digito a menos', async () => {
+    const merchant = await insertMerchant({ default_category: 'alimentacao' });
+    const report = await insertReport();
+    const pagina = await comHistorico(report, merchant.id, [3760, 4860, 4200]);
+
+    // O 3,60 lancado onde o cupom dizia 37,60.
+    await insertReceipt(report.id, {
+      page_number: pagina + 1,
+      merchant_id: merchant.id,
+      amount_cents: 360,
+      status: 'needs_review',
+      issued_at: '2026-06-11',
+      category: 'alimentacao',
+    });
+
+    expect(porRegra(await validar(report.id), 'faixa_emitente')).toHaveLength(
+      1,
+    );
+  });
+
+  it('fica calada com o valor dentro da faixa', async () => {
+    const merchant = await insertMerchant({ default_category: 'alimentacao' });
+    const report = await insertReport();
+    const pagina = await comHistorico(report, merchant.id, [3760, 4860, 4200]);
+
+    // Sem este caso, uma regra que acusasse todo valor com historico passava:
+    // os testes so tinham o digito a mais e a amostra pequena.
+    await insertReceipt(report.id, {
+      page_number: pagina + 1,
+      merchant_id: merchant.id,
+      amount_cents: 5200,
+      status: 'needs_review',
+      issued_at: '2026-06-11',
+      category: 'alimentacao',
+    });
+
+    expect(porRegra(await validar(report.id), 'faixa_emitente')).toHaveLength(
+      0,
+    );
+  });
+
   it('o historico de outra pessoa nao conta, e os valores dela nao aparecem', async () => {
     const merchant = await insertMerchant({ default_category: 'alimentacao' });
     const outra = await createUserWithSession();

@@ -24,3 +24,6 @@ ninguem**; quem barra e `requireScope` / `requireAuth` (`authorize.js`).
 - Em teste o limitador fica desligado; `RATE_LIMIT_ENABLED=true` o religa, e
   `tests/api/rate-limit.test.js` sobe uma instancia propria
   (`startApiInstance`) com tetos baixos. Mexeu nos tetos? E la que se confere.
+- Os limites do upload (`UPLOAD_MAX_BYTES`, `UPLOAD_MAX_FILES`, campo `files`)
+  viram `422` no campo `files` (`upload.js`), sem sobra no disco. O teste sobe
+  uma instancia com tetos baixos, como o do limitador.

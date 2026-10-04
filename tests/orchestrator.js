@@ -596,13 +596,13 @@ async function request(
 async function requestUpload(
   pathname,
   files,
-  { token, baseUrl = BASE_URL } = {},
+  { token, baseUrl = BASE_URL, field = 'files' } = {},
 ) {
   const form = new FormData();
 
   for (const { buffer, filename } of files) {
     form.append(
-      'files',
+      field,
       new Blob([buffer], { type: 'application/pdf' }),
       filename,
     );
