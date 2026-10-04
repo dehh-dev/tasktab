@@ -28,6 +28,10 @@ const FIRST_DATA_ROW = 32;
 const LAST_DATA_ROW = 100;
 const MAX_ROWS = LAST_DATA_ROW - FIRST_DATA_ROW + 1;
 
+// Adiantamento recebido e o saldo, que no template e formula sobre ele.
+const ADVANCE_CELL = 'C3';
+const BALANCE_CELL = 'C4';
+
 /**
  * Coluna de valor de cada categoria, no mapa do formulario versao 19 descrito
  * pelo procedimento de prestacao de contas: O Passagens, Q Taxi/Conducoes,
@@ -115,10 +119,22 @@ async function fillAnexoI(report, receipts) {
     });
   });
 
-  sheetXml = setCell(sheetXml, 'C3', {
-    type: 'number',
-    value: (report.advance_cents ?? 0) / 100,
-  });
+  // Nulo e "nao informado" (issue 44): sem adiantamento nao ha saldo, e o
+  // formulario diz isso, como a planilha. Com o zero no lugar, a formula do
+  // saldo mostrava o total inteiro como devido num documento que vai assinado.
+  // Zero e "nao houve", e segue como numero.
+  if (report.advance_cents === null) {
+    sheetXml = setCell(sheetXml, ADVANCE_CELL, {
+      type: 'string',
+      value: 'Não informado',
+    });
+    sheetXml = setCell(sheetXml, BALANCE_CELL, { type: 'string', value: '—' });
+  } else {
+    sheetXml = setCell(sheetXml, ADVANCE_CELL, {
+      type: 'number',
+      value: report.advance_cents / 100,
+    });
+  }
 
   zip.file(SHEET_PATH, sheetXml);
 

@@ -19,6 +19,10 @@ por categoria (`pdf-por-categoria.service.js`).
 - O regex de `setCell` usa quantificador **preguicoso** nos atributos
   (`[^>]*?`). O guloso consome o `/` de uma celula autofechada e apaga a
   seguinte — ja aconteceu. **Nao volte para guloso.**
+- **Adiantamento nulo nao vira zero**: C3 recebe "Não informado" e o saldo
+  (C4, formula no template) recebe "—". Com o zero, o formulario assinado
+  mostrava o total inteiro como saldo devido. Ao trocar pelo oficial, confira
+  onde ficam essas duas celulas.
 
 ## Planilhas
 

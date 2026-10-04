@@ -236,7 +236,9 @@ abrem-e-regravam um `.xlsx` perdem o que nao sabem representar — foi assim que
 a lista suspensa de um template oficial sumiu, na conferencia manual que
 originou este projeto. Aqui `src/services/export/xlsx-cell-patch.js` troca so
 as celulas de dado direto no XML da planilha; estilo, formula,
-`dataValidations` e `mergeCells` sobrevivem byte a byte.
+`dataValidations` e `mergeCells` sobrevivem byte a byte. Com o adiantamento
+nao informado, o formulario diz "Não informado" e deixa o saldo sem conta, como
+a planilha — o zero no lugar fazia o saldo mostrar o total inteiro como devido.
 
 > **O template em `assets/anexo-i-template.xlsx` e SINTETICO, nao o formulario
 > oficial**, que nao existe neste projeto. O sintetico (gerado por

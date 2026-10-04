@@ -62,6 +62,47 @@ describe('GET /api/reports/:id/export/anexo-i.xlsx', () => {
     });
   });
 
+  it.each([
+    [150000, 1500],
+    [0, 0],
+  ])(
+    'adiantamento de %p centavos sai como numero, e o saldo segue formula',
+    async (advance, reais) => {
+      const report = await insertReport({ advance_cents: advance });
+      await insertReceipt(report.id, {
+        issued_at: '2026-06-19',
+        amount_cents: 3760,
+        category: 'alimentacao',
+        status: 'confirmed',
+      });
+
+      const { workbook } = await loadAnexo(report.id);
+      const sheet = workbook.getWorksheet('Anexo I');
+
+      expect(sheet.getCell('C3').value).toBe(reais);
+      expect(sheet.getCell('C4').value).toEqual({ formula: 'C3-Y101' });
+    },
+  );
+
+  it('adiantamento nao informado nao vira zero, e o saldo nao e calculado', async () => {
+    const report = await insertReport({ advance_cents: null });
+    await insertReceipt(report.id, {
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
+      category: 'alimentacao',
+      status: 'confirmed',
+    });
+
+    const { response, workbook } = await loadAnexo(report.id);
+    const sheet = workbook.getWorksheet('Anexo I');
+
+    // Com o zero no lugar, a formula do saldo mostrava o total inteiro como
+    // devido — no documento que vai assinado.
+    expect(response.status).toBe(200);
+    expect(sheet.getCell('C3').value).toBe('Não informado');
+    expect(sheet.getCell('C4').value).toBe('—');
+  });
+
   it('cada categoria vai para a coluna do formulario versao 19', async () => {
     const report = await insertReport();
 
