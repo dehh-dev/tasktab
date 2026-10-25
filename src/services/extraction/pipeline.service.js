@@ -73,9 +73,11 @@ async function processFile({ buffer, receipts, log }) {
  * vale mais. Uma chave que nao fecha o DV e descartada nos dois casos — nao ha
  * meio termo entre confiar e nao confiar num identificador com verificador.
  */
-async function findAccessKey({ buffer, pageNumber, text, log }) {
+async function findAccessKey({ buffer, pageNumber, text, render, log }) {
   try {
-    const fromQr = await qrService.readAccessKey(buffer, pageNumber);
+    const fromQr = await qrService.readAccessKey(buffer, pageNumber, {
+      png: await render(),
+    });
 
     if (fromQr) {
       return { value: fromQr, source: 'qr', confidence: QR_CONFIDENCE };
@@ -99,17 +101,33 @@ async function processPage(receipt, page, { buffer, log }) {
   let source = text ? 'text' : null;
   let ocrConfidence = null;
 
+  // A pagina e renderizada uma vez e serve ao QR e ao OCR. Eram duas
+  // renderizacoes a 3x por pagina escaneada: em Avare, 3 a 4 s cada, de uns
+  // 12 s por pagina. A promise guardada tambem guarda a falha, e quem a
+  // recebe trata como tratava a propria.
+  let rendered = null;
+  const render = () => {
+    rendered ??= qrService.renderPageToPng(buffer, receipt.page_number);
+    return rendered;
+  };
+
   const key = await findAccessKey({
     buffer,
     pageNumber: receipt.page_number,
     text: text ?? '',
+    render,
     log,
   });
 
   // Ultimo degrau da cascata: sem camada de texto, tenta ler a imagem.
   if (!text) {
-    const scanned = await ocrService
-      .readPage(buffer, receipt.page_number, { rotation: receipt.rotation })
+    const scanned = await render()
+      .then((png) =>
+        ocrService.readPage(buffer, receipt.page_number, {
+          rotation: receipt.rotation,
+          png,
+        }),
+      )
       .catch((error) => {
         log?.warn(
           { err: error, receipt_id: receipt.id },
@@ -133,7 +151,11 @@ async function processPage(receipt, page, { buffer, log }) {
     return;
   }
 
-  const { fields } = parsers.parse(text ?? '');
+  // Com a chave validada, o mes dela escolhe a data entre as que o papel traz
+  // (ver `extractDate`). Ela nao inventa data: so desempata as que foram lidas.
+  const { fields } = parsers.parse(text ?? '', {
+    period: key ? accessKey.parse(key.value)?.issuedPeriod : null,
+  });
 
   if (key) {
     fields.access_key = key;

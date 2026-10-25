@@ -22,7 +22,7 @@ function matches() {
   return true;
 }
 
-function parse(text) {
+function parse(text, { period = null } = {}) {
   const fields = {};
 
   const amount = normalize.extractTotal(text);
@@ -52,7 +52,7 @@ function parse(text) {
     fields.city = { value: city, source: 'text', confidence: CONFIDENCE };
   }
 
-  const issuedAt = normalize.extractDate(text);
+  const issuedAt = normalize.extractDate(text, { period });
   if (issuedAt !== null) {
     fields.issued_at = {
       value: issuedAt,

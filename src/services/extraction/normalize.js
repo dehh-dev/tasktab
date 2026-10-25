@@ -22,6 +22,14 @@ const TOTAL_ANCHORS = [
   /total\s+geral\s*(?:r\$\s*)?/i,
   /total\s*r\$\s*/i,
   /total\s*:\s*(?:r\$\s*)?/i,
+  // Comprovante de maquininha (Stone, Rede, Cielo) nao imprime "total": o valor
+  // cobrado vem colado na forma de pagamento ("DÉBITO R$ 146,50") ou num
+  // "VALOR: 96,53". Ficam no fim da lista para a NFC-e que traga o comprovante
+  // do cartao junto continuar respondendo pela propria ancora. O "R$" e
+  // obrigatorio depois de debito/credito: a linha "Cartão de Débito Outros
+  // 77,60" da NFC-e e forma de pagamento, nao ancora.
+  /(?:d[ée]bito|cr[ée]dito)(?:\s+[àa]\s+vista)?\s*r\$\s*/i,
+  /\bvalor\s*:\s*(?:r\$\s*)?/i,
 ];
 
 // Um numero monetario. A ordem das alternativas importa: a forma com milhar
@@ -237,19 +245,9 @@ function firstDate(text) {
   return null;
 }
 
-/**
- * Data do documento, **ancorada em palavra-chave** — mesma disciplina do
- * `extractTotal`, e pelo mesmo motivo: sem ancora, ganha o numero que estiver
- * mais acima na pagina, que nao tem relacao nenhuma com o numero certo.
- *
- * Sem ancora nenhuma, a primeira data plausivel ainda e melhor que nada: o
- * campo vem preenchido e a revisao confere. Devolver `null` obrigaria a
- * digitar do zero justamente no cupom que o OCR ja leu pior.
- */
-function extractDate(text) {
-  if (typeof text !== 'string') {
-    return null;
-  }
+/** Datas ancoradas, na ordem de confianca das ancoras. */
+function anchoredDates(text) {
+  const found = [];
 
   for (const anchor of DATE_ANCHORS) {
     for (const { regex } of DATE_PATTERNS) {
@@ -260,12 +258,66 @@ function extractDate(text) {
       const parsed = match ? parseDate(match[1]) : null;
 
       if (parsed !== null) {
-        return parsed;
+        found.push(parsed);
       }
     }
   }
 
-  return firstDate(text);
+  return found;
+}
+
+/** Toda data plausivel do texto, na ordem em que aparece. */
+function everyDate(text) {
+  const found = [];
+
+  for (const { regex } of DATE_PATTERNS) {
+    for (const match of text.matchAll(new RegExp(regex.source, 'g'))) {
+      const parsed = parseDate(match[0]);
+
+      if (parsed !== null) {
+        found.push({ at: match.index, value: parsed });
+      }
+    }
+  }
+
+  return found.sort((a, b) => a.at - b.at).map(({ value }) => value);
+}
+
+/**
+ * Data do documento, **ancorada em palavra-chave** — mesma disciplina do
+ * `extractTotal`, e pelo mesmo motivo: sem ancora, ganha o numero que estiver
+ * mais acima na pagina, que nao tem relacao nenhuma com o numero certo.
+ *
+ * Sem ancora nenhuma, a primeira data plausivel ainda e melhor que nada: o
+ * campo vem preenchido e a revisao confere. Devolver `null` obrigaria a
+ * digitar do zero justamente no cupom que o OCR ja leu pior.
+ *
+ * Com `period` (`YYYY-MM`, o mes da chave de acesso que fechou o DV), vale a
+ * primeira data que concorda com ele, ancorada ou nao. A NFC-e imprime a data
+ * duas vezes, e quando o OCR erra a da autorizacao a outra costuma estar
+ * certa: num cupom de Avare a autorizacao saiu `19/10/2006` e a linha do
+ * documento, `19/10/2026`. A chave so diz ano e mes — o dia continua vindo do
+ * papel —, entao ela escolhe entre as datas lidas e nunca inventa uma. Se
+ * nenhuma concorda, a resposta e a de sempre, e a regra `chave_mes` aponta.
+ */
+function extractDate(text, { period = null } = {}) {
+  if (typeof text !== 'string') {
+    return null;
+  }
+
+  const anchored = anchoredDates(text);
+
+  if (period) {
+    const agreeing = [...anchored, ...everyDate(text)].find((date) =>
+      date.startsWith(`${period}-`),
+    );
+
+    if (agreeing) {
+      return agreeing;
+    }
+  }
+
+  return anchored[0] ?? firstDate(text);
 }
 
 const UFS = [
@@ -408,6 +460,15 @@ function extractCnpj(text) {
 const ITEM_LINE =
   /^\s*\d{1,4}\s+.+?\s+\d+(?:[.,]\d+)?\s*(?:UN|KG|PC|LT|CX|DZ|MT)\b.*?(\d{1,3}(?:\.\d{3})*(?:,\d{2})|\d+,\d{2})\s*$/i;
 
+// Segunda linha do item quando o cupom o imprime em duas: a descricao vem numa
+// linha (`001 765 CITRUS LATA`) e a conta na seguinte (`1 UN X 8,00 8,00`,
+// `0,51 KG X 99,90 51,35`, `1,000 UN x 56,9000 = 56,90`). E o layout dos
+// restaurantes de Avare, em que a soma dos itens nunca chegou a ser conferida.
+// A linha abre pela quantidade — `l`, `I` e `|` entram porque e assim que o OCR
+// le o `1` isolado — e exige unidade, o `x` e o preco unitario antes do total.
+const ITEM_DETAIL_LINE =
+  /^[^\S\n]*(?:\d{1,4}[^\S\n]+)?(?:\d{1,4}(?:[.,]\d{1,3})?|[lI|])[^\S\n]*(?:UN|KG|PC|LT|CX|DZ|MT)\b[^\S\n]*[x*][^\S\n]*(?:R\$[^\S\n]*)?\d{1,5}(?:[.,]\d{1,4})?[^\S\n]*(?:[=:][^\S\n]*)?(?:R\$[^\S\n]*)?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})[^\S\n]*$/i;
+
 /**
  * Valores dos itens listados no cupom, em centavos.
  *
@@ -423,10 +484,42 @@ function extractItemTotals(text) {
 
   return text
     .split('\n')
-    .map((line) => line.match(ITEM_LINE))
+    .map((line) => line.match(ITEM_LINE) ?? line.match(ITEM_DETAIL_LINE))
     .filter(Boolean)
     .map((match) => parseAmountToCents(match[1]))
     .filter((cents) => cents !== null);
+}
+
+// "QTD. TOTAL DE ITENS 001", "Qtde. total de itens 2". O que vier sujo
+// ("no:", "00<") nao e contagem.
+const ITEM_COUNT =
+  /(?:\bqtde?\.?|\bquantidade)[^\S\n]*total[^\S\n]*de[^\S\n]*itens[^\d\n]{0,4}(\d{1,3})(?!\d)/i;
+
+// Numero de ordem que abre a linha do item: `003 752 BUFFET POR KILO`,
+// `002 SUCO NATURAL 2 UN 5,80 11,60`.
+const ITEM_SEQUENCE = /^[^\S\n]*(0\d\d)[^\S\n]+\S/;
+
+/**
+ * Quantos itens o cupom diz ter, ou `null` se o papel nao deixa saber.
+ *
+ * Vale a contagem impressa. Sem ela, o maior numero de ordem lido e um piso:
+ * se o `003` aparece, ha pelo menos tres itens, mesmo que o OCR tenha perdido
+ * a linha do `001`. E o que impede a soma de dois itens de tres de virar
+ * alarme contra um total certo.
+ */
+function extractItemCount(text) {
+  if (typeof text !== 'string') {
+    return { printed: null, atLeast: 0 };
+  }
+
+  const printed = Number(text.match(ITEM_COUNT)?.[1] ?? 0) || null;
+
+  const atLeast = text
+    .split('\n')
+    .map((line) => Number(line.match(ITEM_SEQUENCE)?.[1] ?? 0))
+    .reduce((max, sequence) => Math.max(max, sequence), 0);
+
+  return { printed, atLeast };
 }
 
 /**
@@ -563,6 +656,7 @@ module.exports = {
   extractCity,
   extractCnpj,
   extractItemTotals,
+  extractItemCount,
   extractFuelLines,
   extractDiscounts,
 };

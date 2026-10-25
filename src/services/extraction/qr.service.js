@@ -93,10 +93,13 @@ async function decode(imageData) {
  * O texto do QR e uma URL; a chave sai dela por qualquer sequencia de 44
  * digitos que feche o DV. Um QR ilegivel devolve `null` sem estourar — quem
  * chama cai para a leitura do texto impresso.
+ *
+ * `png` e a pagina ja renderizada a `RENDER_SCALE`, quando quem chama vai usa-la
+ * tambem no OCR: a renderizacao custa tanto quanto a decodificacao.
  */
-async function readAccessKey(buffer, pageNumber) {
-  const png = await renderPageToPng(buffer, pageNumber);
-  const imageData = await preprocess(png);
+async function readAccessKey(buffer, pageNumber, { png = null } = {}) {
+  const image = png ?? (await renderPageToPng(buffer, pageNumber));
+  const imageData = await preprocess(image);
   const texts = await decode(imageData);
 
   for (const text of texts) {

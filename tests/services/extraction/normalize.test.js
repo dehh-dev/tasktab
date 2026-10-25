@@ -6,6 +6,8 @@ const {
   extractTotal,
   extractDate,
   extractCnpj,
+  extractItemTotals,
+  extractItemCount,
   extractFuelLines,
   extractDiscounts,
 } = require('../../../src/services/extraction/normalize');
@@ -240,5 +242,143 @@ describe('extractDiscounts', () => {
     expect(extractDiscounts('DESC ITEM 5,00\nDescontos R$ 5,00')).toEqual([
       500, 500,
     ]);
+  });
+});
+
+// Texto sintetico no desenho dos cupons de restaurante de Avare: o item sai em
+// duas linhas, a descricao numa e a conta na seguinte, com os erros de leitura
+// que o OCR cometeu la ("L UN" no lugar de "1 UN", ":" no lugar de "=").
+function cupomEmDuasLinhas(...linhas) {
+  return [
+    'CNPJ: 11.222.333/0001-81 CANTINA EXEMPLO',
+    'CODIGO DESCRICAO',
+    'QTDE UN x VL UNIT = VL TOTAL',
+    ...linhas,
+  ].join('\n');
+}
+
+describe('extractItemTotals com o item em duas linhas', () => {
+  const casos = [
+    ['001 765 REFRIGERANTE LATA\n1 UN X 8,00 8,00', [800]],
+    ['002 752 BUFFET POR KILO\n0,51 KG X 99,90 51,35', [5135]],
+    ['RISOTO DA CASA\n36 1,000 UN x 56,9000 = 56,90', [5690]],
+    ['SUCO NATURAL\n2000 UN x 8,0000 : 16,00', [1600]],
+    ['001 112 PRATO EXECUTIVO\nL UN X 77,60 77,60', [7760]],
+    ['001 113 AGUA\n| UN X 4,00 4,00', [400]],
+  ];
+
+  it.each(casos)('%s', (linhas, esperado) => {
+    expect(extractItemTotals(cupomEmDuasLinhas(linhas))).toEqual(esperado);
+  });
+
+  it('nao le como item a linha de pagamento nem a de total', () => {
+    const texto = cupomEmDuasLinhas(
+      '001 765 REFRIGERANTE LATA',
+      '1 UN X 8,00 8,00',
+      'VALOR TOTAL R$ 8,00',
+      'Cartao de Debito 8,00',
+      'QTD. TOTAL DE ITENS 001',
+    );
+
+    expect(extractItemTotals(texto)).toEqual([800]);
+  });
+
+  it('continua lendo o item numa linha so, sem contar duas vezes', () => {
+    expect(
+      extractItemTotals('001 REFEICAO COMERCIAL 1 UN X 20,00 20,00'),
+    ).toEqual([2000]);
+  });
+});
+
+describe('extractItemCount', () => {
+  const casos = [
+    ['QTD. TOTAL DE ITENS 001', 1],
+    ['Qtde. total de itens 2', 2],
+    ['QTD. ToTAL DE ITENS 003 |', 3],
+    ['Quantidade total de itens: 4', 4],
+    // Sujeira do OCR nao e contagem: "no:" e "00<" sairam de cupons reais.
+    ['QTD. TOTAL DE ITENS no:', null],
+    ['QTD. TOTAL DE ITENS 00<', null],
+    ['VALOR TOTAL R$ 75,08', null],
+  ];
+
+  it.each(casos)('%s -> %p impresso', (linha, esperado) => {
+    expect(extractItemCount(linha).printed).toBe(esperado);
+  });
+
+  it('usa o maior numero de ordem lido como piso', () => {
+    // A linha do 001 se perdeu; o 003 ainda prova que eram tres itens.
+    const texto = cupomEmDuasLinhas(
+      '002 771 GOMA DE MASCAR',
+      '1 UN X 4,00 4,00',
+      '003 752 BUFFET POR KILO',
+      '0,51 KG X 99,90 51,35',
+    );
+
+    expect(extractItemCount(texto)).toEqual({ printed: null, atLeast: 3 });
+  });
+
+  it('nao conta telefone nem linha que comeca por zeros', () => {
+    expect(extractItemCount('000 Fone: (14)3700-0000').atLeast).toBe(0);
+  });
+});
+
+describe('extractTotal em comprovante de maquininha', () => {
+  const casos = [
+    ['| DEBITO R$ 200,00 |', 20000],
+    ['DÉBITO R$ 146,50', 14650],
+    ['CREDITO A VISTA R$ 89,90', 8990],
+    ['CONPROV: 334656088 VALOR: 96,53', 9653],
+  ];
+
+  it.each(casos)('%s', (linha, esperado) => {
+    expect(extractTotal(`VIA CLIENTE\n${linha}\nAPROVADO`)).toBe(esperado);
+  });
+
+  it('a ancora do cupom fiscal ganha da forma de pagamento', () => {
+    // NFC-e com o comprovante do cartao grampeado: o total vem da nota.
+    const texto = [
+      'VALOR TOTAL R$ 77,60',
+      'Cartao de Debito R$ 80,00',
+      'VALOR: 80,00',
+    ].join('\n');
+
+    expect(extractTotal(texto)).toBe(7760);
+  });
+
+  it('forma de pagamento sem R$ nao e ancora', () => {
+    expect(extractTotal('Cartao de Debito Outros 77,60')).toBeNull();
+  });
+});
+
+describe('extractDate guiada pelo mes da chave', () => {
+  // A autorizacao saiu com o ano errado; a linha do documento, certa.
+  const texto = [
+    'NFC-e n 000012321 Serie 001 19/10/2026 20:24:56',
+    'Data de Autorizacao 19/10/2006 20:25:10',
+  ].join('\n');
+
+  it('sem a chave, vale a ancora da autorizacao, como sempre', () => {
+    expect(extractDate(texto)).toBe('2006-10-19');
+  });
+
+  it('com a chave, vale a primeira data do mes dela', () => {
+    expect(extractDate(texto, { period: '2026-10' })).toBe('2026-10-19');
+  });
+
+  it('entre datas do mesmo mes, a ancora continua decidindo', () => {
+    const doisDias = [
+      'NFC-e n 000007315 Serie 001 15/10/2026 12:47:10',
+      'Data de Autorizacao 18/10/2026 12:47:30',
+    ].join('\n');
+
+    expect(extractDate(doisDias, { period: '2026-10' })).toBe('2026-10-18');
+  });
+
+  it('nao inventa data quando nenhuma concorda com a chave', () => {
+    // A regra `chave_mes` aponta; a extracao nao troca o papel pela chave.
+    expect(extractDate('Emissao 29/10/2996', { period: '2026-10' })).toBe(
+      '2996-10-29',
+    );
   });
 });
