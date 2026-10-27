@@ -4,13 +4,17 @@ const {
   parseAmountToCents,
   parseDate,
   extractTotal,
+  extractCardTotal,
   extractDate,
   extractCnpj,
   extractItemTotals,
   extractItemCount,
   extractFuelLines,
   extractDiscounts,
+  extractSurcharges,
+  hasUnreadAdjustment,
 } = require('../../../src/services/extraction/normalize');
+const parsers = require('../../../src/services/extraction/parsers');
 
 describe('parseAmountToCents', () => {
   // Tabela com os formatos reais ja vistos nos emitentes do caso-base.
@@ -283,6 +287,13 @@ describe('extractItemTotals com o item em duas linhas', () => {
     expect(extractItemTotals(texto)).toEqual([800]);
   });
 
+  it('nao parte o preco unitario quando o OCR perdeu o total da linha', () => {
+    // Sem espaco entre preco e total, `18,00` virava o preco `1` e o total
+    // `8,00` — um item que o papel nao tem.
+    expect(extractItemTotals(cupomEmDuasLinhas('1 UN X 18,00'))).toEqual([]);
+    expect(extractItemTotals(cupomEmDuasLinhas('2 UN X 12,50'))).toEqual([]);
+  });
+
   it('continua lendo o item numa linha so, sem contar duas vezes', () => {
     expect(
       extractItemTotals('001 REFEICAO COMERCIAL 1 UN X 20,00 20,00'),
@@ -320,10 +331,12 @@ describe('extractItemCount', () => {
 
   it('nao conta telefone nem linha que comeca por zeros', () => {
     expect(extractItemCount('000 Fone: (14)3700-0000').atLeast).toBe(0);
+    expect(extractItemCount('085 3333-4444').atLeast).toBe(0);
+    expect(extractItemCount('014 99876 5432').atLeast).toBe(0);
   });
 });
 
-describe('extractTotal em comprovante de maquininha', () => {
+describe('total do comprovante de maquininha', () => {
   const casos = [
     ['| DEBITO R$ 200,00 |', 20000],
     ['DÉBITO R$ 146,50', 14650],
@@ -332,22 +345,51 @@ describe('extractTotal em comprovante de maquininha', () => {
   ];
 
   it.each(casos)('%s', (linha, esperado) => {
-    expect(extractTotal(`VIA CLIENTE\n${linha}\nAPROVADO`)).toBe(esperado);
+    const texto = `VIA CLIENTE\n${linha}\nAPROVADO`;
+
+    expect(extractCardTotal(texto)).toBe(esperado);
+    // Fora da leitura estrita: la ele venceria o passe tolerante do cupom.
+    expect(extractTotal(texto)).toBeNull();
   });
 
   it('a ancora do cupom fiscal ganha da forma de pagamento', () => {
     // NFC-e com o comprovante do cartao grampeado: o total vem da nota.
     const texto = [
+      'NFC-e',
       'VALOR TOTAL R$ 77,60',
       'Cartao de Debito R$ 80,00',
       'VALOR: 80,00',
     ].join('\n');
 
-    expect(extractTotal(texto)).toBe(7760);
+    expect(parsers.parse(texto).fields.amount_cents.value).toBe(7760);
+  });
+
+  it('o total sujo do cupom ganha do pago em dinheiro, e chega destacado', () => {
+    // Pago em dinheiro, o "VALOR:" e o que foi entregue, com troco. O total
+    // sujo vem do passe tolerante, com a confianca que pede conferencia.
+    const texto = [
+      'NFC-e',
+      '.. VALOR TOTAL Ri 2... 225,49',
+      'DINHEIRO VALOR: 300,00',
+    ].join('\n');
+
+    expect(parsers.parse(texto).fields.amount_cents).toMatchObject({
+      value: 22549,
+      confidence: 0.3,
+    });
+  });
+
+  it('sem ancora de total, vale a forma de pagamento, sem a confianca da NFC-e', () => {
+    const texto = ['NFC-e', 'DEBITO R$ 146,50'].join('\n');
+
+    expect(parsers.parse(texto).fields.amount_cents).toMatchObject({
+      value: 14650,
+      confidence: 0.6,
+    });
   });
 
   it('forma de pagamento sem R$ nao e ancora', () => {
-    expect(extractTotal('Cartao de Debito Outros 77,60')).toBeNull();
+    expect(extractCardTotal('Cartao de Debito Outros 77,60')).toBeNull();
   });
 });
 
@@ -375,10 +417,50 @@ describe('extractDate guiada pelo mes da chave', () => {
     expect(extractDate(doisDias, { period: '2026-10' })).toBe('2026-10-18');
   });
 
+  it('so troca pela gemea do mesmo dia, nao por garantia ou vencimento', () => {
+    // A data do mes da chave sem relacao com a emissao nao e gemea dela: a
+    // emissao continua, e a regra `chave_mes` aponta a divergencia.
+    const garantia = [
+      'Emissao 21/11/2026',
+      'Vencimento da garantia 05/10/2026',
+    ].join('\n');
+
+    expect(extractDate(garantia, { period: '2026-10' })).toBe('2026-11-21');
+  });
+
   it('nao inventa data quando nenhuma concorda com a chave', () => {
     // A regra `chave_mes` aponta; a extracao nao troca o papel pela chave.
     expect(extractDate('Emissao 29/10/2996', { period: '2026-10' })).toBe(
       '2996-10-29',
     );
+  });
+});
+
+describe('acrescimos e ajustes ilegiveis', () => {
+  const casos = [
+    ['Taxa de servico 10% 7,00', [700]],
+    ['Servico 7,00', [700]],
+    ['Acrescimo R$ 2,00', [200]],
+    ['Couvert artistico 15,00', [1500]],
+    ['(+) Gorjeta 5,00', [500]],
+    // Item com a palavra no meio nao e acrescimo.
+    ['001 PRATO A SERVICO 1 UN X 20,00 20,00', []],
+  ];
+
+  it.each(casos)('%s', (linha, esperado) => {
+    expect(extractSurcharges(linha)).toEqual(esperado);
+  });
+
+  it('aponta a linha de ajuste cujo valor nao se le', () => {
+    expect(hasUnreadAdjustment('Taxa de servico 10% ..')).toBe(true);
+    expect(hasUnreadAdjustment('DESCONTO R$ -,--')).toBe(true);
+  });
+
+  it('nao aponta ajuste legivel nem palavra que so comeca igual', () => {
+    expect(hasUnreadAdjustment('Taxa de servico 7,00\nDesconto 1,00')).toBe(
+      false,
+    );
+    expect(hasUnreadAdjustment('DESCRICAO QTD UN')).toBe(false);
+    expect(hasUnreadAdjustment('Ganhe desconto no proximo pedido')).toBe(false);
   });
 });

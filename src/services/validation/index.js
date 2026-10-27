@@ -222,6 +222,11 @@ function checkAccessKeyFields(receipts) {
  * de `R$ 77,60` apareceu em Avare. Sem contagem, sao ao menos dois itens e
  * nenhum a menos que o maior numero de ordem lido: com tres itens no papel e
  * dois lidos, a soma ficaria R$ 4,00 abaixo de um total que podia estar certo.
+ *
+ * Desconto e acrescimo impressos entram na conta, como na regra do
+ * combustivel: o prato de R$ 70,00 com R$ 7,00 de servico fecha em R$ 77,00,
+ * e acusar esse total seria alarme falso. Linha de ajuste sem valor legivel
+ * cala a regra — sem ela nao ha conta que feche com certeza.
  */
 function checkItemSum(receipts) {
   return receipts.flatMap((receipt) => {
@@ -237,13 +242,25 @@ function checkItemSum(receipts) {
         ? items.length >= Math.max(2, atLeast)
         : items.length === printed;
 
-    if (!complete) {
+    if (!complete || normalize.hasUnreadAdjustment(receipt.raw_text)) {
       return [];
     }
 
-    const sum = items.reduce((total, cents) => total + cents, 0);
+    const sumOf = (list) => list.reduce((acc, cents) => acc + cents, 0);
+    const sum = sumOf(items);
+    const discounts = normalize.extractDiscounts(receipt.raw_text);
+    const surcharges = normalize.extractSurcharges(receipt.raw_text);
 
-    if (sum === receipt.amount_cents) {
+    // Como no combustivel, o mesmo ajuste as vezes sai duas vezes (no item e
+    // no resumo), entao vale tambem cada um sozinho.
+    const accepted = [
+      sum,
+      sum - sumOf(discounts) + sumOf(surcharges),
+      ...discounts.map((cents) => sum - cents),
+      ...surcharges.map((cents) => sum + cents),
+    ];
+
+    if (accepted.includes(receipt.amount_cents)) {
       return [];
     }
 

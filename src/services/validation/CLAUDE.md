@@ -16,7 +16,11 @@ que assina. **Alerta nao bloqueia nada.**
   ao menos dois e nenhum a menos que o maior numero de ordem lido. Medido em
   Avare: pegou os 3 totais lidos errado em que o OCR leu todos os itens, e se
   calou no cupom de tres itens com dois lidos — ali a soma ficaria R$ 4,00
-  abaixo de um total que podia estar certo.
+  abaixo de um total que podia estar certo. Desconto e acrescimo impressos
+  (`extractDiscounts`, `extractSurcharges`: servico, couvert, gorjeta) entram
+  na conta como no combustivel, e linha de ajuste sem valor legivel
+  (`hasUnreadAdjustment`) cala a regra: com um item so, a taxa de servico
+  acusava um total certo.
 - **Nenhuma regra vai ao banco** (issue 52). O que precisa dele vem numa
   consulta do relatorio inteiro, no `Promise.all` do `validateReport`, e a
   regra recebe o resultado. Uma consulta por comprovante eram 80 num

@@ -22,12 +22,17 @@ const TOTAL_ANCHORS = [
   /total\s+geral\s*(?:r\$\s*)?/i,
   /total\s*r\$\s*/i,
   /total\s*:\s*(?:r\$\s*)?/i,
-  // Comprovante de maquininha (Stone, Rede, Cielo) nao imprime "total": o valor
-  // cobrado vem colado na forma de pagamento ("DÉBITO R$ 146,50") ou num
-  // "VALOR: 96,53". Ficam no fim da lista para a NFC-e que traga o comprovante
-  // do cartao junto continuar respondendo pela propria ancora. O "R$" e
-  // obrigatorio depois de debito/credito: a linha "Cartão de Débito Outros
-  // 77,60" da NFC-e e forma de pagamento, nao ancora.
+];
+
+// Comprovante de maquininha (Stone, Rede, Cielo) nao imprime "total": o valor
+// cobrado vem colado na forma de pagamento ("DEBITO R$ 146,50") ou num
+// "VALOR: 96,53". Ficam fora de `TOTAL_ANCHORS`, num passe proprio
+// (`extractCardTotal`) que so roda quando nem a leitura estrita nem a tolerante
+// acharam o total: numa NFC-e paga em dinheiro, "VALOR: 300,00" e o que foi
+// entregue, com troco, e venceria o total sujo que o passe tolerante ainda le.
+// O "R$" e obrigatorio depois de debito/credito: a linha "Cartao de Debito
+// Outros 77,60" da NFC-e e forma de pagamento, nao ancora.
+const CARD_ANCHORS = [
   /(?:d[ée]bito|cr[ée]dito)(?:\s+[àa]\s+vista)?\s*r\$\s*/i,
   /\bvalor\s*:\s*(?:r\$\s*)?/i,
 ];
@@ -182,13 +187,25 @@ function parseDate(input) {
  * total do cupom virava `001` — R$ 1,00 no lugar de R$ 165,00.
  */
 function extractTotal(text) {
+  return firstAnchoredAmount(text, TOTAL_ANCHORS);
+}
+
+/**
+ * Total do comprovante de maquininha, pela forma de pagamento. Terceiro passe,
+ * depois do estrito e do tolerante — ver `CARD_ANCHORS`.
+ */
+function extractCardTotal(text) {
+  return firstAnchoredAmount(text, CARD_ANCHORS);
+}
+
+function firstAnchoredAmount(text, anchors) {
   if (typeof text !== 'string') {
     return null;
   }
 
   const lines = text.split('\n');
 
-  for (const anchor of TOTAL_ANCHORS) {
+  for (const anchor of anchors) {
     const regex = new RegExp(anchor.source + `(${AMOUNT.source})`, 'i');
 
     for (const line of lines) {
@@ -245,10 +262,8 @@ function firstDate(text) {
   return null;
 }
 
-/** Datas ancoradas, na ordem de confianca das ancoras. */
-function anchoredDates(text) {
-  const found = [];
-
+/** Primeira data ancorada, na ordem de confianca das ancoras. */
+function firstAnchoredDate(text) {
   for (const anchor of DATE_ANCHORS) {
     for (const { regex } of DATE_PATTERNS) {
       const match = text.match(
@@ -258,12 +273,12 @@ function anchoredDates(text) {
       const parsed = match ? parseDate(match[1]) : null;
 
       if (parsed !== null) {
-        found.push(parsed);
+        return parsed;
       }
     }
   }
 
-  return found;
+  return null;
 }
 
 /** Toda data plausivel do texto, na ordem em que aparece. */
@@ -292,32 +307,32 @@ function everyDate(text) {
  * campo vem preenchido e a revisao confere. Devolver `null` obrigaria a
  * digitar do zero justamente no cupom que o OCR ja leu pior.
  *
- * Com `period` (`YYYY-MM`, o mes da chave de acesso que fechou o DV), vale a
- * primeira data que concorda com ele, ancorada ou nao. A NFC-e imprime a data
- * duas vezes, e quando o OCR erra a da autorizacao a outra costuma estar
- * certa: num cupom de Avare a autorizacao saiu `19/10/2006` e a linha do
- * documento, `19/10/2026`. A chave so diz ano e mes — o dia continua vindo do
- * papel —, entao ela escolhe entre as datas lidas e nunca inventa uma. Se
- * nenhuma concorda, a resposta e a de sempre, e a regra `chave_mes` aponta.
+ * Com `period` (`YYYY-MM`, o mes da chave de acesso que fechou o DV), a data
+ * lida que discorda dele da lugar a sua gemea: outra data do papel, no mes da
+ * chave e **no mesmo dia**. A NFC-e imprime a data duas vezes, e quando o OCR
+ * erra a da autorizacao a outra costuma estar certa: num cupom de Avare a
+ * autorizacao saiu `19/10/2006` e a linha do documento, `19/10/2026`. O mesmo
+ * dia e o que separa a gemea de uma data de garantia ou vencimento do mesmo
+ * mes, que nao tem relacao com a emissao. A chave so diz ano e mes, entao ela
+ * escolhe entre as datas lidas e nunca inventa uma. Sem gemea, a resposta e a
+ * de sempre, e a regra `chave_mes` aponta.
  */
 function extractDate(text, { period = null } = {}) {
   if (typeof text !== 'string') {
     return null;
   }
 
-  const anchored = anchoredDates(text);
+  const found = firstAnchoredDate(text) ?? firstDate(text);
 
-  if (period) {
-    const agreeing = [...anchored, ...everyDate(text)].find((date) =>
-      date.startsWith(`${period}-`),
-    );
-
-    if (agreeing) {
-      return agreeing;
-    }
+  if (!period || found === null || found.startsWith(`${period}-`)) {
+    return found;
   }
 
-  return anchored[0] ?? firstDate(text);
+  const twin = everyDate(text).find(
+    (date) => date.startsWith(`${period}-`) && date.endsWith(found.slice(7)),
+  );
+
+  return twin ?? found;
 }
 
 const UFS = [
@@ -466,8 +481,11 @@ const ITEM_LINE =
 // restaurantes de Avare, em que a soma dos itens nunca chegou a ser conferida.
 // A linha abre pela quantidade — `l`, `I` e `|` entram porque e assim que o OCR
 // le o `1` isolado — e exige unidade, o `x` e o preco unitario antes do total.
+// Entre o preco e o total ha sempre espaco ou `=`/`:`. Sem essa exigencia, a
+// linha que perdeu o total no OCR (`1 UN X 18,00`) era partida dentro do preco,
+// e o `8,00` virava um total que o papel nao tem.
 const ITEM_DETAIL_LINE =
-  /^[^\S\n]*(?:\d{1,4}[^\S\n]+)?(?:\d{1,4}(?:[.,]\d{1,3})?|[lI|])[^\S\n]*(?:UN|KG|PC|LT|CX|DZ|MT)\b[^\S\n]*[x*][^\S\n]*(?:R\$[^\S\n]*)?\d{1,5}(?:[.,]\d{1,4})?[^\S\n]*(?:[=:][^\S\n]*)?(?:R\$[^\S\n]*)?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})[^\S\n]*$/i;
+  /^[^\S\n]*(?:\d{1,4}[^\S\n]+)?(?:\d{1,4}(?:[.,]\d{1,3})?|[lI|])[^\S\n]*(?:UN|KG|PC|LT|CX|DZ|MT)\b[^\S\n]*[x*][^\S\n]*(?:R\$[^\S\n]*)?\d{1,5}(?:[.,]\d{1,4})?(?:[^\S\n]*[=:][^\S\n]*|[^\S\n]+)(?:R\$[^\S\n]*)?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})[^\S\n]*$/i;
 
 /**
  * Valores dos itens listados no cupom, em centavos.
@@ -496,8 +514,10 @@ const ITEM_COUNT =
   /(?:\bqtde?\.?|\bquantidade)[^\S\n]*total[^\S\n]*de[^\S\n]*itens[^\d\n]{0,4}(\d{1,3})(?!\d)/i;
 
 // Numero de ordem que abre a linha do item: `003 752 BUFFET POR KILO`,
-// `002 SUCO NATURAL 2 UN 5,80 11,60`.
-const ITEM_SEQUENCE = /^[^\S\n]*(0\d\d)[^\S\n]+\S/;
+// `002 SUCO NATURAL 2 UN 5,80 11,60`. Depois dele, no maximo um codigo e logo
+// a descricao, com letra: o telefone `085 3333-4444` tem o mesmo comeco, e um
+// piso de 85 itens calaria a soma em todo cupom de Fortaleza.
+const ITEM_SEQUENCE = /^[^\S\n]*(0\d\d)[^\S\n]+(?:\d+[^\S\n]+)?[A-Za-zÀ-ÿ]/;
 
 /**
  * Quantos itens o cupom diz ter, ou `null` se o papel nao deixa saber.
@@ -639,9 +659,54 @@ function extractDiscounts(text) {
     return [];
   }
 
+  return amountsOf(text, DISCOUNT_LINE);
+}
+
+// Linha de acrescimo: `Taxa de servico 10% 7,00`, `Servico 7,00`, `Acrescimo
+// R$ 2,00`, `Couvert artistico 15,00`. Mesmo desenho do desconto: a palavra
+// abre a linha e o valor a fecha; a porcentagem no meio e pulada.
+const SURCHARGE_LINE =
+  /^[^\S\n]*(?:\(\+\)[^\S\n]*)?(?:acr[eé]scimos?|taxa|servi[cç]o|gorjeta|couvert|frete)(?![a-z])[^\d\n]*?(?:\d{1,2}(?:,\d+)?[^\S\n]*%[^\d\n]*?)?(\d{1,3}(?:\.\d{3})*,\d{2}|\d+,\d{2})[^\S\n]*$/i;
+
+// Qualquer linha que abra com a palavra de um ajuste, legivel ou nao.
+const ADJUSTMENT_START =
+  /^[^\S\n]*(?:\([+-]\)[^\S\n]*)?(?:desc(?:ontos?|\.)?|acr[eé]scimos?|taxa|servi[cç]o|gorjeta|couvert|frete)(?![a-z])/i;
+
+/**
+ * Acrescimos impressos no cupom, em centavos: taxa de servico, couvert,
+ * gorjeta. Num restaurante, o total passa da soma dos itens por eles.
+ */
+function extractSurcharges(text) {
+  if (typeof text !== 'string') {
+    return [];
+  }
+
+  return amountsOf(text, SURCHARGE_LINE);
+}
+
+/**
+ * Se ha linha de desconto ou acrescimo cujo valor nao se le. Com ela, nenhuma
+ * conta entre itens e total fecha com certeza, e quem compara deve se calar.
+ */
+function hasUnreadAdjustment(text) {
+  if (typeof text !== 'string') {
+    return false;
+  }
+
   return text
     .split('\n')
-    .map((line) => line.match(DISCOUNT_LINE))
+    .some(
+      (line) =>
+        ADJUSTMENT_START.test(line) &&
+        !DISCOUNT_LINE.test(line) &&
+        !SURCHARGE_LINE.test(line),
+    );
+}
+
+function amountsOf(text, lineRegex) {
+  return text
+    .split('\n')
+    .map((line) => line.match(lineRegex))
     .filter(Boolean)
     .map((match) => parseAmountToCents(match[1]))
     .filter((cents) => cents !== null);
@@ -652,6 +717,7 @@ module.exports = {
   parseDate,
   extractTotal,
   extractLooseTotal,
+  extractCardTotal,
   extractDate,
   extractCity,
   extractCnpj,
@@ -659,4 +725,6 @@ module.exports = {
   extractItemCount,
   extractFuelLines,
   extractDiscounts,
+  extractSurcharges,
+  hasUnreadAdjustment,
 };
