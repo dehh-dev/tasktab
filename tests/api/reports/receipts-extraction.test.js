@@ -39,6 +39,44 @@ describe('extracao no upload', () => {
     expect(receipt.status).toBe('needs_review');
   });
 
+  it('guarda o que propos, e a revisao corrige sem apagar a proposta', async () => {
+    const report = await insertReport();
+
+    await upload(report.id, [
+      {
+        buffer: await makeReceiptPdf({ total: '37,60', date: '19/06/2026' }),
+        filename: 'a.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    expect(receipt.extracted).toMatchObject({
+      parser: 'nfce',
+      extraction_source: 'text',
+      issued_at: '2026-06-19',
+      amount_cents: 3760,
+      cnpj: '26048802000165',
+      category: receipt.category,
+      confidence: Number(receipt.confidence),
+    });
+
+    // A pessoa corrige o valor e confirma: a coluna muda, a proposta nao. E
+    // essa diferenca que `npm run extraction:evaluate` conta.
+    const confirmed = await request('PATCH', `/api/receipts/${receipt.id}`, {
+      issued_at: '2026-06-19',
+      amount_cents: 3670,
+      category: 'alimentacao',
+      status: 'confirmed',
+    });
+
+    expect(confirmed.body.data).toMatchObject({
+      amount_cents: 3670,
+      extraction_source: 'manual',
+    });
+    expect(confirmed.body.data.extracted).toEqual(receipt.extracted);
+  });
+
   it('guarda o texto de cada pagina separadamente', async () => {
     const report = await insertReport();
 

@@ -5,7 +5,8 @@ const db = require('../config/database');
 const COLUMNS = `id, report_id, merchant_id, file_path, file_hash, page_number,
                  issued_at, amount_cents, category, category_guessed, access_key,
                  issuer_name, issuer_city, rotation, status, extraction_source,
-                 confidence, raw_text, duplicate_of_id, created_at, updated_at`;
+                 confidence, raw_text, extracted, duplicate_of_id, created_at,
+                 updated_at`;
 
 /** As colunas com o alias da tabela, para consulta com JOIN. */
 function prefixed(alias) {
@@ -194,6 +195,24 @@ async function findForExport(reportId) {
   return rows;
 }
 
+/**
+ * Comprovantes confirmados com o que a extracao propos, para a avaliacao da
+ * extracao (`scripts/evaluate-extraction.js`). Sem `reportId`, de todos os
+ * relatorios. `extracted` nulo e confirmado antes de a proposta ser guardada.
+ * Arquivo, pagina e giro servem a reextracao, que le o PDF de novo.
+ */
+async function findConfirmedForEvaluation(reportId = null) {
+  const { rows } = await db.query(
+    `SELECT id, report_id, file_path, page_number, rotation,
+            issued_at, amount_cents, access_key, category, extracted
+     FROM receipts
+     WHERE status = 'confirmed' AND ($1::int IS NULL OR report_id = $1)
+     ORDER BY file_path, page_number`,
+    [reportId],
+  );
+  return rows;
+}
+
 async function findById(id) {
   const { rows } = await db.query(
     `SELECT ${COLUMNS} FROM receipts WHERE id = $1`,
@@ -234,10 +253,12 @@ async function createPages({ reportId, filePath, fileHash, pages, status }) {
 
 // Colunas que a extracao escreve. Separadas de UPDATABLE_COLUMNS de proposito:
 // aquela lista e a superficie que o cliente pode tocar na revisao, esta e a
-// que o pipeline preenche. Misturar as duas deixaria `raw_text` editavel por
-// PATCH, o que apagaria a trilha de auditoria.
+// que o pipeline preenche. Misturar as duas deixaria `raw_text` e `extracted`
+// editaveis por PATCH, o que apagaria a trilha de auditoria e a medida da
+// extracao.
 const EXTRACTION_COLUMNS = [
   'raw_text',
+  'extracted',
   'status',
   'extraction_source',
   'issued_at',
@@ -349,6 +370,7 @@ module.exports = {
   summarizeByReport,
   merchantHistoryByReport,
   findForExport,
+  findConfirmedForEvaluation,
   findById,
   findByReportAndHash,
   findFilesByReport,
