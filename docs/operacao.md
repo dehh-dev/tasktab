@@ -87,6 +87,23 @@ Um `services: postgres` do proprio Actions nao serviria: ele nao executa o
 
 O `npm audit` fica de fora de proposito, pelo motivo da secao abaixo.
 
+### AI Quality Gate
+
+O workflow `.github/workflows/ai-quality-gate.yml` roda em todo pull request
+que nao e rascunho e que toca codigo (`.js`, `.jsx`, `.mjs`, `.cjs`, `.sql`).
+O Claude le o diff, so com ferramentas de leitura, e devolve um veredito em
+JSON pela rubrica de `.claude/skills/quality-gate/SKILL.md`: as regras do
+"Nunca" do `CLAUDE.md` e bug que o diff prova sozinho. Quem reprova e o passo
+seguinte, em bash e `jq`: so um `blocker` com confianca de 0,8 ou mais.
+
+- Precisa do segredo `ANTHROPIC_API_KEY` no repositorio. Sem ele, o gate
+  falha em todo PR que toca codigo.
+- A action le `.claude/` da branch base, nunca a do PR: mudanca na rubrica so
+  vale depois do merge na `main`.
+- A label `skip-ai-gate` e um "Re-run job" pulam o gate num PR.
+- Ainda nao e check obrigatorio: a ideia e medir os alarmes falsos em alguns
+  PRs antes de exigi-lo nas regras do repositorio.
+
 ## Sobre o `npm audit`
 
 Os `overrides` do `package.json` sao escopados por versao de `minimatch`,

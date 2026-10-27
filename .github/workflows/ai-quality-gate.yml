@@ -1,0 +1,151 @@
+name: AI Quality Gate
+
+# Gate semantico com Claude. Complementa (nao substitui) lint e testes de integracao.
+# Claude so LE o codigo e devolve um veredito em JSON; quem decide passar/falhar
+# e o passo "Aplicar veredito", em bash + jq, de forma deterministica.
+#
+# Antes de marcar como required check:
+#   1. Faca o merge da skill (.claude/skills/quality-gate/) na main num PR separado.
+#      Em PRs, a action restaura .claude/ da branch base; skill que so existe no PR e removida.
+#   2. Cadastre o segredo ANTHROPIC_API_KEY no repositorio. Sem ele o gate falha
+#      em todo PR que toca codigo (fail closed).
+#   3. Rode em modo advisory (nao-required) por alguns PRs e meca os falsos positivos.
+#   4. Em Settings > Rules, exija o check "ai-quality-gate".
+#
+# NAO adicione filtro `paths:` neste workflow: check obrigatorio que nao roda fica
+# "Expected — waiting" para sempre e trava o merge. O filtro e feito dentro do job.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ai-quality-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ai-quality-gate:
+    name: ai-quality-gate
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    env:
+      MIN_CONFIDENCE: '0.8' # blocker abaixo disso vira warning, nao reprova
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2 # merge commit do PR + base: basta para `git diff HEAD^1 HEAD`
+
+      # Escape hatch: adicione a label e clique em "Re-run job".
+      # Lido via API (e nao de github.event) porque o re-run reaproveita o payload antigo.
+      - name: Verificar label de bypass
+        id: bypass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | grep -qx 'skip-ai-gate'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::AI Quality Gate ignorado pela label skip-ai-gate"
+          fi
+
+      - name: Detectar mudanças em código
+        id: scope
+        if: steps.bypass.outputs.skip != 'true'
+        run: |
+          if git diff --name-only HEAD^1 HEAD | grep -qE '\.(js|jsx|mjs|cjs|sql)$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nenhum arquivo de código alterado; gate não precisa rodar."
+          fi
+
+      - name: Avaliar PR com Claude
+        id: claude
+        if: steps.scope.outputs.run == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Token do proprio workflow, so leitura. Sem ele a action troca um OIDC
+          # pelo token do app do Claude, o que exige o app instalado e o workflow
+          # identico ao da main: no PR que cria ou altera este arquivo ela pula
+          # sem veredito, e o passo seguinte reprova.
+          github_token: ${{ github.token }}
+          # Rubrica versionada em .claude/skills/quality-gate/SKILL.md (lida da branch base).
+          prompt: '/quality-gate'
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 30
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --disallowedTools "Edit,Write,WebFetch,WebSearch"
+            --json-schema '{
+              "type": "object",
+              "properties": {
+                "summary": { "type": "string" },
+                "findings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "severity":    { "type": "string", "enum": ["blocker", "warning", "nit"] },
+                      "category":    { "type": "string" },
+                      "file":        { "type": "string" },
+                      "line":        { "type": "integer", "minimum": 1 },
+                      "evidence":    { "type": "string" },
+                      "explanation": { "type": "string" },
+                      "confidence":  { "type": "number", "minimum": 0, "maximum": 1 }
+                    },
+                    "required": ["severity", "category", "file", "line", "evidence", "explanation", "confidence"]
+                  }
+                }
+              },
+              "required": ["summary", "findings"]
+            }'
+
+      # Se o Claude falhar ou nao devolver o JSON, o passo anterior ja falha (fail closed).
+      # O veredito chega por env e e tratado com jq: nunca interpolar ${{ }} direto no script,
+      # porque o texto do veredito e influenciado pelo conteudo do PR.
+      - name: Aplicar veredito
+        if: steps.scope.outputs.run == 'true'
+        env:
+          VERDICT: ${{ steps.claude.outputs.structured_output }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${VERDICT:-}" ]; then
+            echo "::error::Claude não devolveu veredito estruturado"
+            exit 1
+          fi
+          printf '%s' "$VERDICT" | jq . > verdict.json
+
+          # Anotacoes inline na aba "Files changed" (sem dar permissao de escrita ao Claude).
+          jq -r --argjson min "$MIN_CONFIDENCE" '
+            def esc:  gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A");
+            def escp: esc | gsub(":"; "%3A") | gsub(","; "%2C");
+            .findings[]
+            | (if .severity == "blocker" and .confidence >= $min then "error"
+               elif .severity == "nit" then "notice"
+               else "warning" end) as $level
+            | "::\($level) file=\(.file | escp),line=\(.line),title=\("[\(.severity)] \(.category)" | escp)::\("\(.explanation)\n\nEvidência: \(.evidence)\nConfiança: \(.confidence)" | esc)"
+          ' verdict.json
+
+          {
+            echo "## AI Quality Gate"
+            echo
+            jq -r '.summary' verdict.json
+            echo
+            echo "| Severidade | Confiança | Local | Problema |"
+            echo "|---|---|---|---|"
+            jq -r '.findings[] | "| \(.severity) | \(.confidence) | `\(.file):\(.line)` | \(.explanation | gsub("[\r\n]+"; " ") | gsub("\\|"; "\\|")) |"' verdict.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          BLOCKERS=$(jq --argjson min "$MIN_CONFIDENCE" '[.findings[] | select(.severity == "blocker" and .confidence >= $min)] | length' verdict.json)
+          if [ "$BLOCKERS" -gt 0 ]; then
+            echo "::error::$BLOCKERS problema(s) bloqueante(s). Veja o resumo do job e as anotações no diff."
+            exit 1
+          fi
+          echo "Nenhum blocker com confiança >= $MIN_CONFIDENCE."
