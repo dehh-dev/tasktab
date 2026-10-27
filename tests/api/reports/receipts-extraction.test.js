@@ -130,6 +130,30 @@ describe('chave de acesso', () => {
     expect(receipt.extraction_source).toBe('text');
   });
 
+  it('escolhe a data que concorda com o mes da chave', async () => {
+    const report = await insertReport();
+
+    // Num cupom de Avare o OCR errou o ano da autorizacao, e a linha do
+    // documento estava certa. A chave (junho de 2026) desempata.
+    await upload(report.id, [
+      {
+        buffer: await makeReceiptPdf({
+          date: '19/06/2026',
+          extra: [
+            'Data de Autorizacao 19/06/2006 12:35:10',
+            `Chave de acesso ${CHAVE}`,
+          ],
+        }),
+        filename: 'ano-errado.pdf',
+      },
+    ]);
+
+    const [receipt] = await listReceipts(report.id);
+
+    expect(receipt.access_key).toBe(CHAVE);
+    expect(receipt.issued_at).toBe('2026-06-19');
+  });
+
   it('descarta chave impressa que nao fecha o digito verificador', async () => {
     const report = await insertReport();
     const quebrada = `${CHAVE.slice(0, 43)}${(Number(CHAVE[43]) + 1) % 10}`;

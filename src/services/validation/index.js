@@ -213,9 +213,15 @@ function checkAccessKeyFields(receipts) {
  * Soma dos itens diferente do total impresso.
  *
  * E a regra que pegaria o `3,60` digitado onde deveria haver `37,60`. So
- * dispara quando consegue ler ao menos dois itens: com um item so, qualquer
- * linha solta viraria alarme falso, e alarme falso destroi a confianca na
- * conferencia mais rapido do que um erro nao detectado.
+ * dispara quando os itens lidos sao todos os do cupom: um item perdido pelo
+ * OCR faria a soma acusar um total certo, e alarme falso destroi a confianca
+ * na conferencia mais rapido do que um erro nao detectado.
+ *
+ * Com a contagem impressa ("QTD. TOTAL DE ITENS 001"), os itens lidos tem de
+ * bater com ela — e ai um item basta: foi assim que o `R$ 17,60` lido no lugar
+ * de `R$ 77,60` apareceu em Avare. Sem contagem, sao ao menos dois itens e
+ * nenhum a menos que o maior numero de ordem lido: com tres itens no papel e
+ * dois lidos, a soma ficaria R$ 4,00 abaixo de um total que podia estar certo.
  */
 function checkItemSum(receipts) {
   return receipts.flatMap((receipt) => {
@@ -224,8 +230,14 @@ function checkItemSum(receipts) {
     }
 
     const items = normalize.extractItemTotals(receipt.raw_text);
+    const { printed, atLeast } = normalize.extractItemCount(receipt.raw_text);
 
-    if (items.length < 2) {
+    const complete =
+      printed === null
+        ? items.length >= Math.max(2, atLeast)
+        : items.length === printed;
+
+    if (!complete) {
       return [];
     }
 

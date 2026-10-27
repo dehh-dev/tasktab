@@ -33,12 +33,14 @@ function resolve(text) {
  * apenas o que sabe fazer melhor. E o que evita que um adaptador novo precise
  * reimplementar data e CNPJ so para acertar o total.
  */
-function parse(text) {
+function parse(text, { period = null } = {}) {
   if (typeof text !== 'string' || text.trim() === '') {
     return { parser: null, fields: {} };
   }
 
-  const fields = generic.parse(text);
+  // `period` e o `YYYY-MM` da chave de acesso ja validada: a data e escolhida
+  // entre as que o papel traz, preferindo a que concorda com ele.
+  const fields = generic.parse(text, { period });
   const parser = resolve(text);
 
   if (!parser) {
@@ -60,6 +62,24 @@ const CNPJ_LINE = new RegExp(
   `(${cnpjRules.IN_TEXT.source})[^\\S\\n]*(.{4,120})$`,
   'gm',
 );
+
+// A linha do CNPJ como o OCR a devolve de papel amassado: o rotulo lido como
+// "GNPJ" ou "CNP)", espaco no meio dos digitos ("21 .417.280/0001-08",
+// "02 330.130/0001-18"). Em Avare foram 6 de 11 cupons, e o nome virava a
+// linha de endereco logo abaixo. So digitos aqui: o CNPJ com letra que o OCR
+// nao quebrou ja casa no `CNPJ_LINE`, e aceitar letra no meio da folga
+// comeria o comeco da razao social.
+const LOOSE_CNPJ_LINE =
+  /\b[CG]NP[J)](?:\/CPF)?[^\S\n]*:?[^\S\n]*((?:\d[^\S\n]*[./-]?[^\S\n]*){13}\d)(.*)$/i;
+
+// Data e hora coladas no fim da linha, como a maquininha imprime ao lado do
+// CNPJ ("22/10/2026 + 20:47") ou da razao social ("13,10,26-07:54").
+const TRAILING_DATE =
+  /[^\S\n]+\d{1,2}[.,/-]\d{1,2}[.,/-]\d{2,4}(?:[^\S\n]*[-+][^\S\n]*|[^\S\n]+)?(?:\d{1,2}:\d{2}(?::\d{2})?)?[^\S\n]*$/;
+
+// Endereco nao e nome, mesmo com proporcao de letras de nome.
+const ADDRESS =
+  /^(?:av(?:enida)?|rua|r\.|rod(?:ovia)?|al(?:ameda)?|travessa|tv\.|pra[çc]a|estrada)\b/i;
 
 // Quanto de uma linha precisa ser letra ou espaco para ela passar por nome. O
 // lixo tipico do OCR (": 40) 47 DL? “o") fica bem abaixo disso; um nome de
@@ -84,6 +104,32 @@ function looksLikeName(line) {
   return line.length >= 5 && alphaRatio(line) >= MIN_ALPHA_RATIO;
 }
 
+function asName(line) {
+  const candidate = clean((line ?? '').replace(TRAILING_DATE, ''));
+  return looksLikeName(candidate) ? candidate.slice(0, 255) : null;
+}
+
+/** Primeira linha com CNPJ: o indice dela e o que vem depois do numero. */
+function findCnpjLine(lines) {
+  for (const [index, line] of lines.entries()) {
+    const strict = [...line.matchAll(CNPJ_LINE)].find(([, cnpj]) =>
+      cnpjRules.plausible(cnpj),
+    );
+
+    if (strict) {
+      return { index, rest: strict[2] };
+    }
+
+    const loose = line.match(LOOSE_CNPJ_LINE);
+
+    if (loose && cnpjRules.plausible(loose[1].replace(/\D/g, ''))) {
+      return { index, rest: loose[2] };
+    }
+  }
+
+  return null;
+}
+
 /**
  * Nome provavel do emitente.
  *
@@ -93,8 +139,14 @@ function looksLikeName(line) {
  *
  * A ordem tenta o mais estruturado primeiro:
  *
- * 1. o que vem depois do CNPJ na linha do CNPJ (a razao social);
- * 2. a primeira linha do topo que pareca nome, medida por proporcao de letras.
+ * 0. o nome fixo do adaptador, quando o documento e de um emitente so (o
+ *    recibo da Uber nao traz razao social, e o topo dele e "Obrigado por
+ *    viajar, Fulano");
+ * 1. o que vem depois do CNPJ na linha do CNPJ (a razao social), mesmo com o
+ *    numero quebrado pelo OCR;
+ * 2. a linha logo acima do CNPJ, quando a dele so traz data e hora — e o
+ *    comprovante da maquininha (Stone, Rede), que imprime o nome em cima;
+ * 3. a primeira linha do topo que pareca nome, medida por proporcao de letras.
  *
  * Continua servindo so de rotulo legivel. A categoria sugerida vem de
  * `category-guess.js`, chega marcada como palpite, e nada aqui confirma nada.
@@ -104,15 +156,30 @@ function merchantName(text) {
     return null;
   }
 
-  const fromCnpj = [...text.matchAll(CNPJ_LINE)].find(([, cnpj]) =>
-    cnpjRules.plausible(cnpj),
-  );
+  const fixed = resolve(text)?.issuer;
 
-  if (fromCnpj) {
-    const candidate = clean(fromCnpj[2]);
+  if (fixed) {
+    return fixed;
+  }
 
-    if (looksLikeName(candidate)) {
-      return candidate.slice(0, 255);
+  const lines = text.split('\n');
+  const cnpjLine = findCnpjLine(lines);
+
+  if (cnpjLine) {
+    const sameLine = asName(cnpjLine.rest);
+
+    if (sameLine) {
+      return sameLine;
+    }
+
+    const above = lines[cnpjLine.index - 1] ?? '';
+
+    if (!ADDRESS.test(clean(above))) {
+      const aboveName = asName(above);
+
+      if (aboveName) {
+        return aboveName;
+      }
     }
   }
 

@@ -2484,3 +2484,126 @@ router (Issue 19): o que está aberto é estado da casca.
 
 **Fora desta issue:** URL própria por módulo ou relatório, que entra junto
 com o router.
+
+---
+
+# M16 — O que a prestação de Avaré mostrou
+
+A prestação de Avaré (outubro de 2026) foi feita à mão e conferida linha a
+linha: 22 lançamentos, R$ 1.323,73. Depois os mesmos PDFs passaram pela
+ferramenta — 43 páginas: 5 RPCI, 17 fotos de comprovante e 7 recibos da Uber
+com 3 páginas cada. Os PDFs ficam **fora do repositório**, pelo mesmo motivo
+de Itapipoca, e os testes desta rodada usam texto sintético no desenho dos
+cupons de lá.
+
+| Medida (22 lançamentos)              | Antes  | Depois |
+| ------------------------------------ | ------ | ------ |
+| Data certa                           | 18     | 19     |
+| Valor certo (21 com valor conhecido) | 10     | 12     |
+| Nome do emitente lido do papel       | 4      | 18     |
+| Corrida da Uber em Táxi/Locomoção    | 0 de 7 | 7 de 7 |
+| Total lido errado apontado pela soma | 0 de 6 | 3 de 6 |
+| Alarme falso da soma dos itens       | 0      | 0      |
+| Comprovantes incompletos             | 26     | 23     |
+| Tempo do lote                        | 260 s  | 212 s  |
+
+O nome conta o `issuer_name`, o que o papel diz: o cadastro do emitente
+guarda o nome do primeiro cupom daquele CNPJ, e na medição ele vinha da
+rodada anterior.
+
+## Issue 59 — Comprovante de maquininha: total e nome
+
+`area:extracao`
+
+Stone e Rede não imprimem "total": o valor vem colado na forma de pagamento
+(`DÉBITO R$ 146,50`) ou num `VALOR: 96,53`, e o nome fica na linha acima do
+CNPJ, que leva a data ao lado. Nenhum dos três comprovantes de Avaré tinha
+valor nem nome.
+
+- [x] Débito/crédito com `R$` e `VALOR:` no fim de `TOTAL_ANCHORS`, sem vencer
+      a âncora da NFC-e que traga o comprovante do cartão junto
+- [x] "Cartão de Débito 77,60" sem `R$` continua sendo pagamento, não âncora
+- [x] Linha acima do CNPJ quando a dele só tem data e hora, sem a data colada
+      no fim e sem aceitar endereço
+
+## Issue 60 — Recibo da Uber com emitente
+
+`area:extracao`
+
+O recibo não traz razão social, e o nome era "Obrigado por viajar, Fulano" —
+que caía no piso Alimentação. O adaptador declara `issuer: 'Uber'`, e o
+palpite por nome põe a corrida em Táxi/Locomoção.
+
+- [x] As 7 corridas de Avaré em Táxi/Locomoção, marcadas como sugeridas
+
+## Issue 61 — Linha do CNPJ quebrada pelo OCR
+
+`area:extracao`
+
+`CNPJ: 21 .417.280/0001-08`, `GNPJ: 21.417 .280/0001-08`, `CNPJ 21.417
+280/0001-08`: 6 dos 11 cupons. O CNPJ não casava, e o nome virava a linha de
+endereço logo abaixo.
+
+- [x] Rótulo tolerante (`CNPJ`, `GNPJ`, `CNP)`, `CNPJ/CPF`) e 14 dígitos com
+      espaço e pontuação entre eles; o resto da linha é o nome
+- [x] Só dígitos na folga: o CNPJ com letra que o OCR não quebrou já casa na
+      leitura estrita
+
+## Issue 62 — A data escolhida pelo mês da chave
+
+`area:extracao`
+
+A autorização saiu `19/10/2006` e a linha do documento, `19/10/2026`; a
+âncora da autorização venceu. Com a chave validada, vale a primeira data do
+mês dela.
+
+- [x] Desempata entre as datas lidas e nunca inventa uma; sem data do mês, a
+      resposta é a de sempre e a `chave_mes` aponta
+- [x] Entre dois dias do mesmo mês, a âncora continua decidindo
+
+## Issue 63 — Soma dos itens no cupom de duas linhas
+
+`area:validation`
+
+Os restaurantes de Avaré imprimem a descrição numa linha e a conta na outra
+(`1 UN X 8,00 8,00`, `0,51 KG X 99,90 51,35`). A regra nunca disparou, e seis
+totais saíram errados do OCR.
+
+- [x] Segunda linha do item lida, com o `1` lido como `l`, `I` ou `|`
+- [x] Contagem impressa ("QTD. TOTAL DE ITENS 001"): os itens lidos têm de ser
+      ela, e um basta
+- [x] Sem contagem: ao menos dois, e nenhum a menos que o maior número de
+      ordem lido
+
+**Decidido:** em dúvida, a regra se cala. No cupom de três itens com dois
+lidos, a soma ficaria R$ 4,00 abaixo — e o total podia estar certo.
+
+## Issue 64 — Uma renderização por página
+
+`area:extracao`
+
+QR e OCR renderizavam a mesma página a 3x, de 3 a 4 s cada vez. O PNG é
+feito uma vez no pipeline e serve aos dois.
+
+- [x] `readAccessKey` e `readPage` aceitam a página já renderizada; sem ela,
+      renderizam como antes
+
+## Fora desta rodada
+
+- **Recibo da Uber em três páginas** vira três comprovantes: a primeira com
+  data e valor, as outras duas sem nada (14 dos 23 incompletos). Juntar
+  páginas muda o modelo — um comprovante passa a ter mais de uma página — e
+  fica para quando houver decisão.
+- **RPCI** (o recibo de pagamento a autônomo que vai junto) entra como
+  comprovante. Não é despesa da viagem; hoje se apaga na revisão.
+- **Total pela linha de pagamento da NFC-e.** Na Padelle, `Alor total h$
+12,90` não casa nada, e "Cartão de Débito 72,90" tem o valor certo. Com
+  dinheiro há troco, e o pago passa do total: seria palpite, com confiança
+  baixa.
+- **Um gasto, dois documentos.** O comprovante da Rede (R$ 96,53) e a NFC-e do
+  Saladão (lida R$ 96,50) somam os dois, e a suspeita de duplicata não
+  dispara com 3 centavos de diferença.
+- **Data que o papel não tem.** O BK saiu com `29/10/2996`, a única data
+  legível; e na Brescia 7315 o OCR leu 18 no lugar de 15 na autorização, com
+  as duas datas no mesmo mês. A chave não tem o dia.
+- **Foto ilegível** (Backstage, Umberry): o total não sai do OCR. É revisão.

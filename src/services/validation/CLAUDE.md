@@ -8,9 +8,15 @@ que assina. **Alerta nao bloqueia nada.**
   Observacoes da planilha. A classe de cada regra fica em `RULE_LEVEL`, num
   lugar so, e ha teste que barra regra sem classe. A tela agrupa por ela
   (`ValidationPanel`), e `web/src/constants.js` espelha os `LEVELS`.
-- Regra so dispara com evidencia suficiente: a de itens exige ao menos dois
-  itens legiveis, a de faixa um historico minimo (`MIN_HISTORY`). Alarme falso
-  destroi a confianca mais rapido que um erro nao detectado.
+- Regra so dispara com evidencia suficiente: a de itens exige ler **todos**
+  os itens do cupom, a de faixa um historico minimo (`MIN_HISTORY`). Alarme
+  falso destroi a confianca mais rapido que um erro nao detectado.
+- **Soma dos itens** (`soma_itens`): com a contagem impressa ("QTD. TOTAL DE
+  ITENS 001"), os itens lidos tem de ser exatamente ela, e um basta; sem ela,
+  ao menos dois e nenhum a menos que o maior numero de ordem lido. Medido em
+  Avare: pegou os 3 totais lidos errado em que o OCR leu todos os itens, e se
+  calou no cupom de tres itens com dois lidos — ali a soma ficaria R$ 4,00
+  abaixo de um total que podia estar certo.
 - **Nenhuma regra vai ao banco** (issue 52). O que precisa dele vem numa
   consulta do relatorio inteiro, no `Promise.all` do `validateReport`, e a
   regra recebe o resultado. Uma consulta por comprovante eram 80 num

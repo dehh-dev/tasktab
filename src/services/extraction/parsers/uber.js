@@ -33,6 +33,12 @@ const LONG_DATE = /(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(\d{4})/i;
 
 const name = 'uber';
 
+// O recibo nao traz razao social nem CNPJ do prestador, e a primeira linha que
+// parece nome e "Obrigado por viajar, Fulano" — que caia no piso de categoria
+// como Alimentacao. Com o nome fixo, o palpite por palavra-chave acerta
+// Taxi/Locomocao.
+const issuer = 'Uber';
+
 function matches(text) {
   return SIGNATURES.some((signature) => signature.test(text));
 }
@@ -87,4 +93,4 @@ function parse(text) {
   return fields;
 }
 
-module.exports = { name, matches, parse };
+module.exports = { name, issuer, matches, parse };

@@ -117,16 +117,18 @@ function withTimeout(promise, ms, onTimeout) {
  * endireita a pagina sozinho, e um cupom de cabeca para baixo sai como ruido.
  * O QR nao precisa disso — o zxing acha o codigo em qualquer orientacao.
  */
-async function readPage(buffer, pageNumber, { rotation = 0 } = {}) {
+async function readPage(buffer, pageNumber, { rotation = 0, png = null } = {}) {
   if (!env.ocr.enabled) {
     return null;
   }
 
-  const png = await qrService.renderPageToPng(buffer, pageNumber);
+  // A pagina ja renderizada para o QR serve aqui: a escala e a mesma, e
+  // renderizar de novo era o passo mais caro depois do proprio Tesseract.
+  const image = png ?? (await qrService.renderPageToPng(buffer, pageNumber));
 
   // Cinza e normalizacao: e no pre-processamento que o OCR ganha ou perde.
   const sharp = require('sharp');
-  const prepared = await sharp(png)
+  const prepared = await sharp(image)
     .rotate(rotation)
     .greyscale()
     .normalise()

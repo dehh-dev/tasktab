@@ -105,6 +105,69 @@ describe('merchantName', () => {
 
     expect(merchantName(texto)).toBe('MERCEARIA FRANGUINHO NA PANELA LTDA');
   });
+
+  // Como o OCR devolveu a linha do CNPJ em 6 dos 11 cupons de Avare. Antes, o
+  // nome virava a linha de endereco de baixo.
+  const cnpjQuebrado = [
+    'CNPJ: 11 .222.333/0001-81 CANTINA EXEMPLO',
+    'CNPJ 11.222 333/0001-81 CANTINA EXEMPLO',
+    'GNPJ: 11.222.333 /0001-81 CANTINA EXEMPLO',
+    'CNPJ: 11 222.333/0001-81 CANTINA EXEMPLO',
+  ];
+
+  it.each(cnpjQuebrado)('le a razao social de %p', (linha) => {
+    const texto = [
+      'margem suja',
+      linha,
+      'RUA DAS PALMEIRAS, 100 CENTRO -',
+      'CIDADE EXEMPLO - SP 18700-000',
+    ].join('\n');
+
+    expect(merchantName(texto)).toBe('CANTINA EXEMPLO');
+  });
+
+  it('usa a linha acima quando a do CNPJ so traz data e hora', () => {
+    // Comprovante de maquininha: nome em cima, CNPJ com a data ao lado.
+    const texto = [
+      'VIA CLIENTE - COMPRA',
+      'BAR DO EXEMPLO',
+      'CNPJ: 11.222.333/0001-81 21/10/2026 + 22:03',
+      'AV DAS PALMEIRAS, CENTRO',
+      '| DEBITO R$ 200,00 |',
+    ].join('\n');
+
+    expect(merchantName(texto)).toBe('BAR DO EXEMPLO');
+  });
+
+  it('tira a data colada no fim da razao social da linha acima', () => {
+    const texto = [
+      'REDE',
+      'CONPROV: 123456 VALOR: 96,53',
+      'EXEMPLO E CIA LTDA  13,10,26-07:54',
+      'CNPJ/CPF:11.222 .333/0001-81',
+    ].join('\n');
+
+    expect(merchantName(texto)).toBe('EXEMPLO E CIA LTDA');
+  });
+
+  it('nao toma o endereco acima do CNPJ por nome', () => {
+    const texto = [
+      'PADARIA ALFA',
+      'RUA DAS PALMEIRAS, 100',
+      'CNPJ: 11.222.333/0001-81',
+    ].join('\n');
+
+    expect(merchantName(texto)).toBe('PADARIA ALFA');
+  });
+
+  it('da o nome fixo ao recibo da Uber', () => {
+    // A primeira linha com cara de nome era "Obrigado por viajar, Fulano", e
+    // o piso de categoria punha a corrida em Alimentacao.
+    const texto = ['Obrigado por viajar, Ana', 'Total R$ 6,95'].join('\n');
+
+    expect(merchantName(texto)).toBe('Uber');
+    expect(guessCategory(merchantName(texto))).toBe('transporte');
+  });
 });
 
 describe('guessCategory', () => {

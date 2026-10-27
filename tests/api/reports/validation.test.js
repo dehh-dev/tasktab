@@ -327,6 +327,81 @@ describe('regra: soma dos itens', () => {
 
     expect(porRegra(await validar(report.id), 'soma_itens')).toHaveLength(0);
   });
+
+  // O layout dos restaurantes de Avare: descricao numa linha, conta na outra.
+  function cupomEmDuasLinhas(total, ...itens) {
+    return [
+      'CNPJ: 11.222.333/0001-81 CANTINA EXEMPLO',
+      ...itens,
+      `VALOR TOTAL R$ ${total}`,
+    ].join('\n');
+  }
+
+  it('com a contagem impressa, um item basta para pegar o total errado', async () => {
+    const report = await insertReport();
+
+    // O OCR leu R$ 17,60 onde o cupom dizia R$ 77,60.
+    await insertReceipt(report.id, {
+      status: 'needs_review',
+      issued_at: '2026-10-19',
+      amount_cents: 1760,
+      category: 'alimentacao',
+      raw_text: cupomEmDuasLinhas(
+        '17,60',
+        '001 112 PRATO EXECUTIVO',
+        'L UN X 77,60 77,60',
+        'QTD. TOTAL DE ITENS 001',
+      ),
+    });
+
+    const alertas = porRegra(await validar(report.id), 'soma_itens');
+
+    expect(alertas).toHaveLength(1);
+    expect(alertas[0].message).toMatch(/7760/);
+  });
+
+  it('se cala quando faltou ler um dos itens que o cupom diz ter', async () => {
+    const report = await insertReport();
+
+    // Tres itens no papel (o 003 prova), dois lidos: a soma ficaria R$ 4,00
+    // abaixo de um total certo.
+    await insertReceipt(report.id, {
+      status: 'needs_review',
+      issued_at: '2026-10-17',
+      amount_cents: 7508,
+      category: 'alimentacao',
+      raw_text: cupomEmDuasLinhas(
+        '75,08',
+        '001 845 REFRIGERANTE LATA',
+        '1 UN X 8,00 8,00',
+        '002 771 GOMA DE MASCAR',
+        'q UN X 4,00 4,00',
+        '003 752 BUFFET POR KILO',
+        '0,57 KG X 109,90 63,08',
+      ),
+    });
+
+    expect(porRegra(await validar(report.id), 'soma_itens')).toHaveLength(0);
+  });
+
+  it('se cala quando a contagem impressa nao bate com os itens lidos', async () => {
+    const report = await insertReport();
+
+    await insertReceipt(report.id, {
+      status: 'needs_review',
+      issued_at: '2026-10-17',
+      amount_cents: 7508,
+      category: 'alimentacao',
+      raw_text: cupomEmDuasLinhas(
+        '75,08',
+        '1 UN X 8,00 8,00',
+        '0,57 KG X 109,90 63,08',
+        'QTD. TOTAL DE ITENS 003',
+      ),
+    });
+
+    expect(porRegra(await validar(report.id), 'soma_itens')).toHaveLength(0);
+  });
 });
 
 describe('regra: periodo', () => {
