@@ -2639,3 +2639,52 @@ injeção de falha.
 
 **Decidido:** os testes seguem em português, como o resto da suíte, apesar da
 regra global de descrição em inglês.
+
+---
+
+# M17 — Medir antes de mudar
+
+A avaliação do relatório 93 (outubro de 2026) só conseguiu medir a extração
+relendo o `raw_text`: a revisão grava por cima do que a extração leu, e todo
+"confirmar" marcava o comprovante como `manual`, porque a tela reenvia data,
+valor e categoria mesmo sem mudança. Os 23 saíram como digitados, com a
+extração certa em parte deles. É a fase 0 do plano de LLM: antes de qualquer
+degrau novo de leitura, saber quanto o atual acerta.
+
+## Issue 65 — Guardar o que a extração propôs
+
+`area:extracao`
+
+- [x] `receipts.extracted` (jsonb): data, valor, chave, CNPJ, emitente,
+      cidade, categoria, palpite, origem, confiança e parser, na mesma
+      escrita das colunas
+- [x] Página sem leitura grava a proposta vazia; nulo é comprovante anterior
+      à coluna
+- [x] Só a extração escreve (`EXTRACTION_COLUMNS`); o `PATCH` não, e a matriz
+      de contrato confere
+
+## Issue 66 — `manual` só quando o valor muda
+
+`area:receipts`
+
+- [x] Confirmar com os valores lidos mantém a origem da extração
+- [x] Mudar data, valor, categoria, chave, emitente ou cidade marca `manual`
+- [x] CNPJ digitado marca; `cnpj: null` só marca se havia emitente
+
+## Issue 67 — Avaliação da extração
+
+`area:extracao`
+
+- [x] `npm run extraction:evaluate -- --report <id>`: por campo, certo,
+      errado, vazio e errado sem destaque (confiança acima do destaque da
+      revisão, ou categoria sem marca de palpite)
+- [x] No total, por origem e por parser; `--json` para comparar execuções
+- [x] Só contagens na saída, com teste que procura chave, CNPJ, nome e valor
+- [x] `--reextract`: lê os PDFs de novo com o código de hoje, sem gravar nada
+      nem cadastrar emitente, e mede também o que foi confirmado antes da
+      coluna — o relatório 93, o corpus de Itapipoca
+
+**Decidido:** reprocessar com `discard_review` para ganhar a proposta foi
+descartado, porque apaga os valores conferidos, que são o gabarito. A
+reextração em memória usa o mesmo caminho do upload (`proposePage`), sem a
+escrita.

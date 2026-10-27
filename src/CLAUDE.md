@@ -25,6 +25,12 @@
   `extraction_source = 'manual'`) exige `{ "discard_review": true }`, senao
   `409` — a extracao regrava data, valor e categoria por cima. A tela pergunta
   antes.
+- **`manual` e valor mudado, nao campo enviado.** A tela reenvia data, valor
+  e categoria a cada "confirmar"; contar isso marcava como digitado todo
+  confirmado (os 23 do relatorio 93), e o acerto da extracao deixava de ser
+  medivel. O que ela propos fica em `extracted`, que so a extracao escreve
+  (`EXTRACTION_COLUMNS`) e o contrato barra no `PATCH`.
+  `npm run extraction:evaluate` compara os dois e imprime so contagens.
 - **Adiantamento nulo e "nao informado"; zero e "nao houve"** (issue 44): sem
   saber qual dos dois nao ha saldo, e a conferencia pede o nulo como pendente.
   Os relatorios anteriores a migration ficaram com o zero que tinham. O
