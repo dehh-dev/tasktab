@@ -2607,3 +2607,35 @@ feito uma vez no pipeline e serve aos dois.
   legível; e na Brescia 7315 o OCR leu 18 no lugar de 15 na autorização, com
   as duas datas no mesmo mês. A chave não tem o dia.
 - **Foto ilegível** (Backstage, Umberry): o total não sai do OCR. É revisão.
+
+## Revisão do PR #29
+
+A revisão do PR #29 levantou dez problemas, cinco deles piores que a `main`.
+Cada item abaixo tem teste que cai sem a correção, menos o último.
+
+**Critérios de aceite**
+
+- [x] Soma dos itens com desconto e acréscimo impressos (serviço, couvert,
+      gorjeta) na conta; linha de ajuste sem valor legível cala a regra. Com
+      a contagem impressa e um item só, a taxa de serviço acusava um total
+      certo
+- [x] A linha de item sem total (`1 UN X 18,00`) não é partida dentro do
+      preço unitário
+- [x] Débito/crédito e `VALOR:` num terceiro passe, depois do estrito e do
+      tolerante, sem a confiança da NFC-e: pago em dinheiro, o `VALOR:` é o
+      entregue, com troco
+- [x] Linha de cima do CNPJ só quando a dele traz só data e hora, ou nada, e
+      não é endereço, cidade nem título do DANFE
+- [x] Endereço abreviado com ou sem ponto (`R.`, `R `, `Tv.`, `End.:`)
+- [x] Razão social antes do nome fixo da Uber
+- [x] Data pelo mês da chave só troca pela gêmea do mesmo dia; garantia ou
+      vencimento do mês não cala a `chave_mes`
+- [x] Telefone (`085 3333-4444`) não é número de ordem de item
+- [x] Chave impressa lida também do texto do OCR
+- [x] Falha passageira da renderização no QR: o OCR renderiza de novo
+
+Ficou sem teste a renderização que falha no QR e passa no OCR: só com
+injeção de falha.
+
+**Decidido:** os testes seguem em português, como o resto da suíte, apesar da
+regra global de descrição em inglês.

@@ -63,18 +63,21 @@ pagar`, ...). Pegar "o maior numero da pagina" acharia a chave de acesso, o
 CNPJ ou o telefone — todos maiores que qualquer refeicao. O comprovante de
 maquininha (Stone, Rede), que nao imprime "total", e lido pela forma de
 pagamento com o valor (`DEBITO R$ 146,50`) ou pelo `VALOR: 96,53` — ancoras
-que so valem quando nenhuma das do cupom fiscal aparece.
+que so valem quando nenhuma das do cupom fiscal aparece, nem suja: paga em
+dinheiro, a forma de pagamento traz o valor entregue, com troco.
 
 A data tambem e ancorada, e prefere a da autorizacao. Com a chave de acesso
 lida, o mes dela **escolhe entre as datas impressas**: a NFC-e traz a data
 duas vezes, e quando o OCR erra uma (`19/10/2006` na autorizacao,
-`19/10/2026` na linha do documento) vale a que concorda com a chave. A chave
+`19/10/2026` na linha do documento) vale a que concorda com a chave, desde
+que seja do mesmo dia — uma data de garantia do mesmo mes nao conta. A chave
 nao tem o dia, entao nunca substitui a data do papel.
 
 Cupom com QR Code tem a **chave de acesso** lida do codigo — o dado mais
 confiavel que a extracao produz, porque o QR tem correcao de erro e a chave
 ainda passa pelo digito verificador mod-11. Sem QR legivel, a chave e buscada
-no texto impresso; em qualquer caso, chave que nao fecha o DV e descartada.
+no texto impresso, inclusive o que o OCR leu da foto; em qualquer caso, chave
+que nao fecha o DV e descartada.
 Quando nem o QR nem o texto a dao, ela pode ser **digitada na revisao**
 (`access_key` no `PATCH /api/receipts/:id`, com ou sem espacos): o DV confere
 a digitacao, o CNPJ dela vincula o emitente, e a mesma chave em outro
@@ -82,9 +85,10 @@ comprovante do relatorio faz deste a duplicata.
 
 O nome do emitente vem da razao social impressa ao lado do CNPJ, mesmo
 quando o OCR quebra o numero (`CNPJ: 21 .417.280/0001-08`) ou le o rotulo
-como `GNPJ`; na maquininha, que poe a data ao lado do CNPJ, vem da linha de
-cima. O recibo da Uber nao tem razao social e sai como **Uber**, o que poe a
-corrida em Taxi/Locomocao.
+como `GNPJ`; na maquininha, que poe so a data ao lado do CNPJ, vem da linha
+de cima, quando ela nao e endereco, cidade ou o titulo do documento. O recibo
+da Uber nao tem razao social e sai como **Uber**, o que poe a corrida em
+Taxi/Locomocao; um cupom com razao social fica com ela, mesmo citando a Uber.
 
 Comprovante sem CNPJ legivel — o recibo manuscrito — guarda **nome e cidade
 como estao no papel** (`issuer_name` e `issuer_city`), lidos do texto quando ha
@@ -154,7 +158,8 @@ Ate a issue 48 o campo era `severity`, com `erro` e `aviso`; o `meta` trazia
 contas decide; a ferramenta aponta, nao veta.
 
 Regras: soma dos itens contra o total impresso (o item numa linha ou em duas,
-e so quando os itens lidos sao todos os que o cupom diz ter), litros vezes preco unitario no
+so quando os itens lidos sao todos os que o cupom diz ter, e com desconto,
+taxa de servico e couvert impressos na conta), litros vezes preco unitario no
 combustivel, digito verificador da chave, mes, UF e tipo de emissao da chave
 (contingencia), data dentro do periodo, valor fora da faixa historica do
 emitente (a faixa vem so dos relatorios da mesma pessoa), comprovante
