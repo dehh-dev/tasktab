@@ -3,6 +3,7 @@
 const generic = require('./generic');
 const nfce = require('./nfce');
 const uber = require('./uber');
+const normalize = require('../normalize');
 const cnpjRules = require('../../../validators/cnpj');
 
 /**
@@ -74,12 +75,19 @@ const LOOSE_CNPJ_LINE =
 
 // Data e hora coladas no fim da linha, como a maquininha imprime ao lado do
 // CNPJ ("22/10/2026 + 20:47") ou da razao social ("13,10,26-07:54").
-const TRAILING_DATE =
-  /[^\S\n]+\d{1,2}[.,/-]\d{1,2}[.,/-]\d{2,4}(?:[^\S\n]*[-+][^\S\n]*|[^\S\n]+)?(?:\d{1,2}:\d{2}(?::\d{2})?)?[^\S\n]*$/;
+const DATE_TIME =
+  /\d{1,2}[.,/-]\d{1,2}[.,/-]\d{2,4}(?:[^\S\n]*[-+][^\S\n]*|[^\S\n]+)?(?:\d{1,2}:\d{2}(?::\d{2})?)?[^\S\n]*$/;
+const TRAILING_DATE = new RegExp(`[^\\S\\n]+${DATE_TIME.source}`);
+const ONLY_DATE_TIME = new RegExp(`^[^\\S\\n]*(?:${DATE_TIME.source})?$`);
 
-// Endereco nao e nome, mesmo com proporcao de letras de nome.
+// Endereco nao e nome, mesmo com proporcao de letras de nome. A abreviatura
+// pode vir com ponto ou sem: "R. SETE DE SETEMBRO", "R SETE", "Tv. das Flores".
 const ADDRESS =
-  /^(?:av(?:enida)?|rua|r\.|rod(?:ovia)?|al(?:ameda)?|travessa|tv\.|pra[çc]a|estrada)\b/i;
+  /^(?:(?:av|avenida|rua|r|rod|rodovia|alameda|travessa|tv|pra[çc]a|estrada|end|endere[çc]o)[.:,]*|al\.)(?=\s|$)/i;
+
+// O que fica acima do CNPJ e nao e quem vendeu: o titulo do documento.
+const DOCUMENT_TITLE =
+  /documento\s+auxiliar|nota\s+fiscal|nfc-?e|danfe|cupom\s+fiscal|extrato/i;
 
 // Quanto de uma linha precisa ser letra ou espaco para ela passar por nome. O
 // lixo tipico do OCR (": 40) 47 DL? “o") fica bem abaixo disso; um nome de
@@ -122,7 +130,8 @@ function findCnpjLine(lines) {
 
     const loose = line.match(LOOSE_CNPJ_LINE);
 
-    if (loose && cnpjRules.plausible(loose[1].replace(/\D/g, ''))) {
+    // Tira so os separadores que a folga aceita: o grupo ja e de digitos.
+    if (loose && cnpjRules.plausible(loose[1].replace(/[\s./-]/g, ''))) {
       return { index, rest: loose[2] };
     }
   }
@@ -139,14 +148,17 @@ function findCnpjLine(lines) {
  *
  * A ordem tenta o mais estruturado primeiro:
  *
- * 0. o nome fixo do adaptador, quando o documento e de um emitente so (o
- *    recibo da Uber nao traz razao social, e o topo dele e "Obrigado por
- *    viajar, Fulano");
  * 1. o que vem depois do CNPJ na linha do CNPJ (a razao social), mesmo com o
  *    numero quebrado pelo OCR;
- * 2. a linha logo acima do CNPJ, quando a dele so traz data e hora — e o
- *    comprovante da maquininha (Stone, Rede), que imprime o nome em cima;
- * 3. a primeira linha do topo que pareca nome, medida por proporcao de letras.
+ * 2. o nome fixo do adaptador, quando o documento e de um emitente so (o
+ *    recibo da Uber nao traz razao social, e o topo dele e "Obrigado por
+ *    viajar, Fulano"). Depois da razao social: "Pedido via Uber Eats" no
+ *    cupom do restaurante nao faz da Uber quem vendeu;
+ * 3. a linha logo acima do CNPJ, quando a dele so traz data e hora, ou nada —
+ *    e o comprovante da maquininha (Stone, Rede), que imprime o nome em cima.
+ *    Com qualquer outra coisa ao lado do CNPJ (`IE: ...`, sujeira), a linha de
+ *    cima e endereco ou cidade tantas vezes quanto e nome, e fica de fora;
+ * 4. a primeira linha do topo que pareca nome, medida por proporcao de letras.
  *
  * Continua servindo so de rotulo legivel. A categoria sugerida vem de
  * `category-guess.js`, chega marcada como palpite, e nada aqui confirma nada.
@@ -156,38 +168,46 @@ function merchantName(text) {
     return null;
   }
 
+  const lines = text.split('\n');
+  const cnpjLine = findCnpjLine(lines);
+  const sameLine = cnpjLine ? asName(cnpjLine.rest) : null;
+
+  if (sameLine) {
+    return sameLine;
+  }
+
   const fixed = resolve(text)?.issuer;
 
   if (fixed) {
     return fixed;
   }
 
-  const lines = text.split('\n');
-  const cnpjLine = findCnpjLine(lines);
+  if (cnpjLine && ONLY_DATE_TIME.test(cnpjLine.rest)) {
+    const above = nameAbove(lines[cnpjLine.index - 1]);
 
-  if (cnpjLine) {
-    const sameLine = asName(cnpjLine.rest);
-
-    if (sameLine) {
-      return sameLine;
-    }
-
-    const above = lines[cnpjLine.index - 1] ?? '';
-
-    if (!ADDRESS.test(clean(above))) {
-      const aboveName = asName(above);
-
-      if (aboveName) {
-        return aboveName;
-      }
+    if (above) {
+      return above;
     }
   }
 
   // So o topo do documento: mais abaixo comecam os itens, e uma descricao de
   // produto tambem passa no teste de "parece nome".
-  const fromTop = text.split('\n').slice(0, 8).map(clean).find(looksLikeName);
+  return lines.slice(0, 8).map(asName).find(Boolean) ?? null;
+}
 
-  return fromTop ? fromTop.slice(0, 255) : null;
+/** A linha acima do CNPJ como nome, se ela nao for endereco, cidade ou titulo. */
+function nameAbove(line) {
+  const candidate = clean(line ?? '');
+
+  if (
+    ADDRESS.test(candidate) ||
+    DOCUMENT_TITLE.test(candidate) ||
+    normalize.extractCity(candidate) !== null
+  ) {
+    return null;
+  }
+
+  return asName(candidate);
 }
 
 module.exports = { parse, resolve, merchantName, PARSERS };

@@ -402,6 +402,56 @@ describe('regra: soma dos itens', () => {
 
     expect(porRegra(await validar(report.id), 'soma_itens')).toHaveLength(0);
   });
+
+  // Prato de R$ 70,00 com servico: o total certo passa da soma dos itens.
+  async function pratoComServico(linhaDoServico) {
+    const report = await insertReport();
+
+    await insertReceipt(report.id, {
+      status: 'needs_review',
+      issued_at: '2026-10-19',
+      amount_cents: 7700,
+      category: 'alimentacao',
+      raw_text: cupomEmDuasLinhas(
+        '77,00',
+        '001 112 PRATO EXECUTIVO',
+        '1 UN X 70,00 70,00',
+        'QTD. TOTAL DE ITENS 001',
+        linhaDoServico,
+      ),
+    });
+
+    return porRegra(await validar(report.id), 'soma_itens');
+  }
+
+  it('a taxa de servico impressa entra na conta', async () => {
+    expect(await pratoComServico('Taxa de servico 10% 7,00')).toHaveLength(0);
+  });
+
+  it('se cala quando a linha do servico nao tem valor legivel', async () => {
+    expect(await pratoComServico('Taxa de servico 10% -,--')).toHaveLength(0);
+  });
+
+  it('o desconto impresso entra na conta', async () => {
+    const report = await insertReport();
+
+    // Posto de um item com desconto de aplicativo: o valor gravado e o pago.
+    await insertReceipt(report.id, {
+      status: 'needs_review',
+      issued_at: '2026-10-19',
+      amount_cents: 19500,
+      category: 'combustivel',
+      raw_text: cupomEmDuasLinhas(
+        '195,00',
+        '001 1 GASOLINA COMUM',
+        '40,000 LT X 5,0000 200,00',
+        'QTD. TOTAL DE ITENS 001',
+        'Desconto R$ 5,00',
+      ),
+    });
+
+    expect(porRegra(await validar(report.id), 'soma_itens')).toHaveLength(0);
+  });
 });
 
 describe('regra: periodo', () => {

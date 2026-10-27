@@ -32,6 +32,9 @@ async function listReceipts(reportId) {
  * afirmacao abaixo e uma daquelas; o que mudou e que pagam um OCR so.
  */
 describe('cascata de extracao', () => {
+  // Junho de 2026, com o CNPJ da fixture nas posicoes 7 a 20.
+  const CHAVE = '52260626048802000165650010001631601303284889';
+
   it('le o digital pelo texto e o escaneado pelo OCR, e nao confirma nenhum dos dois', async () => {
     const report = await insertReport();
 
@@ -47,6 +50,8 @@ describe('cascata de extracao', () => {
           total: '37,60',
           date: '19/06/2026',
           residualText: '2',
+          // Impressa, sem QR: so o OCR a le.
+          extra: [CHAVE.match(/\d{4}/g).join(' ')],
         }),
         filename: 'escaneado.pdf',
       },
@@ -74,6 +79,9 @@ describe('cascata de extracao', () => {
       amount_cents: 3760,
     });
     expect(scanned.raw_text).toMatch(/FRANGUINHO/i);
+    // A chave impressa que o OCR leu vale como a do texto digital. Antes ela
+    // era procurada so antes do OCR, numa pagina ainda sem texto.
+    expect(scanned.access_key).toBe(CHAVE);
 
     // E nenhum confirmado. Extrair nao e conferir — inclusive quando a
     // extracao preencheu tudo, categoria adivinhada incluida —, e o que veio

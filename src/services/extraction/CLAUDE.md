@@ -27,25 +27,35 @@ nao por deixar de olhar.
 - O nome do emitente vem da **razao social colada no CNPJ**, nao da primeira
   linha — num PDF escaneado ela e a margem do papel. A linha do CNPJ e lida
   tambem quebrada pelo OCR (`21 .417.280/0001-08`, `GNPJ`, `CNP)`), so com
-  digitos; quando ela so traz data e hora (maquininha), vale a linha de cima,
-  se nao for endereco. Adaptador de emitente unico declara `issuer` (a Uber):
-  sem isso, "Obrigado por viajar, Fulano" virava nome e o piso punha a
-  corrida em Alimentacao.
+  digitos. Adaptador de emitente unico declara `issuer` (a Uber), que vale
+  **depois** da razao social: "Pedido via Uber Eats" nao faz da Uber quem
+  vendeu. A linha de cima do CNPJ so vale quando a dele traz **so data e
+  hora, ou nada** (maquininha), e se nao for endereco (`R.`, `Tv.`, `End.:`),
+  cidade ou titulo do DANFE — o nome vai para o cadastro do emitente. Com
+  `IE: ...` ou sujeira ao lado do CNPJ, fica o topo.
 - **Maquininha nao imprime "total"**: `DEBITO R$ 146,50` e `VALOR: 96,53` sao
-  as ultimas ancoras de `TOTAL_ANCHORS`, para nao vencer a da NFC-e que traga
-  o comprovante do cartao junto. Debito/credito so com `R$`: "Cartão de
-  Débito 77,60" e a linha de pagamento da NFC-e.
-- `extractDate(text, { period })`: com a chave validada, vale a primeira data
-  — ancorada ou nao — do mes da chave. **Ela desempata, nao inventa**: sem
-  data do mes, a resposta e a de sempre e a `chave_mes` aponta. O dia
-  continua vindo do papel; entre dois dias do mesmo mes, decide a ancora.
+  `CARD_ANCHORS`, um **terceiro passe** (`extractCardTotal`) que so roda
+  quando o estrito e o tolerante nao acharam ancora de total. Dentro de
+  `TOTAL_ANCHORS` eles venciam o total sujo da NFC-e e saiam com a confianca
+  dela: paga em dinheiro, "VALOR: 300,00" e o entregue, com troco.
+  Debito/credito so com `R$`: "Cartao de Debito 77,60" e a linha de
+  pagamento da NFC-e.
+- `extractDate(text, { period })`: com a chave validada, a data lida que
+  discorda do mes dela da lugar a **gemea** — outra data do papel, no mes da
+  chave e no mesmo dia (`19/10/2006` → `19/10/2026`). Sem o mesmo dia, uma
+  garantia ou vencimento do mes trocaria a emissao e calaria a `chave_mes`.
+  **Ela desempata, nao inventa**: sem gemea, a resposta e a de sempre e a
+  `chave_mes` aponta.
 - Item em duas linhas (`001 765 CITRUS LATA` / `1 UN X 8,00 8,00`) e lido
   pela segunda (`ITEM_DETAIL_LINE`), com o `1` lido como `l`, `I` ou `|`.
-  `extractItemCount` da a contagem impressa e o maior numero de ordem lido,
+  Entre o preco unitario e o total, espaco ou `=` obrigatorio: sem ele, a
+  linha sem total (`1 UN X 18,00`) era partida dentro do preco.
+  `extractItemCount` da a contagem impressa e o maior numero de ordem lido
+  (`003 752 BUFFET`, com letra na descricao — `085 3333-4444` e telefone),
   que a regra da soma usa para nao acusar com item faltando.
 - A pagina e **renderizada uma vez** (`pipeline.service.js`) e o PNG serve ao
   QR e ao OCR, na mesma `RENDER_SCALE`. Eram duas renderizacoes a 3x por
-  pagina escaneada.
+  pagina escaneada. A falha nao fica guardada: o OCR renderiza de novo.
 - Nome e cidade do papel ficam no comprovante (`issuer_name`, `issuer_city`,
   issue 42), com ou sem CNPJ; a cidade vai tambem para `merchants.city`. Lista
   e saidas usam o cadastro quando ha e o papel quando nao ha, num lugar so
@@ -62,6 +72,10 @@ nao por deixar de olhar.
 
 - O CNPJ confiavel e o das posicoes 7 a 20 da **chave**, nao o do texto: o
   cupom traz tambem o da credenciadora do cartao.
+- A chave impressa e procurada **depois do OCR** (`keyFromText`), no texto da
+  pagina, digital ou lido da imagem: na foto com o QR borrado ela e a unica,
+  e e ela que escolhe a data. Antes era procurada so antes do OCR, numa
+  pagina escaneada ainda sem texto.
 - Chave que nao fecha o DV mod-11 e **descartada** — nao ha meio termo num
   identificador com verificador.
 - **CNPJ alfanumerico** (julho de 2026): os 12 primeiros caracteres do CNPJ, e

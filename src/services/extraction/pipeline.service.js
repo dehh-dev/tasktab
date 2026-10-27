@@ -67,13 +67,12 @@ async function processFile({ buffer, receipts, log }) {
 }
 
 /**
- * Chave de acesso da pagina: QR primeiro, texto impresso como reserva.
- *
- * O numero aparece nos dois lugares, mas o QR carrega correcao de erro, entao
- * vale mais. Uma chave que nao fecha o DV e descartada nos dois casos — nao ha
- * meio termo entre confiar e nao confiar num identificador com verificador.
+ * Chave de acesso da pagina pelo QR. O numero vem tambem impresso
+ * (`keyFromText`), mas o QR carrega correcao de erro, entao vale mais. Uma
+ * chave que nao fecha o DV e descartada nos dois casos — nao ha meio termo
+ * entre confiar e nao confiar num identificador com verificador.
  */
-async function findAccessKey({ buffer, pageNumber, text, render, log }) {
+async function keyFromQr({ buffer, pageNumber, render, log }) {
   try {
     const fromQr = await qrService.readAccessKey(buffer, pageNumber, {
       png: await render(),
@@ -87,10 +86,19 @@ async function findAccessKey({ buffer, pageNumber, text, render, log }) {
     log?.debug({ err: error, page: pageNumber }, 'nao foi possivel ler o QR');
   }
 
+  return null;
+}
+
+/**
+ * Chave impressa, lida do texto da pagina — a camada de texto do PDF ou o que
+ * o OCR leu. Na foto do cupom com o QR borrado, a chave impressa e a unica, e
+ * e ela que escolhe a data pelo mes (`extractDate`).
+ */
+function keyFromText(text, source) {
   const fromText = parsers.parse(text).fields.access_key;
 
   if (fromText && accessKey.isValid(fromText.value)) {
-    return fromText;
+    return { ...fromText, source };
   }
 
   return null;
@@ -103,18 +111,22 @@ async function processPage(receipt, page, { buffer, log }) {
 
   // A pagina e renderizada uma vez e serve ao QR e ao OCR. Eram duas
   // renderizacoes a 3x por pagina escaneada: em Avare, 3 a 4 s cada, de uns
-  // 12 s por pagina. A promise guardada tambem guarda a falha, e quem a
-  // recebe trata como tratava a propria.
+  // 12 s por pagina. A falha nao fica guardada: o OCR tenta de novo, como
+  // quando cada um renderizava a sua.
   let rendered = null;
   const render = () => {
-    rendered ??= qrService.renderPageToPng(buffer, receipt.page_number);
+    rendered ??= qrService
+      .renderPageToPng(buffer, receipt.page_number)
+      .catch((error) => {
+        rendered = null;
+        throw error;
+      });
     return rendered;
   };
 
-  const key = await findAccessKey({
+  const fromQr = await keyFromQr({
     buffer,
     pageNumber: receipt.page_number,
-    text: text ?? '',
     render,
     log,
   });
@@ -142,6 +154,10 @@ async function processPage(receipt, page, { buffer, log }) {
       ocrConfidence = scanned.confidence;
     }
   }
+
+  // A chave impressa so e procurada depois do OCR: antes dele, a pagina
+  // escaneada nao tem texto, e a chave que o OCR le nunca era usada.
+  const key = fromQr ?? (text ? keyFromText(text, source) : null);
 
   // Nem texto, nem QR, nem OCR: so uma pessoa resolve. Recibo manuscrito cai
   // aqui de proposito — o Tesseract nao le caneta, e insistir nisso e onde

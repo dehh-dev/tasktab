@@ -160,6 +160,48 @@ describe('merchantName', () => {
     expect(merchantName(texto)).toBe('PADARIA ALFA');
   });
 
+  it('com outra coisa ao lado do CNPJ, nao usa a linha de cima', () => {
+    // `IE: ...` ao lado do CNPJ: a linha de cima e a cidade, e o nome vem do
+    // topo, como antes.
+    const texto = [
+      'PADARIA ALFA LTDA',
+      'RUA DAS FLORES, 100',
+      'CENTRO - AVARE/SP',
+      'CNPJ: 11.222.333/0001-81 IE: 123.456.789.110',
+    ].join('\n');
+
+    expect(merchantName(texto)).toBe('PADARIA ALFA LTDA');
+  });
+
+  const acimaQueNaoENome = [
+    'CENTRO - AVARE/SP',
+    'DOCUMENTO AUXILIAR DA NOTA FISCAL DE CONSUMIDOR ELETRONICA',
+    'R. SETE DE SETEMBRO 123',
+    'R SETE DE SETEMBRO 123',
+    'Tv. das Flores 12',
+    'END.: RUA DAS FLORES 12',
+    'Endereco: Rua das Flores 12',
+  ];
+
+  it.each(acimaQueNaoENome)('nao toma %p acima do CNPJ por nome', (acima) => {
+    const texto = ['PADARIA ALFA LTDA', acima, 'CNPJ: 11.222.333/0001-81'].join(
+      '\n',
+    );
+
+    expect(merchantName(texto)).toBe('PADARIA ALFA LTDA');
+  });
+
+  it('a razao social ganha do nome fixo da Uber', () => {
+    // "Uber" no texto nao faz da Uber quem vendeu.
+    const texto = [
+      'CNPJ: 11.222.333/0001-81 RESTAURANTE BOM SABOR LTDA',
+      'Pedido via Uber Eats',
+      'Total R$ 50,00',
+    ].join('\n');
+
+    expect(merchantName(texto)).toBe('RESTAURANTE BOM SABOR LTDA');
+  });
+
   it('da o nome fixo ao recibo da Uber', () => {
     // A primeira linha com cara de nome era "Obrigado por viajar, Fulano", e
     // o piso de categoria punha a corrida em Alimentacao.

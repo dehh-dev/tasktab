@@ -37,12 +37,21 @@ function parse(text, { period = null } = {}) {
     // com confianca baixa de proposito: o campo chega preenchido, e a revisao
     // recebe o destaque que diz "confira este aqui antes de assinar".
     const loose = normalize.extractLooseTotal(text);
+    // Terceira, a forma de pagamento da maquininha: so quando o papel nao
+    // tem ancora de total nenhuma, legivel ou suja.
+    const card = loose === null ? normalize.extractCardTotal(text) : null;
 
     if (loose !== null) {
       fields.amount_cents = {
         value: loose,
         source: 'text',
         confidence: LOOSE_CONFIDENCE,
+      };
+    } else if (card !== null) {
+      fields.amount_cents = {
+        value: card,
+        source: 'text',
+        confidence: CONFIDENCE,
       };
     }
   }
