@@ -26,17 +26,7 @@ const QR_CONFIDENCE = 0.99;
  * planilha manual que este projeto substitui.
  */
 async function processFile({ buffer, receipts, log }) {
-  let pages = [];
-
-  try {
-    pages = await textService.extractPages(buffer);
-  } catch (error) {
-    // Sem camada de texto legivel ainda resta o OCR: seguir com paginas vazias
-    // deixa cada uma cair na rota de imagem.
-    log?.warn({ err: error }, 'falha ao ler a camada de texto do PDF');
-  }
-
-  const byNumber = new Map(pages.map((page) => [page.pageNumber, page]));
+  const byNumber = await textPages(buffer, log);
 
   for (const receipt of receipts) {
     const page = byNumber.get(receipt.page_number);
@@ -64,6 +54,48 @@ async function processFile({ buffer, receipts, log }) {
       });
     }
   }
+}
+
+/**
+ * O que a extracao proporia hoje para as paginas de um arquivo, por `id`, sem
+ * gravar nada nem cadastrar emitente. E a reextracao da avaliacao
+ * (`npm run extraction:evaluate -- --reextract`): o codigo atual contra o que
+ * uma pessoa ja confirmou, nos PDFs que estao no disco. Pagina que falha
+ * fica sem proposta, e a avaliacao a conta a parte.
+ */
+async function proposeFile({ buffer, receipts, log }) {
+  const byNumber = await textPages(buffer, log);
+  const proposals = new Map();
+
+  for (const receipt of receipts) {
+    const read = await proposePage(receipt, byNumber.get(receipt.page_number), {
+      buffer,
+      log,
+      register: false,
+    }).catch((error) => {
+      log?.warn({ err: error, receipt_id: receipt.id }, 'falha ao reextrair');
+      return null;
+    });
+
+    proposals.set(receipt.id, read?.extracted ?? null);
+  }
+
+  return proposals;
+}
+
+/** Camada de texto do PDF, por numero de pagina. */
+async function textPages(buffer, log) {
+  let pages = [];
+
+  try {
+    pages = await textService.extractPages(buffer);
+  } catch (error) {
+    // Sem camada de texto legivel ainda resta o OCR: seguir com paginas vazias
+    // deixa cada uma cair na rota de imagem.
+    log?.warn({ err: error }, 'falha ao ler a camada de texto do PDF');
+  }
+
+  return new Map(pages.map((page) => [page.pageNumber, page]));
 }
 
 /**
@@ -105,6 +137,70 @@ function keyFromText(text, source) {
 }
 
 async function processPage(receipt, page, { buffer, log }) {
+  const { text, key, merchant_id, proposal, extracted } = await proposePage(
+    receipt,
+    page,
+    { buffer, log },
+  );
+
+  // Nem texto, nem QR, nem OCR: so uma pessoa resolve. A proposta vazia
+  // tambem fica: e o que a avaliacao conta como "a extracao nao leu",
+  // diferente do comprovante anterior a coluna.
+  if (proposal === null) {
+    await Receipt.applyExtraction(receipt.id, {
+      status: 'needs_review',
+      extracted,
+    });
+    return;
+  }
+
+  // So o que e provadamente o mesmo documento colapsa sozinho; suspeita vira
+  // alerta na revisao, nunca exclusao silenciosa. A checagem vem antes da
+  // gravacao, e nao depois dela: gravar `needs_review` primeiro deixava a
+  // pagina parecendo pronta por alguns milissegundos, e quem lesse nesse
+  // intervalo — a tela, que para de consultar quando nada esta em
+  // processamento — via como pendente o que ia virar duplicata. Confirmada
+  // ali, ela entraria na soma: o erro que a ferramenta existe para evitar.
+  const original = key
+    ? await dedup.findExactDuplicate({
+        id: receipt.id,
+        report_id: receipt.report_id,
+        access_key: key.value,
+      })
+    : null;
+
+  await Receipt.applyExtraction(receipt.id, {
+    raw_text: text,
+    // Nada e confirmado sozinho, e o que veio de OCR menos ainda. O ganho da
+    // extracao e o humano deixar de digitar e passar a conferir. A duplicata
+    // continua listada e vai no PDF consolidado — ela existe, so nao soma.
+    status: original ? 'duplicate' : 'needs_review',
+    // Nulo tambem quando reprocessada deixa de ser duplicata, para nao apontar
+    // para um original que ja nao vale.
+    duplicate_of_id: original?.id ?? null,
+    merchant_id,
+    ...proposal,
+    // A mesma proposta, numa coluna que a revisao nao sobrescreve: e contra
+    // ela que `npm run extraction:evaluate` mede o que uma pessoa confirmou.
+    extracted,
+  });
+
+  if (original) {
+    log?.info(
+      { receipt_id: receipt.id, duplicate_of_id: original.id },
+      'comprovante marcado como duplicata pela chave de acesso',
+    );
+  }
+}
+
+/**
+ * Le a pagina — texto, QR, OCR — e devolve o que a extracao propoe, sem
+ * gravar nada no comprovante. `proposal` nulo e pagina sem leitura.
+ *
+ * Com `register: false` o emitente desconhecido nao e cadastrado: e o modo
+ * da reextracao da avaliacao, que nao pode deixar rastro no banco.
+ */
+async function proposePage(receipt, page, { buffer, log, register = true }) {
   let text = page?.useful ? page.text : null;
   let source = text ? 'text' : null;
   let ocrConfidence = null;
@@ -159,17 +255,21 @@ async function processPage(receipt, page, { buffer, log }) {
   // escaneada nao tem texto, e a chave que o OCR le nunca era usada.
   const key = fromQr ?? (text ? keyFromText(text, source) : null);
 
-  // Nem texto, nem QR, nem OCR: so uma pessoa resolve. Recibo manuscrito cai
-  // aqui de proposito — o Tesseract nao le caneta, e insistir nisso e onde
-  // este tipo de projeto costuma travar.
+  // Recibo manuscrito cai aqui de proposito — o Tesseract nao le caneta, e
+  // insistir nisso e onde este tipo de projeto costuma travar.
   if (!text && !key) {
-    await Receipt.applyExtraction(receipt.id, { status: 'needs_review' });
-    return;
+    return {
+      text: null,
+      key: null,
+      merchant_id: null,
+      proposal: null,
+      extracted: { parser: null, extraction_source: null },
+    };
   }
 
   // Com a chave validada, o mes dela escolhe a data entre as que o papel traz
   // (ver `extractDate`). Ela nao inventa data: so desempata as que foram lidas.
-  const { fields } = parsers.parse(text ?? '', {
+  const { parser, fields } = parsers.parse(text ?? '', {
     period: key ? accessKey.parse(key.value)?.issuedPeriod : null,
   });
 
@@ -191,32 +291,11 @@ async function processPage(receipt, page, { buffer, log }) {
     fields.cnpj?.value,
     issuerName,
     issuerCity,
+    { register },
   );
 
-  // So o que e provadamente o mesmo documento colapsa sozinho; suspeita vira
-  // alerta na revisao, nunca exclusao silenciosa. A checagem vem antes da
-  // gravacao, e nao depois dela: gravar `needs_review` primeiro deixava a
-  // pagina parecendo pronta por alguns milissegundos, e quem lesse nesse
-  // intervalo — a tela, que para de consultar quando nada esta em
-  // processamento — via como pendente o que ia virar duplicata. Confirmada
-  // ali, ela entraria na soma: o erro que a ferramenta existe para evitar.
-  const original = key
-    ? await dedup.findExactDuplicate({
-        id: receipt.id,
-        report_id: receipt.report_id,
-        access_key: key.value,
-      })
-    : null;
-
-  await Receipt.applyExtraction(receipt.id, {
-    raw_text: text,
-    // Nada e confirmado sozinho, e o que veio de OCR menos ainda. O ganho da
-    // extracao e o humano deixar de digitar e passar a conferir. A duplicata
-    // continua listada e vai no PDF consolidado — ela existe, so nao soma.
-    status: original ? 'duplicate' : 'needs_review',
-    // Nulo tambem quando reprocessada deixa de ser duplicata, para nao apontar
-    // para um original que ja nao vale.
-    duplicate_of_id: original?.id ?? null,
+  // O que a extracao propoe para a revisao conferir.
+  const proposal = {
     // O QR vale mais que o texto, que vale mais que o OCR.
     extraction_source: key?.source === 'qr' ? 'qr' : (source ?? 'text'),
     issued_at: fields.issued_at?.value ?? null,
@@ -226,7 +305,6 @@ async function processPage(receipt, page, { buffer, log }) {
     // usam quando o comprovante nao tem emitente cadastrado (issue 42).
     issuer_name: issuerName,
     issuer_city: issuerCity,
-    merchant_id,
     category,
     category_guessed,
     // O OCR entra no calculo como mais um campo: se ele leu mal, a linha
@@ -236,14 +314,15 @@ async function processPage(receipt, page, { buffer, log }) {
         ? fields
         : { ...fields, ocr: { confidence: ocrConfidence } },
     ),
-  });
+  };
 
-  if (original) {
-    log?.info(
-      { receipt_id: receipt.id, duplicate_of_id: original.id },
-      'comprovante marcado como duplicata pela chave de acesso',
-    );
-  }
+  return {
+    text,
+    key,
+    merchant_id,
+    proposal,
+    extracted: { ...proposal, parser, cnpj: fields.cnpj?.value ?? null },
+  };
 }
 
 /**
@@ -268,7 +347,7 @@ async function processPage(receipt, page, { buffer, log }) {
  * O palpite **nunca** sobrescreve o passo 1: cadastro e decisao registrada, e
  * um palpite nao desfaz decisao de ninguem.
  */
-async function classify(cnpj, name, city) {
+async function classify(cnpj, name, city, { register = true } = {}) {
   // O palpite por palavra-chave e o piso `alimentacao` sao a mesma coisa para
   // quem revisa — os dois sao chute e os dois chegam marcados. Ficam separados
   // no codigo porque so o primeiro carrega evidencia: se um dia o piso mudar,
@@ -287,11 +366,15 @@ async function classify(cnpj, name, city) {
     return fallback;
   }
 
-  const merchant = await Merchant.findOrCreate({
-    cnpj: normalized,
-    name: name || `Emitente ${normalized}`,
-    city,
-  });
+  // Sem cadastrar, o desconhecido da o mesmo que o cadastrado agora: sem
+  // categoria propria, vale o palpite.
+  const merchant = register
+    ? await Merchant.findOrCreate({
+        cnpj: normalized,
+        name: name || `Emitente ${normalized}`,
+        city,
+      })
+    : await Merchant.findByCnpj(normalized);
 
   if (!merchant) {
     return fallback;
@@ -326,4 +409,4 @@ function lowestConfidence(fields) {
   return values.length > 0 ? Math.min(...values) : null;
 }
 
-module.exports = { processFile, classify };
+module.exports = { processFile, proposeFile, classify };

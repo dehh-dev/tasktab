@@ -47,7 +47,10 @@ const REVIEWED_FIELDS = ['issued_at', 'amount_cents', 'category'];
 // Corrigir qualquer um destes marca a origem como manual — e o que permite a
 // tela destacar o que veio de OCR. Chave, CNPJ e emitente entram aqui e nao na
 // lista de cima: recibo manuscrito e comanda nao tem chave, e se confirmam do
-// mesmo jeito.
+// mesmo jeito. Corrigir e mudar o valor: a tela reenvia data, valor e
+// categoria a cada "confirmar", e contar isso como correcao marcava como
+// digitado todo comprovante confirmado — os 23 de um relatorio real, com a
+// extracao certa em parte deles.
 const MANUAL_FIELDS = [
   ...REVIEWED_FIELDS,
   'access_key',
@@ -274,7 +277,7 @@ function validateUpdate(body, current = {}) {
   }
 
   // Correcao humana marca a origem, para a revisao saber o que ja foi olhado.
-  if (MANUAL_FIELDS.some((field) => field in data)) {
+  if (MANUAL_FIELDS.some((field) => changes(field, data, current))) {
     data.extraction_source = 'manual';
   }
 
@@ -285,6 +288,23 @@ function validateUpdate(body, current = {}) {
   }
 
   return data;
+}
+
+/**
+ * Se o PATCH muda o campo. O CNPJ nao e coluna do comprovante, e a tela so o
+ * pede de quem nao tem emitente: digitado, e informacao nova; nulo, desvincula
+ * o emitente que houver.
+ */
+function changes(field, data, current) {
+  if (!(field in data)) {
+    return false;
+  }
+
+  if (field === 'cnpj') {
+    return data.cnpj !== null || (current.merchant_id ?? null) !== null;
+  }
+
+  return data[field] !== (current[field] ?? null);
 }
 
 /**

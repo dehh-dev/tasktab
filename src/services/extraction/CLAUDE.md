@@ -53,6 +53,17 @@ nao por deixar de olhar.
   `extractItemCount` da a contagem impressa e o maior numero de ordem lido
   (`003 752 BUFFET`, com letra na descricao — `085 3333-4444` e telefone),
   que a regra da soma usa para nao acusar com item faltando.
+- A proposta inteira vai tambem para `extracted` (jsonb), na mesma escrita
+  das colunas: os mesmos nomes, mais `parser` e `cnpj`. Pagina sem leitura
+  grava `{ parser: null, extraction_source: null }` — nulo e comprovante
+  anterior a coluna. A revisao nao a toca: e a base da avaliacao
+  (`scripts/evaluate-extraction.js`).
+- **Mudou a extracao, meca antes e depois**:
+  `npm run extraction:evaluate -- --report <id> --reextract` le os PDFs de
+  novo com `proposeFile`, que nao grava nada nem cadastra emitente
+  (`classify` com `register: false`). `proposePage` e o mesmo caminho do
+  upload, sem a escrita: nao duplique a cascata num caminho so da avaliacao.
+  Relatorio 93 e corpus de Itapipoca sao a base.
 - A pagina e **renderizada uma vez** (`pipeline.service.js`) e o PNG serve ao
   QR e ao OCR, na mesma `RENDER_SCALE`. Eram duas renderizacoes a 3x por
   pagina escaneada. A falha nao fica guardada: o OCR renderiza de novo.

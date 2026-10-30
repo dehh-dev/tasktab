@@ -42,6 +42,56 @@ describe('PATCH /api/receipts/:id', () => {
     expect(response.body.data.extraction_source).toBe('manual');
   });
 
+  it('confirmar com os valores que a extracao leu nao marca como digitado', async () => {
+    // A tela reenvia data, valor e categoria a cada "confirmar". Contar isso
+    // como correcao marcava como digitado todo comprovante confirmado, e o
+    // que a extracao acertou deixava de ser mensuravel.
+    const report = await insertReport();
+    const receipt = await insertReceipt(report.id, {
+      ...COMPLETO,
+      status: 'needs_review',
+    });
+    await updateColumnDirectly(
+      'receipts',
+      receipt.id,
+      'extraction_source',
+      'ocr',
+    );
+
+    const response = await request('PATCH', `/api/receipts/${receipt.id}`, {
+      ...COMPLETO,
+      status: 'confirmed',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      status: 'confirmed',
+      extraction_source: 'ocr',
+    });
+  });
+
+  it('confirmar com um valor corrigido marca como digitado', async () => {
+    const report = await insertReport();
+    const receipt = await insertReceipt(report.id, {
+      ...COMPLETO,
+      status: 'needs_review',
+    });
+    await updateColumnDirectly(
+      'receipts',
+      receipt.id,
+      'extraction_source',
+      'ocr',
+    );
+
+    const response = await request('PATCH', `/api/receipts/${receipt.id}`, {
+      ...COMPLETO,
+      amount_cents: 3770,
+      status: 'confirmed',
+    });
+
+    expect(response.body.data.extraction_source).toBe('manual');
+  });
+
   it('confirma quando data, valor e categoria estao preenchidos', async () => {
     const report = await insertReport();
     const receipt = await insertReceipt(report.id);

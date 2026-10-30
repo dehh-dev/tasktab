@@ -27,13 +27,21 @@ const EDITS = WITH_ID.filter((route) => route.body);
 /**
  * Colunas que nenhuma rota de edicao pode escrever, por colecao: a identidade
  * do registro e, no relatorio, o dono — transferir posse por um PATCH que
- * passou por acaso seria a forma mais silenciosa de burlar a autorizacao.
+ * passou por acaso seria a forma mais silenciosa de burlar a autorizacao. No
+ * comprovante, tambem o que a extracao propos: e a medida da extracao, e a
+ * revisao nao pode reescreve-la.
  */
 const IDENTITY = {
   users: { id: 999, password_hash: 'scrypt$1$1$1$sal$hash' },
   tasks: { id: 999, created_at: '2020-01-01T00:00:00Z' },
   reports: { id: 999, owner_id: 999 },
-  receipts: { id: 999, report_id: 999, file_hash: 'outro', page_number: 9 },
+  receipts: {
+    id: 999,
+    report_id: 999,
+    file_hash: 'outro',
+    page_number: 9,
+    extracted: { amount_cents: 1 },
+  },
   merchants: { id: 999, cnpj: '58080015000197' },
 };
 

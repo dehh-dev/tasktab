@@ -140,6 +140,21 @@ trabalho ja e "uma pagina, um registro", a migracao e local.
 um comprovante exige data, valor e categoria — a checagem considera o que ja
 esta gravado, nao so o que veio no corpo.
 
+O que a extracao propos fica tambem em `extracted` (JSON com data, valor,
+chave, CNPJ, emitente, categoria, origem, confianca e parser), que so a
+extracao escreve: a revisao corrige as colunas e a proposta continua la. A
+origem vira `manual` ("Digitado" na tela) so quando a revisao **muda** algum
+valor; confirmar o que a extracao leu mantem a origem dela. Com as duas
+coisas, `npm run extraction:evaluate -- --report <id>` mede a extracao contra
+o que foi confirmado: por campo, quantos certos, errados e vazios, e quantos
+errados chegaram sem destaque na revisao — no total, por origem (QR, texto,
+OCR) e por parser. Imprime so contagens: nada do que o comprovante traz sai
+na tela. Com `--reextract`, a proposta medida e a do codigo de hoje: o PDF de
+cada comprovante e lido de novo, sem gravar nada nem cadastrar emitente. E o
+que mede um relatorio confirmado antes de a proposta ser guardada, e o antes
+e depois de qualquer mudanca na extracao. A categoria, ali, usa o cadastro de
+emitentes de hoje, que ja aprendeu com a propria conferencia.
+
 ## Conferencia
 
 `GET /api/reports/:id/validation` devolve alertas com a **classe do

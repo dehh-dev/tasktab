@@ -233,6 +233,12 @@ describe('OCR que nao sobe', () => {
       ['needs_review', null],
       ['needs_review', null],
     ]);
+    // A proposta vazia tambem fica: a avaliacao conta "nao leu", diferente do
+    // comprovante anterior a coluna, que fica nulo.
+    expect(receipts.map((r) => r.extracted)).toEqual([
+      { parser: null, extraction_source: null },
+      { parser: null, extraction_source: null },
+    ]);
     expect(health.status).toBe(200);
   }, 70000);
 });
