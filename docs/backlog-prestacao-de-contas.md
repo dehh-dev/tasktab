@@ -2688,3 +2688,21 @@ degrau novo de leitura, saber quanto o atual acerta.
 descartado, porque apaga os valores conferidos, que são o gabarito. A
 reextração em memória usa o mesmo caminho do upload (`proposePage`), sem a
 escrita.
+
+## Issue 68 — Total com o "pagar" sujo pelo OCR
+
+`area:extracao`
+
+Num cupom de Itapipoca a linha saiu "Valor a Pasar R$ 117,14": o número
+limpo, a âncora com o `g` lido como `s`. Nenhuma âncora casava, e o total
+ficava vazio. É a primeira mudança medida com a avaliação.
+
+- [x] `total a pagar` e `valor a pagar` aceitam `pasar` e `paqar`
+- [x] A forma de pagamento sem `R$` continua não sendo âncora
+
+| Medida (`--reextract`, 65 confirmados) | Antes  | Depois |
+| -------------------------------------- | ------ | ------ |
+| Valor certo                            | 12     | 13     |
+| Valor errado (todos com destaque)      | 2      | 2      |
+| Valor vazio                            | 51     | 50     |
+| Data, chave e categoria                | iguais | iguais |
