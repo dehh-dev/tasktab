@@ -9,6 +9,7 @@ const {
   insertRpaCompany,
   insertRpaLaunch,
   insertRpaWorker,
+  insertRow,
   currentUser,
   DEFAULT_USER,
   DEFAULT_PASSWORD,
@@ -53,6 +54,13 @@ const IDENTITY = {
   // O numero da pessoa e fixo e vai no codigo do RPA; as pendencias so a
   // importacao e as verificacoes escrevem.
   'rpa/workers': { id: 999, launch_id: 999, number: 99, issues: [] },
+  // O arquivo e o hash dele: trocar seria apontar o documento para outro.
+  'rpa/files': {
+    id: 999,
+    launch_id: 999,
+    file_hash: 'outro',
+    file_path: 'outro.pdf',
+  },
 };
 
 /** Status e classe do erro — e o `action`, que a interface exibe sempre. */
@@ -136,6 +144,16 @@ describe('contrato das rotas de edicao', () => {
       'rpa/companies': (await insertRpaCompany()).id,
       'rpa/launches': (await insertRpaLaunch()).id,
       'rpa/workers': (await insertRpaWorker()).id,
+      'rpa/files': (
+        await insertRow('rpa_files', {
+          launch_id: (await insertRpaLaunch()).id,
+          kind: 'ctps',
+          file_hash: 'a'.repeat(64),
+          file_path: `${'a'.repeat(64)}.jpg`,
+          content_type: 'image/jpeg',
+          byte_size: 10,
+        })
+      ).id,
     };
     // O caminho entre `/api/` e o `:id`: `reports`, `rpa/companies`.
     const collection = (route) =>

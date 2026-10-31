@@ -68,6 +68,11 @@ module.exports = {
     dir: path.resolve(__dirname, '../..', process.env.UPLOAD_DIR || 'uploads'),
     maxBytes: Number(process.env.UPLOAD_MAX_BYTES || 20 * 1024 * 1024),
     maxFiles: Number(process.env.UPLOAD_MAX_FILES || 20),
+    // O .zip dos documentos do formulario do RPA (issue 41): fotos de celular
+    // de toda a equipe. O de um lancamento com 6 pessoas deu 27 MB.
+    documentsMaxBytes: Number(
+      process.env.RPA_DOCUMENTS_MAX_BYTES || 200 * 1024 * 1024,
+    ),
   },
   ocr: {
     // Desligavel para quem so processa PDF digital e nao quer o custo do

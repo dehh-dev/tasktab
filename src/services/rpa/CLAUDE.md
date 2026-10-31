@@ -1,9 +1,10 @@
-# RPA: equipe, pendencias, calculo, pagamentos e emissao
+# RPA: equipe, documentos, calculo, pagamentos e emissao
 
 O modulo substitui a planilha `CONTROLE DE DIARIA - <cidade>.xlsb` (plano em
 issue 35). Aqui ficam a importacao das respostas do Google Forms (issue 37),
 a grade do ponto com o calculo das diarias (issue 38), os pagamentos com o
-bruto e os impostos (issue 39) e a emissao: PDF, .zip e e-mail (issue 40).
+bruto e os impostos (issue 39), a emissao: PDF, .zip e e-mail (issue 40), e
+os documentos do formulario (issue 41).
 
 ## Importacao (`import.service.js`)
 
@@ -176,3 +177,37 @@ pendencia barra a importacao.
   texto e HTML (campos em negrito vermelho, escapados). Do 2o pagamento em
   diante o texto e o da resposta, com o mesmo assunto, para o Gmail juntar a
   conversa.
+
+## Documentos do formulario (`zip-reader.js`, `documents.js`, `documents.service.js`)
+
+- **O .zip vai para o disco e e lido por partes** (`zip-reader.js`, sobre
+  `FileHandle`): o do Drive pode ter centenas de MB (limite proprio,
+  `RPA_DOCUMENTS_MAX_BYTES`). Leitor proprio, e nao o JSZip, porque a defesa
+  de bomba precisa dos tamanhos **antes** de descompactar, e o JSZip so os
+  expoe por propriedade interna.
+- **Defesa de zip em duas camadas.** Pelo diretorio central, antes de abrir
+  qualquer entrada: ate 2.000 arquivos, 50 MB por arquivo e 400 MB no total
+  descompactados. Ao descompactar, `maxOutputLength` igual ao tamanho
+  declarado: a entrada que mente para no primeiro byte a mais. CRC e tamanho
+  conferidos. Zip64, senha e compressao que nao seja deflate sao recusados.
+  Uma entrada ruim recusa o .zip inteiro; arquivo de formato desconhecido so
+  volta em `rejected`.
+- **O nome da entrada nunca vira caminho**: o arquivo e gravado pelo SHA-256,
+  no mesmo diretorio dos comprovantes (a retencao conta as duas tabelas). O
+  nome so diz a pasta (tipo e lado) e a conta (a pessoa).
+- **Tipo pela pasta da pergunta**, nunca pelo nome do arquivo, com regras em
+  ordem (`KIND_RULES`): a CTPS ("Carteira de Trabalho") antes do RG, porque o
+  RG diz "Lado dos Dados". O formato e pelo conteudo (`detectType`).
+- **Pessoa pelo primeiro e ultimo nome da conta**, sem acento e sem caixa;
+  duas pessoas com a mesma chave, ou nenhuma, deixam o documento sem pessoa,
+  com `source_name` para escolher na mao (`PATCH /api/rpa/files/:id`).
+  Reenviar so preenche a pessoa que faltava: a escolha feita na mao fica.
+- Frente e verso com o mesmo hash viram **um arquivo sem lado** (`CTPS.jpg`);
+  o mesmo arquivo nao se repete no lancamento (`rpa_files_unique_hash_per_launch`).
+- **Versao para e-mail**: foto acima de 1 MB sai a 2.400 px no lado maior,
+  JPEG q85, virada pela orientacao da camera; PDF vai como veio. O .zip e
+  montado em memoria so nesse caso, para avisar (`X-Email-Warning`) se passar
+  dos 25 MB do Gmail. A versao completa sai do disco em fluxo.
+- **Nada de nome de arquivo, de conta ou de documento no log**: so contagens
+  e o id do lancamento, com teste lendo a saida de uma API de verdade
+  (`tests/api/rpa/log.test.js`). Os nomes so voltam na resposta.

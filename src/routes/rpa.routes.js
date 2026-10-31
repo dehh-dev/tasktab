@@ -7,10 +7,11 @@ const workers = require('../controllers/rpa-worker.controller');
 const timesheet = require('../controllers/rpa-timesheet.controller');
 const payments = require('../controllers/rpa-payment.controller');
 const documents = require('../controllers/rpa-document.controller');
+const files = require('../controllers/rpa-file.controller');
 const asyncHandler = require('../middlewares/async-handler');
 const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireScope } = require('../middlewares/authorize');
-const { spreadsheetUpload } = require('../middlewares/upload');
+const { spreadsheetUpload, documentsUpload } = require('../middlewares/upload');
 
 const router = Router();
 
@@ -103,6 +104,24 @@ router.get(
   requireScope('rpa:read'),
   asyncHandler(documents.email),
 );
+// O escopo antes do upload, como na planilha: quem nao pode escrever nao
+// chega a mandar documento de ninguem para o disco.
+router.post(
+  '/launches/:id/documents',
+  requireScope('rpa:write'),
+  documentsUpload,
+  asyncHandler(files.upload),
+);
+router.get(
+  '/launches/:id/documents',
+  requireScope('rpa:read'),
+  asyncHandler(files.index),
+);
+router.get(
+  '/launches/:id/documents.zip',
+  requireScope('rpa:read'),
+  asyncHandler(files.zip),
+);
 
 router.get(
   '/workers/:id',
@@ -119,6 +138,11 @@ router.get(
   '/payments/:id',
   requireScope('rpa:read'),
   asyncHandler(payments.show),
+);
+router.patch(
+  '/files/:id',
+  requireScope('rpa:write'),
+  asyncHandler(files.update),
 );
 router.get(
   '/payments/:id/rpa.pdf',

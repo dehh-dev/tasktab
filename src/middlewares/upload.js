@@ -33,11 +33,33 @@ const receiveSpreadsheet = multer({
 }).single('file');
 
 /**
+ * O .zip dos documentos do formulario do RPA (issue 41) vai para o disco, com
+ * limite proprio: pode ter centenas de MB, e o leitor de zip o le por partes.
+ * O nome temporario nunca vem do cliente; o controller apaga o arquivo depois
+ * de ler.
+ */
+const receiveDocuments = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, done) => done(null, env.upload.dir),
+    filename: (req, file, done) =>
+      done(
+        null,
+        `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}.zip`,
+      ),
+  }),
+  limits: { fileSize: env.upload.documentsMaxBytes, files: 1 },
+}).single('file');
+
+/**
  * Envolve o middleware do multer para que os erros dele saiam no formato da
  * API. Sem isso, estourar o limite de tamanho viraria um 500 generico em vez
  * de dizer ao usuario qual e o limite.
  */
-function withApiErrors(receive, field, { count, unexpected }) {
+function withApiErrors(
+  receive,
+  field,
+  { count, unexpected, maxBytes = env.upload.maxBytes },
+) {
   return (req, res, next) => {
     receive(req, res, (error) => {
       if (!error) {
@@ -45,7 +67,7 @@ function withApiErrors(receive, field, { count, unexpected }) {
       }
 
       if (error instanceof multer.MulterError) {
-        const megabytes = Math.round(env.upload.maxBytes / (1024 * 1024));
+        const megabytes = Math.round(maxBytes / (1024 * 1024));
 
         const messages = {
           LIMIT_FILE_SIZE: `Arquivo maior que o limite de ${megabytes} MB.`,
@@ -78,4 +100,10 @@ const spreadsheetUpload = withApiErrors(receiveSpreadsheet, 'file', {
   unexpected: 'Envie a planilha no campo "file".',
 });
 
-module.exports = { receiptUpload, spreadsheetUpload };
+const documentsUpload = withApiErrors(receiveDocuments, 'file', {
+  count: 'Envie um .zip por vez.',
+  unexpected: 'Envie o .zip no campo "file".',
+  maxBytes: env.upload.documentsMaxBytes,
+});
+
+module.exports = { receiptUpload, spreadsheetUpload, documentsUpload };

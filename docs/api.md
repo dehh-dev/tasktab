@@ -87,26 +87,30 @@ issue 35.
 | `GET`   | `/api/rpa/companies/:id` | Detalhe                                          |
 | `PATCH` | `/api/rpa/companies/:id` | Atualiza (o codigo UAU nao muda: e a identidade) |
 
-| Metodo   | Rota                             | Descricao                                     |
-| -------- | -------------------------------- | --------------------------------------------- |
-| `GET`    | `/api/rpa/launches`              | Lista os lancamentos (filtro por `status`)    |
-| `POST`   | `/api/rpa/launches`              | Cria, com horario padrao e diarias            |
-| `GET`    | `/api/rpa/launches/:id`          | Detalhe                                       |
-| `PATCH`  | `/api/rpa/launches/:id`          | Atualiza; encerrado so aceita reabrir         |
-| `DELETE` | `/api/rpa/launches/:id`          | Apaga (recusa com `409` se ha RPA)            |
-| `POST`   | `/api/rpa/launches/:id/import`   | Importa a equipe das respostas do formulario  |
-| `GET`    | `/api/rpa/launches/:id/workers`  | A equipe, pelo numero fixo, com pendencias    |
-| `GET`    | `/api/rpa/launches/:id/days`     | A grade do ponto, com o valor de cada dia     |
-| `PUT`    | `/api/rpa/launches/:id/days`     | Grava em lote so os dias que mudam            |
-| `GET`    | `/api/rpa/launches/:id/payments` | Os RPAs do lancamento (`status`, `number`)    |
-| `POST`   | `/api/rpa/launches/:id/payments` | Previa (`?preview=true`) ou emissao dos RPAs  |
-| `GET`    | `/api/rpa/launches/:id/rpas.zip` | Um PDF por pessoa do pagamento `?payment=n`   |
-| `GET`    | `/api/rpa/launches/:id/email`    | Texto do e-mail de solicitacao (`?payment=n`) |
-| `GET`    | `/api/rpa/workers/:id`           | Detalhe da pessoa                             |
-| `PATCH`  | `/api/rpa/workers/:id`           | Corrige a pessoa e da pendencia por resolvida |
-| `GET`    | `/api/rpa/payments/:id`          | O RPA, com o que levou de cada dia            |
-| `GET`    | `/api/rpa/payments/:id/rpa.pdf`  | O RPA no layout do formulario de emissao      |
-| `POST`   | `/api/rpa/payments/:id/cancel`   | Cancela com motivo e libera os dias           |
+| Metodo   | Rota                                  | Descricao                                     |
+| -------- | ------------------------------------- | --------------------------------------------- |
+| `GET`    | `/api/rpa/launches`                   | Lista os lancamentos (filtro por `status`)    |
+| `POST`   | `/api/rpa/launches`                   | Cria, com horario padrao e diarias            |
+| `GET`    | `/api/rpa/launches/:id`               | Detalhe                                       |
+| `PATCH`  | `/api/rpa/launches/:id`               | Atualiza; encerrado so aceita reabrir         |
+| `DELETE` | `/api/rpa/launches/:id`               | Apaga (recusa com `409` se ha RPA)            |
+| `POST`   | `/api/rpa/launches/:id/import`        | Importa a equipe das respostas do formulario  |
+| `GET`    | `/api/rpa/launches/:id/workers`       | A equipe, pelo numero fixo, com pendencias    |
+| `GET`    | `/api/rpa/launches/:id/days`          | A grade do ponto, com o valor de cada dia     |
+| `PUT`    | `/api/rpa/launches/:id/days`          | Grava em lote so os dias que mudam            |
+| `GET`    | `/api/rpa/launches/:id/payments`      | Os RPAs do lancamento (`status`, `number`)    |
+| `POST`   | `/api/rpa/launches/:id/payments`      | Previa (`?preview=true`) ou emissao dos RPAs  |
+| `GET`    | `/api/rpa/launches/:id/rpas.zip`      | Um PDF por pessoa do pagamento `?payment=n`   |
+| `GET`    | `/api/rpa/launches/:id/email`         | Texto do e-mail de solicitacao (`?payment=n`) |
+| `POST`   | `/api/rpa/launches/:id/documents`     | Importa o .zip dos documentos do formulario   |
+| `GET`    | `/api/rpa/launches/:id/documents`     | Os documentos, pela pessoa; sem pessoa no fim |
+| `GET`    | `/api/rpa/launches/:id/documents.zip` | Uma pasta por pessoa (`?email=true` reduz)    |
+| `GET`    | `/api/rpa/workers/:id`                | Detalhe da pessoa                             |
+| `PATCH`  | `/api/rpa/workers/:id`                | Corrige a pessoa e da pendencia por resolvida |
+| `PATCH`  | `/api/rpa/files/:id`                  | Pessoa, tipo ou lado do documento, na mao     |
+| `GET`    | `/api/rpa/payments/:id`               | O RPA, com o que levou de cada dia            |
+| `GET`    | `/api/rpa/payments/:id/rpa.pdf`       | O RPA no layout do formulario de emissao      |
+| `POST`   | `/api/rpa/payments/:id/cancel`        | Cancela com motivo e libera os dias           |
 
 O lancamento leva `company_id`, `city`, `state`, `development`, `starts_on` e
 `ends_on` (obrigatorios), `holidays` (datas), `service_type` e `cost_center`
@@ -198,6 +202,25 @@ do n-esimo pagamento, um por pessoa, com os nomes em UTF-8.
 `text` e `html` do e-mail de solicitacao (o envio continua pelo Gmail); do 2o
 pagamento em diante, `reply` e `true` e o texto e o da resposta na mesma
 conversa, com o mesmo assunto.
+
+`POST /api/rpa/launches/:id/documents` recebe, no campo `file`, o .zip da
+pasta de respostas do formulario baixado do Drive (uma subpasta por pergunta,
+arquivos `<nome original> - <nome da conta Google>`). O tipo sai da subpasta
+(CTPS, RG ou CNH, comprovante de endereco, dados bancarios; frente ou verso);
+a pessoa, do nome da conta, pelo primeiro e ultimo nome sem acento e sem
+caixa. O que nao casar fica sem `worker_id`, com `source_name`, para escolher
+no `PATCH /api/rpa/files/:id`. Frente e verso com o mesmo conteudo viram um
+arquivo so, sem lado; reenviar o mesmo .zip nao duplica. Arquivo de pergunta
+desconhecida, ou que nao e foto nem PDF, volta em `rejected`. O .zip e
+recusado inteiro com `422` se tiver mais de 2.000 arquivos, um arquivo acima
+de 50 MB descompactado, mais de 400 MB descompactados no total, ou um arquivo
+que descompacta mais do que declara.
+
+`GET /api/rpa/launches/:id/documents.zip` monta uma pasta `NOME SOBRENOME`
+por pessoa, com `CTPS`, `RG-CNH`, `CE` (comprovante de endereco) e `DB`
+(dados bancarios), e `FRENTE`/`VERSO` quando sao arquivos diferentes. Com
+`?email=true`, fotos acima de 1 MB saem reduzidas a 2.400 px no lado maior
+(JPEG q85); passando ainda de 25 MB, o cabecalho `X-Email-Warning` avisa.
 
 Campos da empresa: `code` (codigo UAU, inteiro, unico), `name` e `cnpj`
 (obrigatorios; o CNPJ entra com ou sem mascara e e conferido pelo
