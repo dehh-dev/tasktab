@@ -53,7 +53,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 | `runScript(file, args)`                                            | roda um script de `scripts/` contra o banco de teste       |
 | `runMigration(direcao, n)` / `migrationsFrom(nome)`                | anda migrations; quantas o `down` desfaz ate antes de uma  |
 | `enumLabels(tipo)`                                                 | valores de um enum do banco, na ordem declarada            |
-| `startApiInstance(env)`                                            | outra API, em porta propria (`request` com `baseUrl`)      |
+| `startApiInstance(env)`                                            | outra API, em porta propria; `output()` e o stdout dela    |
 
 - `request()` ja chega autenticada como o **admin padrao**. `{ token: null }`
   testa 401; `createUserWithSession({ role })`, outro papel. O hash da senha e
@@ -85,6 +85,10 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 - Conteudo extraido, so depois de `waitForProcessing`.
 - Nunca use comprovante real como fixture: traz CNPJ e CPF de terceiros.
   `tests/fixtures/pdf.js` gera cupom com texto, com QR e escaneado.
+- O mesmo para o RPA: `tests/fixtures/forms.js` gera as respostas do
+  formulario em .xlsx (como o Sheets exporta: data como data, CPF e CEP como
+  numero) e .csv (UTF-8 com virgula, ou Windows-1252 com ponto e virgula), com
+  os titulos reais das perguntas e CPF/PIS sinteticos pelo verificador.
 
 ## Puros
 

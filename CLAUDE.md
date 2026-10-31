@@ -86,6 +86,7 @@ toca auth, middlewares e testes.
 | Variaveis de ambiente, bancos, datas                  | `src/config/CLAUDE.md`                |
 | Extracao (texto, QR, OCR), chave de acesso, categoria | `src/services/extraction/CLAUDE.md`   |
 | Conferencia e duplicatas                              | `src/services/validation/CLAUDE.md`   |
+| RPA: importacao da equipe, pendencias, calculo        | `src/services/rpa/CLAUDE.md`          |
 | Exportacao (planilha, Anexo I, PDF)                   | `src/services/export/CLAUDE.md`       |
 | Erros e logs                                          | `infra/CLAUDE.md`                     |
 | Migrations e garantias do banco                       | `src/models/CLAUDE.md`                |

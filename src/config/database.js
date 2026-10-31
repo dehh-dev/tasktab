@@ -9,6 +9,13 @@ const { logger } = require('../../infra/logger');
 const PG_DATE_OID = 1082;
 types.setTypeParser(PG_DATE_OID, (value) => value);
 
+// O mesmo para `date[]` (OID 1182, os feriados do lancamento do RPA): o
+// parser padrao do array chama o de data para cada item e volta a criar
+// `Date`. O de `text[]` (OID 1009) devolve as strings como vieram.
+const PG_DATE_ARRAY_OID = 1182;
+const PG_TEXT_ARRAY_OID = 1009;
+types.setTypeParser(PG_DATE_ARRAY_OID, types.getTypeParser(PG_TEXT_ARRAY_OID));
+
 const pool = new Pool({
   host: env.database.host,
   port: env.database.port,
@@ -57,8 +64,30 @@ async function queryWithTimeout(text, params, timeoutMs) {
   }
 }
 
+/**
+ * Roda `work(client)` numa transacao: COMMIT se ela termina, ROLLBACK se
+ * estoura. Quem escreve em mais de uma tabela de uma vez (o lancamento do RPA
+ * com horario e diarias, a importacao da equipe) passa por aqui, para nao
+ * sobrar metade gravada.
+ */
+async function transaction(work) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 function close() {
   return pool.end();
 }
 
-module.exports = { pool, query, queryWithTimeout, close };
+module.exports = { pool, query, queryWithTimeout, transaction, close };

@@ -7,6 +7,8 @@ const {
   insertReceipt,
   insertMerchant,
   insertRpaCompany,
+  insertRpaLaunch,
+  insertRpaWorker,
   currentUser,
   DEFAULT_USER,
   DEFAULT_PASSWORD,
@@ -46,6 +48,11 @@ const IDENTITY = {
   merchants: { id: 999, cnpj: '58080015000197' },
   // O codigo UAU e a identidade da empresa: vai no codigo de todo RPA dela.
   'rpa/companies': { id: 999, code: 999 },
+  // A empresa da o codigo de todo RPA; quem criou sai da sessao.
+  'rpa/launches': { id: 999, company_id: 999, created_by: 999 },
+  // O numero da pessoa e fixo e vai no codigo do RPA; as pendencias so a
+  // importacao e as verificacoes escrevem.
+  'rpa/workers': { id: 999, launch_id: 999, number: 99, issues: [] },
 };
 
 /** Status e classe do erro — e o `action`, que a interface exibe sempre. */
@@ -127,6 +134,8 @@ describe('contrato das rotas de edicao', () => {
       receipts: (await insertReceipt(report.id)).id,
       merchants: (await insertMerchant()).id,
       'rpa/companies': (await insertRpaCompany()).id,
+      'rpa/launches': (await insertRpaLaunch()).id,
+      'rpa/workers': (await insertRpaWorker()).id,
     };
     // O caminho entre `/api/` e o `:id`: `reports`, `rpa/companies`.
     const collection = (route) =>

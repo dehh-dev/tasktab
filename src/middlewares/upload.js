@@ -23,37 +23,59 @@ const upload = multer({
 const receiveFiles = upload.array('files', env.upload.maxFiles);
 
 /**
+ * A planilha de respostas do formulario (issue 37) fica so em memoria: e
+ * lida e descartada, e nao vai para o disco nem para o banco — traz CPF, RG e
+ * conta de todo mundo. Um arquivo por vez, no campo `file`.
+ */
+const receiveSpreadsheet = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: env.upload.maxBytes, files: 1 },
+}).single('file');
+
+/**
  * Envolve o middleware do multer para que os erros dele saiam no formato da
  * API. Sem isso, estourar o limite de tamanho viraria um 500 generico em vez
  * de dizer ao usuario qual e o limite.
  */
-function receiptUpload(req, res, next) {
-  receiveFiles(req, res, (error) => {
-    if (!error) {
-      return next();
-    }
+function withApiErrors(receive, field, { count, unexpected }) {
+  return (req, res, next) => {
+    receive(req, res, (error) => {
+      if (!error) {
+        return next();
+      }
 
-    if (error instanceof multer.MulterError) {
-      const megabytes = Math.round(env.upload.maxBytes / (1024 * 1024));
+      if (error instanceof multer.MulterError) {
+        const megabytes = Math.round(env.upload.maxBytes / (1024 * 1024));
 
-      const messages = {
-        LIMIT_FILE_SIZE: `Arquivo maior que o limite de ${megabytes} MB.`,
-        LIMIT_FILE_COUNT: `Envie no maximo ${env.upload.maxFiles} arquivos por vez.`,
-        LIMIT_UNEXPECTED_FILE: 'Envie os arquivos no campo "files".',
-      };
+        const messages = {
+          LIMIT_FILE_SIZE: `Arquivo maior que o limite de ${megabytes} MB.`,
+          LIMIT_FILE_COUNT: count,
+          LIMIT_UNEXPECTED_FILE: unexpected,
+        };
 
-      return next(
-        new ValidationError({
-          message: messages[error.code] || 'Falha ao receber o arquivo.',
-          action: 'Ajuste o envio e tente de novo.',
-          details: [{ field: 'files', message: error.code }],
-          cause: error,
-        }),
-      );
-    }
+        return next(
+          new ValidationError({
+            message: messages[error.code] || 'Falha ao receber o arquivo.',
+            action: 'Ajuste o envio e tente de novo.',
+            details: [{ field, message: error.code }],
+            cause: error,
+          }),
+        );
+      }
 
-    return next(error);
-  });
+      return next(error);
+    });
+  };
 }
 
-module.exports = { receiptUpload };
+const receiptUpload = withApiErrors(receiveFiles, 'files', {
+  count: `Envie no maximo ${env.upload.maxFiles} arquivos por vez.`,
+  unexpected: 'Envie os arquivos no campo "files".',
+});
+
+const spreadsheetUpload = withApiErrors(receiveSpreadsheet, 'file', {
+  count: 'Envie uma planilha por vez.',
+  unexpected: 'Envie a planilha no campo "file".',
+});
+
+module.exports = { receiptUpload, spreadsheetUpload };

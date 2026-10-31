@@ -58,3 +58,8 @@ com o `request_id` e, depois do `authenticate`, o `user_id`).
   escrevendo o que mandarem. Para investigar acesso, logue o `user_id`; uma
   extracao, o `id` do comprovante; uma pessoa do RPA, o `id` dela. Campo
   sensivel novo entra na lista e no `tests/infra/logger.test.js`.
+- O `err.detail` do Postgres tambem sai como `[Redacted]`: repete o valor que
+  violou a constraint (`Key (cpf)=(...)`) e, no CHECK, a linha inteira. Para
+  saber qual regra, olhe o `err.constraint`. A `message` passa: num erro de
+  tipo (`value "..." is out of range`) ela traz o valor, entao nao mande dado
+  pessoal para coluna de tipo errado.
