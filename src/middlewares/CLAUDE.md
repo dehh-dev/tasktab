@@ -25,5 +25,7 @@ ninguem**; quem barra e `requireScope` / `requireAuth` (`authorize.js`).
   `tests/api/rate-limit.test.js` sobe uma instancia propria
   (`startApiInstance`) com tetos baixos. Mexeu nos tetos? E la que se confere.
 - Os limites do upload (`UPLOAD_MAX_BYTES`, `UPLOAD_MAX_FILES`, campo `files`)
-  viram `422` no campo `files` (`upload.js`), sem sobra no disco. O teste sobe
+  viram `422` no campo `files` (`upload.js`), sem sobra no disco. A planilha
+  de respostas do RPA vem pelo `spreadsheetUpload`: **em memoria**, campo
+  `file`, um arquivo — e lida e descartada, nunca vai para o disco. O teste sobe
   uma instancia com tetos baixos, como o do limitador.

@@ -17,6 +17,8 @@ A data "andava" um dia, e dois pontos resolvem:
 
 1. `database.js` registra um type parser para o OID 1082 (`DATE`) que devolve
    a string crua `YYYY-MM-DD`. Sem ele o `pg` cria um `Date` na timezone local.
+   O `date[]` (OID 1182, os feriados do lancamento do RPA) tem parser proprio
+   pelo mesmo motivo: o padrao do array chamava o de data em cada item.
 2. `web/src/constants.js` formata a data com `split('-')`, sem `Date`.
 
 Em `due_date`, `issued_at` ou qualquer `DATE`, **nao introduza

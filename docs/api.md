@@ -87,6 +87,44 @@ issue 35.
 | `GET`   | `/api/rpa/companies/:id` | Detalhe                                          |
 | `PATCH` | `/api/rpa/companies/:id` | Atualiza (o codigo UAU nao muda: e a identidade) |
 
+| Metodo   | Rota                            | Descricao                                     |
+| -------- | ------------------------------- | --------------------------------------------- |
+| `GET`    | `/api/rpa/launches`             | Lista os lancamentos (filtro por `status`)    |
+| `POST`   | `/api/rpa/launches`             | Cria, com horario padrao e diarias            |
+| `GET`    | `/api/rpa/launches/:id`         | Detalhe                                       |
+| `PATCH`  | `/api/rpa/launches/:id`         | Atualiza; encerrado so aceita reabrir         |
+| `DELETE` | `/api/rpa/launches/:id`         | Apaga (recusa com `409` se ha RPA)            |
+| `POST`   | `/api/rpa/launches/:id/import`  | Importa a equipe das respostas do formulario  |
+| `GET`    | `/api/rpa/launches/:id/workers` | A equipe, pelo numero fixo, com pendencias    |
+| `GET`    | `/api/rpa/workers/:id`          | Detalhe da pessoa                             |
+| `PATCH`  | `/api/rpa/workers/:id`          | Corrige a pessoa e da pendencia por resolvida |
+
+O lancamento leva `company_id`, `city`, `state`, `development`, `starts_on` e
+`ends_on` (obrigatorios), `holidays` (datas), `service_type` e `cost_center`
+(sem eles, valem os da empresa), `site`, `product` e `supply` (os campos do
+e-mail de solicitacao), `email_to` e `email_cc`, `first_payment_daily_only`,
+`schedule` — o horario padrao, `[{ weekday, quantity, start_time, lunch_out,
+lunch_in, end_time }]`, com `weekday` de 1 (segunda) a 7 (domingo); dia que
+nao vem e folga — e `rates` — as diarias por funcao, `[{ role, starts_on,
+ends_on, daily_cents, promoted_bonus_cents }]`, sem vigencias sobrepostas da
+mesma funcao. No `PATCH`, `schedule` e `rates` substituem a lista inteira.
+
+`POST /api/rpa/launches/:id/import` recebe o `.xlsx` ou `.csv` baixado das
+respostas do Google Forms, em multipart no campo `file`. O arquivo e lido e
+descartado. A resposta traz `created`, `updated`, `unchanged`, `rejected`
+(`[{ line, reason }]`, as linhas sem nome ou CPF), `warnings` (pergunta
+desconhecida ou pessoa repetida, pela linha), `changes` (`[{ worker_id,
+number, fields }]`, o que cada resposta mais nova mudou) e `workers` (a equipe,
+com as pendencias). Reimportar casa pelo CPF e nao duplica ninguem. Sem a
+pergunta de nome ou de CPF, ou com um arquivo que nao e planilha, `422` no
+campo `file`.
+
+Cada pessoa tem `issues`: `[{ code, field, message, source, resolved }]`. O
+`PATCH` corrige campos (CPF com verificador valido e unico no lancamento,
+inicio real, saida, `promoted_since`, `dependents`, dados do formulario) e da
+pendencias por resolvidas com `resolve_issues: [{ code, field }]`. O `number`
+nao muda.
+
 Campos da empresa: `code` (codigo UAU, inteiro, unico), `name` e `cnpj`
 (obrigatorios; o CNPJ entra com ou sem mascara e e conferido pelo
 verificador), `city`, `state` (UF), `service_type` e `cost_center`. Os dois

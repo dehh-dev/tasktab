@@ -2,6 +2,8 @@
 
 const Report = require('../../models/report.model');
 const Receipt = require('../../models/receipt.model');
+const Launch = require('../../models/rpa-launch.model');
+const Worker = require('../../models/rpa-worker.model');
 const { NotFoundError, ConflictError } = require('../../../infra/errors');
 const ownership = require('./ownership');
 
@@ -104,4 +106,69 @@ async function loadReceipt(user, id, { write = false } = {}) {
   return receipt;
 }
 
-module.exports = { loadReport, loadReceipt, receiptNotFound, reportClosed };
+function launchNotFound(id) {
+  return new NotFoundError({
+    message: `Lancamento ${id} nao encontrado.`,
+    action: 'Verifique o id informado ou liste os lancamentos.',
+  });
+}
+
+function workerNotFound(id) {
+  return new NotFoundError({
+    message: `Pessoa ${id} nao encontrada.`,
+    action: 'Verifique o id informado ou liste a equipe do lancamento.',
+  });
+}
+
+/**
+ * Lancamento encerrado e somente leitura, como o relatorio fechado: e o que
+ * ja foi pago. A excecao e o PATCH que reabre (`allowClosed`).
+ */
+function launchClosed(id) {
+  return new ConflictError({
+    message: `O lancamento ${id} esta encerrado.`,
+    action: 'Reabra o lancamento para alterar a equipe ou os pagamentos.',
+  });
+}
+
+/**
+ * O lancamento do RPA. Nao tem dono: e compartilhado entre quem tem `rpa:*`,
+ * como tarefas e emitentes, e o escopo ja foi conferido na rota. Fica aqui
+ * mesmo assim para o 404 sair de um lugar so, como no `loadReport`.
+ */
+async function loadLaunch(id, { write = false, allowClosed = false } = {}) {
+  const launch = await Launch.findById(id);
+
+  if (!launch) {
+    throw launchNotFound(id);
+  }
+
+  if (write && !allowClosed && launch.status === 'closed') {
+    throw launchClosed(id);
+  }
+
+  return launch;
+}
+
+/** A pessoa e o lancamento dela, ja com a trava do encerrado na escrita. */
+async function loadWorker(id, { write = false } = {}) {
+  const worker = await Worker.findById(id);
+
+  if (!worker) {
+    throw workerNotFound(id);
+  }
+
+  const launch = await loadLaunch(worker.launch_id, { write });
+
+  return { worker, launch };
+}
+
+module.exports = {
+  loadReport,
+  loadReceipt,
+  loadLaunch,
+  loadWorker,
+  receiptNotFound,
+  reportClosed,
+  launchNotFound,
+};

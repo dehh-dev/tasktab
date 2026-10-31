@@ -106,6 +106,25 @@ const ROUTES = [
     roles: ADMIN,
     body: { name: 'Outra Razao Social' },
   },
+  { method: 'GET', path: '/api/rpa/launches', roles: ADMIN },
+  { method: 'POST', path: '/api/rpa/launches', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id', roles: ADMIN },
+  {
+    method: 'PATCH',
+    path: '/api/rpa/launches/:id',
+    roles: ADMIN,
+    body: { development: 'Outro Residencial' },
+  },
+  { method: 'DELETE', path: '/api/rpa/launches/:id', roles: ADMIN },
+  { method: 'POST', path: '/api/rpa/launches/:id/import', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id/workers', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/workers/:id', roles: ADMIN },
+  {
+    method: 'PATCH',
+    path: '/api/rpa/workers/:id',
+    roles: ADMIN,
+    body: { dependents: 1 },
+  },
 ];
 
 /** Como a rota aparece nos mapas das matrizes: `GET /api/tasks/:id`. */

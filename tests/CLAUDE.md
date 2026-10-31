@@ -85,6 +85,10 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 - Conteudo extraido, so depois de `waitForProcessing`.
 - Nunca use comprovante real como fixture: traz CNPJ e CPF de terceiros.
   `tests/fixtures/pdf.js` gera cupom com texto, com QR e escaneado.
+- O mesmo para o RPA: `tests/fixtures/forms.js` gera as respostas do
+  formulario em .xlsx (como o Sheets exporta: data como data, CPF e CEP como
+  numero) e .csv (UTF-8 com virgula, ou Windows-1252 com ponto e virgula), com
+  os titulos reais das perguntas e CPF/PIS sinteticos pelo verificador.
 
 ## Puros
 
