@@ -120,6 +120,8 @@ const ROUTES = [
   { method: 'GET', path: '/api/rpa/launches/:id/workers', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/launches/:id/days', roles: ADMIN },
   { method: 'PUT', path: '/api/rpa/launches/:id/days', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id/payments', roles: ADMIN },
+  { method: 'POST', path: '/api/rpa/launches/:id/payments', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/workers/:id', roles: ADMIN },
   {
     method: 'PATCH',
@@ -127,6 +129,8 @@ const ROUTES = [
     roles: ADMIN,
     body: { dependents: 1 },
   },
+  { method: 'GET', path: '/api/rpa/payments/:id', roles: ADMIN },
+  { method: 'POST', path: '/api/rpa/payments/:id/cancel', roles: ADMIN },
 ];
 
 /** Como a rota aparece nos mapas das matrizes: `GET /api/tasks/:id`. */

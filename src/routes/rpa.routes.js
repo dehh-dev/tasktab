@@ -5,6 +5,7 @@ const companies = require('../controllers/rpa-company.controller');
 const launches = require('../controllers/rpa-launch.controller');
 const workers = require('../controllers/rpa-worker.controller');
 const timesheet = require('../controllers/rpa-timesheet.controller');
+const payments = require('../controllers/rpa-payment.controller');
 const asyncHandler = require('../middlewares/async-handler');
 const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireScope } = require('../middlewares/authorize');
@@ -81,6 +82,16 @@ router.put(
   requireScope('rpa:write'),
   asyncHandler(timesheet.update),
 );
+router.get(
+  '/launches/:id/payments',
+  requireScope('rpa:read'),
+  asyncHandler(payments.index),
+);
+router.post(
+  '/launches/:id/payments',
+  requireScope('rpa:write'),
+  asyncHandler(payments.create),
+);
 
 router.get(
   '/workers/:id',
@@ -91,6 +102,17 @@ router.patch(
   '/workers/:id',
   requireScope('rpa:write'),
   asyncHandler(workers.update),
+);
+
+router.get(
+  '/payments/:id',
+  requireScope('rpa:read'),
+  asyncHandler(payments.show),
+);
+router.post(
+  '/payments/:id/cancel',
+  requireScope('rpa:write'),
+  asyncHandler(payments.cancel),
 );
 
 module.exports = rejectOtherMethods(router);

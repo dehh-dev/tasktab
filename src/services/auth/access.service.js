@@ -4,6 +4,7 @@ const Report = require('../../models/report.model');
 const Receipt = require('../../models/receipt.model');
 const Launch = require('../../models/rpa-launch.model');
 const Worker = require('../../models/rpa-worker.model');
+const Payment = require('../../models/rpa-payment.model');
 const { NotFoundError, ConflictError } = require('../../../infra/errors');
 const ownership = require('./ownership');
 
@@ -120,6 +121,13 @@ function workerNotFound(id) {
   });
 }
 
+function paymentNotFound(id) {
+  return new NotFoundError({
+    message: `Pagamento ${id} nao encontrado.`,
+    action: 'Verifique o id informado ou liste os pagamentos do lancamento.',
+  });
+}
+
 /**
  * Lancamento encerrado e somente leitura, como o relatorio fechado: e o que
  * ja foi pago. A excecao e o PATCH que reabre (`allowClosed`).
@@ -163,11 +171,29 @@ async function loadWorker(id, { write = false } = {}) {
   return { worker, launch };
 }
 
+/**
+ * O RPA e o lancamento dele. Na escrita (cancelar), o lancamento encerrado e
+ * 409 como em todo o resto; o estado do proprio RPA quem confere e quem
+ * escreve, porque cada escrita tem a sua regra.
+ */
+async function loadPayment(id, { write = false } = {}) {
+  const payment = await Payment.findById(id);
+
+  if (!payment) {
+    throw paymentNotFound(id);
+  }
+
+  const launch = await loadLaunch(payment.launch_id, { write });
+
+  return { payment, launch };
+}
+
 module.exports = {
   loadReport,
   loadReceipt,
   loadLaunch,
   loadWorker,
+  loadPayment,
   receiptNotFound,
   reportClosed,
   launchNotFound,

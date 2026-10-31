@@ -6,6 +6,7 @@ const db = require('../config/database');
 // definicao do lancamento, e a tela os edita com ele.
 const SELECT = `
   SELECT l.id, l.company_id, c.code AS company_code, c.name AS company_name,
+         c.cnpj AS company_cnpj,
          l.city, l.state, l.development, l.starts_on, l.ends_on, l.holidays,
          l.service_type, l.cost_center, l.site, l.product, l.supply,
          l.email_to, l.email_cc, l.first_payment_daily_only, l.status,

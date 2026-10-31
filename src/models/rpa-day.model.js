@@ -11,8 +11,8 @@ const db = require('../config/database');
  * Gravar e apagar sao uma consulta cada, qualquer que seja o tamanho do lote
  * (`unnest` dos arrays): a grade da equipe inteira sai num PUT so.
  */
-async function findByLaunch(launchId, from, to) {
-  const { rows } = await db.query(
+async function findByLaunch(launchId, from, to, client = db) {
+  const { rows } = await client.query(
     `SELECT d.worker_id, d.work_date, d.quantity::float8 AS quantity,
             to_char(d.start_time, 'HH24:MI') AS start_time,
             to_char(d.lunch_out, 'HH24:MI') AS lunch_out,
