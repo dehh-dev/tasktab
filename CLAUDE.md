@@ -20,6 +20,7 @@ Docker, migrations com `node-pg-migrate`, interface React 19 + Vite em `web/`
 | Aplicar / reverter migrations            | `npm run migrations:up` / `:down`         |
 | Popular 5 tarefas de exemplo             | `npm run seed`                            |
 | Cadastrar usuario (primeiro acesso)      | `npm run users:create -- --email ...`     |
+| Empresas do RPA (aba EMPRESA em .xlsx)   | `npm run rpa:companies:import -- --file`  |
 | Medir a extracao contra o confirmado     | `npm run extraction:evaluate -- --report` |
 | Subir / parar / remover servicos         | `services:up` / `services:stop` / `:down` |
 | Build de producao da interface           | `npm run build` (gera `web/dist`)         |

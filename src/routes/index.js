@@ -7,6 +7,7 @@ const receiptRoutes = require('./receipt.routes');
 const merchantRoutes = require('./merchant.routes');
 const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
+const rpaRoutes = require('./rpa.routes');
 const healthController = require('../controllers/health.controller');
 const asyncHandler = require('../middlewares/async-handler');
 const rejectOtherMethods = require('../middlewares/method-not-allowed');
@@ -18,12 +19,13 @@ const {
 
 const router = Router();
 
-// Um teto de escrita por familia de rota, e um so. Prestacao de contas
-// trabalha em lote e tem o seu: revisar 30 cupons sao dezenas de PATCH
-// seguidos de uma pessoa so. Antes do `authenticate`, para que o excesso seja
-// recusado sem consultar sessao no banco.
+// Um teto de escrita por familia de rota, e um so. Prestacao de contas e o
+// RPA trabalham em lote e tem o seu: revisar 30 cupons sao dezenas de PATCH
+// seguidos de uma pessoa so, e o ponto de uma equipe inteira vem em lote.
+// Antes do `authenticate`, para que o excesso seja recusado sem consultar
+// sessao no banco.
 router.use(['/auth', '/users', '/tasks'], writeLimiter);
-router.use(['/reports', '/receipts', '/merchants'], batchWriteLimiter);
+router.use(['/reports', '/receipts', '/merchants', '/rpa'], batchWriteLimiter);
 
 // Resolve a sessao para toda a API, sem barrar ninguem: quem exige credencial
 // e o `requireScope` de cada rota. A ordem importa — montado aqui em cima,
@@ -41,6 +43,8 @@ router.use('/tasks', taskRoutes);
 router.use('/reports', reportRoutes);
 router.use('/receipts', receiptRoutes);
 router.use('/merchants', merchantRoutes);
+
+router.use('/rpa', rpaRoutes);
 
 // So o `/health` e rota propria daqui; os sub-routers ja cuidam dos seus.
 module.exports = rejectOtherMethods(router);

@@ -74,6 +74,26 @@ Base: `/api/merchants` — o cadastro que da categoria ao comprovante.
 | `PATCH` | `/api/merchants/:id`           | Atualiza (e a categoria padrao) |
 | `GET`   | `/api/merchants/by-cnpj/:cnpj` | Busca pelo CNPJ lido da chave   |
 
+### RPA de lancamentos
+
+Escopos `rpa:read` / `rpa:write`, por enquanto so do papel `admin`: o modulo
+guarda CPF, RG e conta bancaria de terceiros. O plano e as etapas estao na
+issue 35.
+
+| Metodo  | Rota                     | Descricao                                        |
+| ------- | ------------------------ | ------------------------------------------------ |
+| `GET`   | `/api/rpa/companies`     | Lista as empresas pelo codigo UAU (paginada)     |
+| `POST`  | `/api/rpa/companies`     | Cadastra uma empresa                             |
+| `GET`   | `/api/rpa/companies/:id` | Detalhe                                          |
+| `PATCH` | `/api/rpa/companies/:id` | Atualiza (o codigo UAU nao muda: e a identidade) |
+
+Campos da empresa: `code` (codigo UAU, inteiro, unico), `name` e `cnpj`
+(obrigatorios; o CNPJ entra com ou sem mascara e e conferido pelo
+verificador), `city`, `state` (UF), `service_type` e `cost_center`. Os dois
+ultimos sao o padrao que o lancamento herda para o formulario do RPA. Para
+cadastrar a aba EMPRESA inteira, use `npm run rpa:companies:import` (ver o
+README).
+
 `GET /api/health` consulta o banco de verdade: devolve `200` com
 `{ "data": { "status": "ok", "uptime": ... } }` quando o Postgres responde e
 `503` (`ServiceError`) quando nao responde — nunca `200` com o banco fora.

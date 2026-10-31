@@ -4,10 +4,26 @@ const fs = require('fs/promises');
 const path = require('path');
 
 const Receipt = require('../models/receipt.model');
+const RpaFile = require('../models/rpa-file.model');
 const env = require('../config/env');
 
 /**
- * Apaga do disco os PDFs que nenhum comprovante referencia mais.
+ * Quem ainda guarda um arquivo do diretorio de upload. Comprovantes e
+ * arquivos do RPA dividem o diretorio e o nome pelo SHA-256: o mesmo PDF pode
+ * ser um cupom e o recibo de uma pessoa. Tabela nova que grave ali entra
+ * nesta lista, ou a primeira exclusao leva o arquivo dela.
+ */
+const REFERENCE_COUNTERS = [Receipt.countByHash, RpaFile.countByHash];
+
+async function countReferences(fileHash) {
+  const counts = await Promise.all(
+    REFERENCE_COUNTERS.map((count) => count(fileHash)),
+  );
+  return counts.reduce((total, count) => total + count, 0);
+}
+
+/**
+ * Apaga do disco os arquivos que nada mais referencia.
  *
  * O arquivo e gravado com o proprio SHA-256 como nome, entao um mesmo PDF
  * atende todas as paginas dele e ainda e reaproveitado por outro relatorio que
@@ -22,7 +38,7 @@ const env = require('../config/env');
  */
 async function discardOrphans(files, log) {
   for (const file of files) {
-    const remaining = await Receipt.countByHash(file.file_hash);
+    const remaining = await countReferences(file.file_hash);
 
     if (remaining > 0) {
       continue;

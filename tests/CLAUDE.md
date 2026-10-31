@@ -44,6 +44,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 | `request(m, path, body, { token, baseUrl })`                       | HTTP; `body` string vai cru, `token: null` = sem sessao    |
 | `requestUpload` / `requestBinary`                                  | multipart (`baseUrl`, `field`); resposta binaria           |
 | `insertTask` / `insertReport` / `insertReceipt` / `insertMerchant` | arranjo direto no banco, sem passar pela API               |
+| `insertRow(tabela, valores)` / `insertRpa*`                        | qualquer linha crua; empresa, lancamento, pessoa e RPA     |
 | `insertUser` / `insertSession` / `createUserWithSession`           | usuario e sessao; o ultimo devolve `{ user, token }`       |
 | `updateColumnDirectly(t, id, c, v)`                                | escrita crua; diz se o `updated_at` andou, medido no banco |
 | `waitForProcessing(reportId)` / `waitForQueue()`                   | espera a extracao terminar                                 |
@@ -61,6 +62,10 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   o mesmo token.
 - O padrao e admin para o arranjo antigo valer: `insertReport()` cria
   relatorio sem dono, que so `reports:read:any` enxerga.
+- Os `insertRpa*` criam o que falta acima deles (o RPA cria a pessoa, que
+  cria o lancamento, que cria a empresa) com dados sinteticos, e o codigo UAU
+  muda a cada empresa criada assim. O `clearDatabase` deixa `rpa_banks` e
+  `rpa_tax_tables` de fora: sao sementes da migration.
 - Os `insert*` nao citam as colunas mais novas (giro, emitente, cidade
   principal): `tests/db/expense-category.test.js` volta o banco para antes
   delas e arranja com os mesmos `insert*`. Coluna nova entra por

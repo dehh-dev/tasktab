@@ -83,6 +83,21 @@ Para redefinir a senha de quem perdeu o acesso, repita o comando com
 `--replace`: a senha nova passa a valer, as sessoes abertas daquela pessoa sao
 encerradas e o papel so muda se vier `--role`.
 
+### Empresas do RPA
+
+As empresas vem da aba EMPRESA da planilha de controle de diarias. Abra a
+planilha no Excel, salve como `.xlsx` (o `.xlsb` nao e lido) e rode:
+
+```bash
+npm run rpa:companies:import -- --file "CONTROLE DE DIARIA.xlsx"
+```
+
+O script casa pelo codigo UAU: cadastra a empresa nova e atualiza a que ja
+existe, sem apagar tipo de servico e centro de custo preenchidos pela API
+quando a planilha os traz vazios. A linha recusada sai listada pelo numero,
+com o campo e o motivo, e o codigo de saida e `1`. O arquivo fica na sua
+maquina: os dados das empresas nao entram no repositorio.
+
 ## Scripts
 
 | Script                      | O que faz                                             |
@@ -93,6 +108,7 @@ encerradas e o papel so muda se vier `--role`.
 | `start`                     | So o servidor (assume banco pronto — uso em producao) |
 | `seed`                      | Servicos + espera + migrations + 5 tarefas de exemplo |
 | `users:create`              | Cadastra um usuario (o primeiro acesso sai por aqui)  |
+| `rpa:companies:import`      | Cadastra/atualiza as empresas da aba EMPRESA (.xlsx)  |
 | `services:up`               | Sobe os containers em background                      |
 | `services:stop`             | Para os containers, preservando os dados              |
 | `services:down`             | Remove os containers (`-v` tambem apaga o volume)     |

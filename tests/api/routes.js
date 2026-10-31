@@ -95,6 +95,17 @@ const ROUTES = [
     roles: WRITERS,
     body: { default_category: 'outros' },
   },
+
+  // RPA: so o admin ate a decisao "quem acessa" da issue 35.
+  { method: 'GET', path: '/api/rpa/companies', roles: ADMIN },
+  { method: 'POST', path: '/api/rpa/companies', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/companies/:id', roles: ADMIN },
+  {
+    method: 'PATCH',
+    path: '/api/rpa/companies/:id',
+    roles: ADMIN,
+    body: { name: 'Outra Razao Social' },
+  },
 ];
 
 /** Como a rota aparece nos mapas das matrizes: `GET /api/tasks/:id`. */

@@ -51,6 +51,10 @@ com o `request_id` e, depois do `authenticate`, o `user_id`).
 - Em teste o logger e `silent`.
 - Os serializers sao enxutos de proposito: o padrao do `pino-http` despeja
   todos os headers em cada linha.
-- O `redact` cobre `req.headers.cookie` e `authorization`, mas log manual
-  escreve o que mandarem. Para investigar acesso, logue o `user_id`; uma
-  extracao, o `id` do comprovante.
+- O `redact` cobre `req.headers.cookie` e `authorization` e, como rede de
+  seguranca, os campos de `SENSITIVE_FIELDS` (CPF, PIS, RG, agencia, conta,
+  chave Pix, `raw_text`, `access_key`, senha) no topo e um nivel abaixo do
+  objeto logado. E por caminho, nao por conteudo: log manual continua
+  escrevendo o que mandarem. Para investigar acesso, logue o `user_id`; uma
+  extracao, o `id` do comprovante; uma pessoa do RPA, o `id` dela. Campo
+  sensivel novo entra na lista e no `tests/infra/logger.test.js`.

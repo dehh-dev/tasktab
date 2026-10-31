@@ -123,3 +123,7 @@ protege o `raw_text` e o cerco em volta dele:
   apagavel pelo cliente.
 - **Nunca vai para o log**, nem a `access_key` ou o comprovante inteiro. Para
   investigar uma extracao, logue o `id` do comprovante e consulte o banco.
+  Como rede de seguranca, o logger troca por `[Redacted]` os campos `cpf`,
+  `pis`, `rg`, `agency`, `account`, `pix_key`, `raw_text`, `access_key` e
+  `password` no topo do objeto logado e um nivel abaixo. Ele casa o nome do
+  campo, nao o conteudo: um CPF dentro de uma mensagem de texto passa.
