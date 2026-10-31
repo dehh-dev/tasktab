@@ -11,7 +11,7 @@ async function rpaObjects() {
        (SELECT COUNT(*)::int FROM information_schema.tables
         WHERE table_name LIKE 'rpa\\_%') AS tables,
        (SELECT COUNT(*)::int FROM pg_proc
-        WHERE proname = 'rpa_void_canceled_payment_days') AS functions`,
+        WHERE proname LIKE 'rpa\\_%') AS functions`,
   );
   return rows[0];
 }
@@ -25,7 +25,7 @@ async function rpaObjects() {
  * reaplicada fora de ordem, o node-pg-migrate recusaria a proxima execucao.
  */
 describe('migrations do RPA', () => {
-  it('o down remove tabelas, enums e funcao, e o up recria tudo', async () => {
+  it('o down remove tabelas, enums e funcoes, e o up recria tudo', async () => {
     const ate = migrationsFrom('1793470275082_create-rpa-tables');
     let removed;
 
@@ -37,7 +37,8 @@ describe('migrations do RPA', () => {
     }
 
     expect(removed).toEqual({ enums: 0, tables: 0, functions: 0 });
-    expect(await rpaObjects()).toEqual({ enums: 9, tables: 12, functions: 1 });
+    // A que anula os dias do cancelado e as tres travas do RPA emitido.
+    expect(await rpaObjects()).toEqual({ enums: 9, tables: 12, functions: 4 });
     expect(await enumLabels('rpa_adjustment_kind')).toEqual([
       'bonus',
       'addition',
