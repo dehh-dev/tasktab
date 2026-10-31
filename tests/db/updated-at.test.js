@@ -5,6 +5,11 @@ const {
   insertReport,
   insertReceipt,
   insertMerchant,
+  insertRow,
+  insertRpaCompany,
+  insertRpaLaunch,
+  insertRpaWorker,
+  insertRpaPayment,
   currentUser,
   findSessions,
   updateColumnDirectly,
@@ -35,6 +40,48 @@ const TABLES = [
     async () => (await findSessions(currentUser().id))[0],
     'expires_at',
     new Date(Date.now() + 60 * 60 * 1000),
+  ],
+  ['rpa_companies', () => insertRpaCompany(), 'name', 'Depois'],
+  ['rpa_launches', () => insertRpaLaunch(), 'development', 'Depois'],
+  [
+    'rpa_rates',
+    async () =>
+      insertRow('rpa_rates', {
+        launch_id: (await insertRpaLaunch()).id,
+        role: 'Assistente Administrativo',
+        starts_on: '2026-10-01',
+        ends_on: '2026-10-31',
+        daily_cents: 13000,
+      }),
+    'daily_cents',
+    14000,
+  ],
+  ['rpa_workers', () => insertRpaWorker(), 'name', 'Depois'],
+  [
+    'rpa_days',
+    async () =>
+      insertRow('rpa_days', {
+        worker_id: (await insertRpaWorker()).id,
+        work_date: '2026-10-15',
+        quantity: 0,
+      }),
+    'note',
+    'faltou',
+  ],
+  ['rpa_payments', () => insertRpaPayment(), 'payment_date', '2026-10-22'],
+  [
+    'rpa_files',
+    async () =>
+      insertRow('rpa_files', {
+        launch_id: (await insertRpaLaunch()).id,
+        kind: 'ctps',
+        file_hash: 'a'.repeat(64),
+        file_path: `${'a'.repeat(64)}.pdf`,
+        content_type: 'application/pdf',
+        byte_size: 1024,
+      }),
+    'side',
+    'front',
   ],
 ];
 

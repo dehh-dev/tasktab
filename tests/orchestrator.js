@@ -239,9 +239,17 @@ async function waitForQueue({ timeoutMs = 30000 } = {}) {
 
 // CASCADE porque receipts referencia reports e merchants, e sessions
 // referencia users; sem ele o TRUNCATE recusa a tabela que tem dependente.
+//
+// `rpa_banks` e `rpa_tax_tables` ficam de fora de proposito: sao as sementes
+// publicas da migration, e nenhum teste as recria. O CASCADE so desce para
+// quem referencia a tabela truncada, nunca para quem ela referencia — entao
+// truncar os pagamentos nao as leva.
 function clearDatabase() {
   return db.query(
-    `TRUNCATE TABLE tasks, receipts, reports, merchants, sessions, users
+    `TRUNCATE TABLE tasks, receipts, reports, merchants, sessions, users,
+       rpa_files, rpa_payment_adjustments, rpa_payment_days, rpa_payments,
+       rpa_days, rpa_workers, rpa_rates, rpa_launch_schedules, rpa_launches,
+       rpa_companies
      RESTART IDENTITY CASCADE`,
   );
 }
@@ -482,6 +490,116 @@ async function insertMerchant(overrides = {}) {
   );
 
   return rows[0];
+}
+
+/**
+ * Insere uma linha qualquer direto no banco e devolve a linha gravada. E o
+ * arranjo dos testes de constraint: a garantia e do banco, entao o teste fala
+ * com ele sem API nem model no meio. Tabela e colunas vem do proprio teste; os
+ * valores vao por placeholder.
+ */
+async function insertRow(table, values) {
+  const columns = Object.keys(values);
+
+  for (const identifier of [table, ...columns]) {
+    if (!/^[a-z_]+$/.test(identifier)) {
+      throw new Error(`identificador invalido: ${identifier}`);
+    }
+  }
+
+  const placeholders = columns.map((_, index) => `$${index + 1}`);
+  const { rows } = await db.query(
+    `INSERT INTO ${table} (${columns.join(', ')})
+     VALUES (${placeholders.join(', ')})
+     RETURNING *`,
+    Object.values(values),
+  );
+
+  return rows[0];
+}
+
+/** Empresa do RPA, com dados sinteticos. */
+function insertRpaCompany(overrides = {}) {
+  return insertRow('rpa_companies', {
+    code: 900,
+    name: 'Empresa Sintetica de Empreendimentos SPE Ltda',
+    cnpj: '26048802000165',
+    city: 'Sao Joao',
+    state: 'SP',
+    ...overrides,
+  });
+}
+
+// Codigo UAU das empresas criadas pelos helpers abaixo: um por chamada, para
+// dois lancamentos no mesmo teste nao baterem no unico do codigo.
+let lastCompanyCode = 900;
+
+/** Lancamento; cria a empresa se `company_id` nao vier. */
+async function insertRpaLaunch(overrides = {}) {
+  lastCompanyCode += 1;
+  const companyId =
+    overrides.company_id ??
+    (await insertRpaCompany({ code: lastCompanyCode })).id;
+
+  return insertRow('rpa_launches', {
+    city: 'Sao Joao',
+    state: 'SP',
+    development: 'Residencial Sintetico',
+    starts_on: '2026-10-13',
+    ends_on: '2026-11-30',
+    ...overrides,
+    company_id: companyId,
+  });
+}
+
+/** Pessoa no lancamento; cria o lancamento se `launch_id` nao vier. CPF sintetico. */
+async function insertRpaWorker(overrides = {}) {
+  const launchId = overrides.launch_id ?? (await insertRpaLaunch()).id;
+
+  return insertRow('rpa_workers', {
+    number: 1,
+    cpf: '52998224725',
+    name: 'Maria da Conceicao Sintetica',
+    role: 'Assistente Administrativo',
+    starts_on: '2026-10-13',
+    ...overrides,
+    launch_id: launchId,
+  });
+}
+
+/**
+ * RPA emitido; cria a pessoa se `worker_id` nao vier. As tabelas de imposto
+ * sao as mais novas da semente. Os valores padrao fecham a conta do bruto:
+ * liquido de R$ 650,00 com INSS truncado.
+ */
+async function insertRpaPayment(overrides = {}) {
+  const workerId = overrides.worker_id ?? (await insertRpaWorker()).id;
+  const { rows } = await db.query(
+    `SELECT
+       (SELECT id FROM rpa_tax_tables WHERE kind = 'inss'
+        ORDER BY starts_on DESC LIMIT 1) AS inss,
+       (SELECT id FROM rpa_tax_tables WHERE kind = 'irrf'
+        ORDER BY starts_on DESC LIMIT 1) AS irrf`,
+  );
+
+  return insertRow('rpa_payments', {
+    number: 1,
+    period_start: '2026-10-13',
+    period_end: '2026-10-19',
+    payment_date: '2026-10-20',
+    net_cents: 65000,
+    inss_cents: 8033,
+    irrf_cents: 0,
+    gross_cents: 73033,
+    irrf_base_cents: 12313,
+    inss_table_id: rows[0].inss,
+    irrf_table_id: rows[0].irrf,
+    // `no-empresa-pessoa-mmaaaa`, com o id no lugar do numero da pessoa para
+    // dois pagamentos do mesmo teste nao baterem no unico do codigo.
+    code: `1-900-${workerId}-102026`,
+    ...overrides,
+    worker_id: workerId,
+  });
 }
 
 /**
@@ -736,6 +854,11 @@ module.exports = {
   insertReport,
   insertReceipt,
   insertMerchant,
+  insertRow,
+  insertRpaCompany,
+  insertRpaLaunch,
+  insertRpaWorker,
+  insertRpaPayment,
   updateColumnDirectly,
   enumLabels,
   findSessions,
