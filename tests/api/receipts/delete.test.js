@@ -8,6 +8,8 @@ const {
   findReceipts,
   uploadedFileExists,
   waitForProcessing,
+  insertRow,
+  insertRpaLaunch,
 } = require('../../orchestrator');
 const { makePdf } = require('../../fixtures/pdf');
 
@@ -122,5 +124,25 @@ describe('retencao do arquivo enviado', () => {
     await request('DELETE', `/api/reports/${second.id}`);
 
     expect(uploadedFileExists(receipt.file_hash)).toBe(false);
+  });
+
+  it('o arquivo que o RPA tambem guarda sobrevive a exclusao do comprovante', async () => {
+    // Recibo assinado e documento do formulario vao para o mesmo diretorio,
+    // com o mesmo nome pelo SHA-256 (issue 36). Contar so os comprovantes
+    // levaria embora o arquivo do RPA na primeira exclusao.
+    const report = await insertReport();
+    const [receipt] = await uploadPdf(report.id, { pages: 1 });
+    await insertRow('rpa_files', {
+      launch_id: (await insertRpaLaunch()).id,
+      kind: 'signed_receipt',
+      file_hash: receipt.file_hash,
+      file_path: receipt.file_path,
+      content_type: 'application/pdf',
+      byte_size: 1024,
+    });
+
+    await request('DELETE', `/api/receipts/${receipt.id}`);
+
+    expect(uploadedFileExists(receipt.file_hash)).toBe(true);
   });
 });

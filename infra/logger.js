@@ -7,6 +7,34 @@ const env = require('../src/config/env');
 
 const isDevelopment = env.nodeEnv === 'development';
 
+/**
+ * Campos que nunca podem sair no log, venham de onde vierem. O RPA guarda CPF,
+ * PIS, RG, conta e chave Pix de terceiros, e o comprovante traz CNPJ e as
+ * vezes CPF no `raw_text`.
+ *
+ * E rede de seguranca, nao a regra: o `redact` do pino casa **caminho**, nao
+ * conteudo — aqui o campo no topo do objeto logado e um nivel abaixo
+ * (`{ worker: { cpf } }`). Um CPF dentro de uma mensagem de texto passa. A
+ * regra continua sendo logar so o `id`.
+ */
+const SENSITIVE_FIELDS = [
+  'cpf',
+  'pis',
+  'rg',
+  'agency',
+  'account',
+  'pix_key',
+  'raw_text',
+  'access_key',
+  'password',
+];
+
+const REDACT_PATHS = [
+  'req.headers.authorization',
+  'req.headers.cookie',
+  ...SENSITIVE_FIELDS.flatMap((field) => [field, `*.${field}`]),
+];
+
 const logger = pino({
   // Em teste o log so poluiria a saida da suite.
   level: process.env.LOG_LEVEL || (env.isTest ? 'silent' : 'info'),
@@ -20,7 +48,7 @@ const logger = pino({
       }
     : undefined,
 
-  redact: ['req.headers.authorization', 'req.headers.cookie'],
+  redact: REDACT_PATHS,
 });
 
 /**
