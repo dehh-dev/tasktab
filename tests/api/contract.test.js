@@ -162,6 +162,22 @@ describe('contrato das rotas de edicao', () => {
 });
 
 describe('contrato do corpo JSON', () => {
+  it('corpo acima de 100 KB responde 413 com action, e nao 500', async () => {
+    const response = await request(
+      'POST',
+      '/api/tasks',
+      JSON.stringify({ title: 'x'.repeat(101 * 1024) }),
+    );
+
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({
+      name: 'PayloadTooLargeError',
+      message: 'Corpo da requisicao maior que o limite de 100 KB.',
+      action: 'Envie os dados em partes menores.',
+      status_code: 413,
+    });
+  });
+
   it('JSON malformado responde 400, antes de chegar a qualquer rota', async () => {
     const response = await request('POST', '/api/tasks', '{"title": ');
 
