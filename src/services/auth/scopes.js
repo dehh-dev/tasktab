@@ -42,6 +42,11 @@ const SCOPES = [
   'merchants:write',
   'users:read',
   'users:write',
+  // Modulo RPA (issue 36). Por enquanto so o admin, pelo `SCOPES` inteiro:
+  // o lancamento guarda CPF, RG e conta de terceiros, e quem mais o acessa
+  // ainda e decisao em aberto na issue 35.
+  'rpa:read',
+  'rpa:write',
 ];
 
 const ROLES = ['admin', 'user', 'auditor'];

@@ -15,9 +15,9 @@ ninguem**; quem barra e `requireScope` / `requireAuth` (`authorize.js`).
   leva os mesmos headers do 200, senao herda o `no-store`.
 - Um teto para toda requisicao (`app.js`) e **um teto de escrita por familia
   de rota** (`routes/index.js`): o geral para `/auth`, `/users` e `/tasks`, e
-  o `batchWriteLimiter` para `/reports`, `/receipts` e `/merchants`, **no
-  lugar** do geral e nunca somado — revisar 30 cupons sao dezenas de escritas
-  de uma pessoa so. Os dois rodam antes do `authenticate`, para recusar sem
+  o `batchWriteLimiter` para `/reports`, `/receipts`, `/merchants` e `/rpa`,
+  **no lugar** do geral e nunca somado — revisar 30 cupons sao dezenas de
+  escritas de uma pessoa so, e o ponto do RPA vem em lote. Os dois rodam antes do `authenticate`, para recusar sem
   consultar a sessao.
 - `POST /api/auth/login` usa o `authLimiter`, o mais apertado: e a unica rota
   onde repetir com outro valor serve a quem nao deveria estar aqui.

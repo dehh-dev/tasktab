@@ -23,6 +23,8 @@ const SCOPES = [
   // Autenticacao e autorizacao
   'auth',
   'users',
+  // Modulo RPA: equipes de lancamento
+  'rpa',
 ];
 
 module.exports = {

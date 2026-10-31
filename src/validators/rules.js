@@ -148,6 +148,57 @@ function optionalText(field, max = 255) {
   };
 }
 
+const STATES = [
+  'AC',
+  'AL',
+  'AP',
+  'AM',
+  'BA',
+  'CE',
+  'DF',
+  'ES',
+  'GO',
+  'MA',
+  'MT',
+  'MS',
+  'MG',
+  'PA',
+  'PB',
+  'PR',
+  'PE',
+  'PI',
+  'RJ',
+  'RN',
+  'RS',
+  'RO',
+  'RR',
+  'SC',
+  'SP',
+  'SE',
+  'TO',
+];
+
+/**
+ * UF opcional, em maiuscula. Vale para a empresa e o lancamento do RPA: e o
+ * que vai no "Cidade/Estado" do formulario e no assunto do e-mail.
+ */
+function optionalState(field) {
+  return (value, errors) => {
+    if (value === null || value === '') {
+      return null;
+    }
+
+    const state = typeof value === 'string' ? value.trim().toUpperCase() : '';
+
+    if (!STATES.includes(state)) {
+      errors.push({ field, message: `${field} deve ser uma UF, como SP` });
+      return undefined;
+    }
+
+    return state;
+  };
+}
+
 module.exports = {
   isBlank,
   isValidIsoDate,
@@ -156,4 +207,6 @@ module.exports = {
   parsePagination,
   validateCnpj,
   optionalText,
+  optionalState,
+  STATES,
 };
