@@ -6,6 +6,7 @@ const launches = require('../controllers/rpa-launch.controller');
 const workers = require('../controllers/rpa-worker.controller');
 const timesheet = require('../controllers/rpa-timesheet.controller');
 const payments = require('../controllers/rpa-payment.controller');
+const documents = require('../controllers/rpa-document.controller');
 const asyncHandler = require('../middlewares/async-handler');
 const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireScope } = require('../middlewares/authorize');
@@ -92,6 +93,16 @@ router.post(
   requireScope('rpa:write'),
   asyncHandler(payments.create),
 );
+router.get(
+  '/launches/:id/rpas.zip',
+  requireScope('rpa:read'),
+  asyncHandler(documents.rpasZip),
+);
+router.get(
+  '/launches/:id/email',
+  requireScope('rpa:read'),
+  asyncHandler(documents.email),
+);
 
 router.get(
   '/workers/:id',
@@ -108,6 +119,11 @@ router.get(
   '/payments/:id',
   requireScope('rpa:read'),
   asyncHandler(payments.show),
+);
+router.get(
+  '/payments/:id/rpa.pdf',
+  requireScope('rpa:read'),
+  asyncHandler(documents.rpaPdf),
 );
 router.post(
   '/payments/:id/cancel',

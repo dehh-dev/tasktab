@@ -98,6 +98,15 @@ quando a planilha os traz vazios. A linha recusada sai listada pelo numero,
 com o campo e o motivo, e o codigo de saida e `1`. O arquivo fica na sua
 maquina: os dados das empresas nao entram no repositorio.
 
+### Logo e cabecalho do RPA
+
+O PDF do RPA segue o layout do formulario de emissao, com o logo e a
+identificacao do documento de quem emite. O repositorio e publico e traz os
+dois **sinteticos**: troque, na instalacao, `assets/rpa-logo.png` pelo logo
+(PNG) e `assets/rpa-form.json` pela identificacao, versao e data de aprovacao
+do formulario. `npm run generate:rpa-assets` regera os sinteticos e
+sobrescreve os dois.
+
 ## Scripts
 
 | Script                      | O que faz                                             |
@@ -116,6 +125,7 @@ maquina: os dados das empresas nao entram no repositorio.
 | `migrations:up` / `:down`   | Aplica / reverte migrations                           |
 | `migrations:create`         | Gera um novo arquivo de migration                     |
 | `generate:anexo-i-template` | Regera o template SINTETICO em `assets/` (dev only)   |
+| `generate:rpa-assets`       | Regera o logo e o cabecalho SINTETICOS do RPA         |
 
 ## Testes
 

@@ -1,9 +1,9 @@
-# RPA: importacao da equipe, pendencias, calculo e pagamentos
+# RPA: equipe, pendencias, calculo, pagamentos e emissao
 
 O modulo substitui a planilha `CONTROLE DE DIARIA - <cidade>.xlsb` (plano em
 issue 35). Aqui ficam a importacao das respostas do Google Forms (issue 37),
-a grade do ponto com o calculo das diarias (issue 38) e os pagamentos com o
-bruto e os impostos (issue 39).
+a grade do ponto com o calculo das diarias (issue 38), os pagamentos com o
+bruto e os impostos (issue 39) e a emissao: PDF, .zip e e-mail (issue 40).
 
 ## Importacao (`import.service.js`)
 
@@ -143,3 +143,36 @@ pendencia barra a importacao.
 - O numero do RPA e o menor livre entre os nao cancelados: cancelar o 1o e
   emitir de novo da o 1 outra vez, com o mesmo codigo. O banco trava o
   emitido (ver `src/models/CLAUDE.md`); pago nao se cancela pela API.
+
+## Emissao (`rpa-pdf.service.js`, `rpa-format.js`, `document.service.js`)
+
+- **O layout e o da aba FORM.DRH.03**: a area A1:L56, com as larguras das
+  colunas e as alturas das linhas reais, reduzida para 507 x 630 pt a 71 pt da
+  esquerda e 80 pt do topo da pagina Carta. Cada campo ocupa a celula
+  mesclada que ocupava la. Da planilha vieram so rotulos e posicoes.
+- **Logo e cabecalho sao da instalacao** (`assets/rpa-logo.png`,
+  `assets/rpa-form.json`): o repositorio e publico e traz os dois sinteticos
+  (`npm run generate:rpa-assets`). O codigo do RPA vai em negrito italico sob
+  o logo.
+- As tabelas impressas sao as que o RPA **guardou na emissao**
+  (`inss_table_id`, `irrf_table_id`), e nao as vigentes hoje. O formulario
+  trazia as faixas do empregado, todas a 11%; o contribuinte individual tem
+  uma so, com o teto logo abaixo.
+- **Gerar de novo da o mesmo arquivo, byte a byte**: datas do PDF e hora do
+  nome sao as da emissao (em Brasilia), e as do .zip tambem. Atencao no
+  teste: o `PDFDocument.load` do pdf-lib regrava a data de modificacao sem
+  `updateMetadata: false`.
+- A fonte padrao (WinAnsi) escreve acento, ç, ª e º; o que ela nao tem perde
+  o acento ou vira `?` (`encodable`), para um nome de terceiro nunca derrubar
+  a emissao. Texto que nao cabe encolhe ate 4,5 pt e, no limite, corta com
+  reticencias.
+- Sem tipo de servico e centro de custo o RPA nao sai (`422`): a planilha
+  imprimia `0`. Cancelado nao se imprime (`409`).
+- O nome do arquivo leva acento e `ª`; o `Content-Disposition` manda as duas
+  formas (`filename` ASCII e `filename*` UTF-8). No .zip o JSZip marca o nome
+  como UTF-8 (bit 11) sozinho; duas pessoas com o mesmo primeiro e ultimo
+  nome ganham o numero da pessoa no fim.
+- O e-mail nao e enviado: a API devolve assunto, destinatarios e corpo em
+  texto e HTML (campos em negrito vermelho, escapados). Do 2o pagamento em
+  diante o texto e o da resposta, com o mesmo assunto, para o Gmail juntar a
+  conversa.

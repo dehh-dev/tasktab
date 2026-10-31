@@ -218,6 +218,27 @@ function validateListQuery(query = {}) {
   return result;
 }
 
+/** `?payment=n`: o numero do pagamento (1o, 2o, ...) do zip e do e-mail. */
+function validateDocumentQuery(query = {}) {
+  const number = Number(query.payment);
+
+  if (
+    query.payment === undefined ||
+    !/^\d+$/.test(String(query.payment)) ||
+    number < 1
+  ) {
+    throw new ValidationError({
+      message:
+        'Informe qual pagamento: ?payment=1 para o 1o, e assim por diante.',
+      details: [
+        { field: 'payment', message: 'payment deve ser o numero do pagamento' },
+      ],
+    });
+  }
+
+  return number;
+}
+
 function validateId(rawId) {
   return parseId(rawId, INVALID_ID);
 }
@@ -227,5 +248,6 @@ module.exports = {
   validatePreview,
   validateCancel,
   validateListQuery,
+  validateDocumentQuery,
   validateId,
 };

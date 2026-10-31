@@ -223,6 +223,47 @@ async function insertAdjustments(client, adjustments) {
   );
 }
 
+// Tudo o que o formulario do RPA imprime, numa consulta: a pessoa inteira, o
+// lancamento, a empresa e as tabelas de imposto que o RPA guardou ao ser
+// emitido (as impressas sao essas, e nao as vigentes hoje).
+const DOCUMENT_SELECT = `
+  SELECT p.id, p.number, p.code, p.status, p.period_start, p.period_end,
+         p.payment_date, p.net_cents, p.inss_cents, p.irrf_cents,
+         p.gross_cents, p.irrf_base_cents, p.dependents, p.issued_at,
+         row_to_json(w) AS worker,
+         json_build_object(
+           'id', l.id, 'city', l.city, 'state', l.state,
+           'service_type', l.service_type, 'cost_center', l.cost_center
+         ) AS launch,
+         json_build_object(
+           'code', c.code, 'name', c.name, 'cnpj', c.cnpj,
+           'city', c.city, 'state', c.state
+         ) AS company,
+         row_to_json(ti) AS inss_table,
+         row_to_json(tr) AS irrf_table
+  FROM rpa_payments p
+  JOIN rpa_workers w ON w.id = p.worker_id
+  JOIN rpa_launches l ON l.id = w.launch_id
+  JOIN rpa_companies c ON c.id = l.company_id
+  JOIN rpa_tax_tables ti ON ti.id = p.inss_table_id
+  JOIN rpa_tax_tables tr ON tr.id = p.irrf_table_id`;
+
+async function findDocument(id) {
+  const { rows } = await db.query(`${DOCUMENT_SELECT} WHERE p.id = $1`, [id]);
+  return rows[0] || null;
+}
+
+/** Os RPAs validos do n-esimo pagamento do lancamento, pelo numero da pessoa. */
+async function findDocumentsByNumber(launchId, number) {
+  const { rows } = await db.query(
+    `${DOCUMENT_SELECT}
+     WHERE w.launch_id = $1 AND p.number = $2 AND p.status <> 'canceled'
+     ORDER BY w.number`,
+    [launchId, number],
+  );
+  return rows;
+}
+
 /** Cancela com motivo; o trigger do banco anula os dias que ele levou. */
 async function cancel(id, reason) {
   await db.query(
@@ -245,5 +286,7 @@ module.exports = {
   insertMany,
   insertDays,
   insertAdjustments,
+  findDocument,
+  findDocumentsByNumber,
   cancel,
 };
