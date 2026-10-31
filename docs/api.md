@@ -100,9 +100,12 @@ issue 35.
 | `PUT`    | `/api/rpa/launches/:id/days`     | Grava em lote so os dias que mudam            |
 | `GET`    | `/api/rpa/launches/:id/payments` | Os RPAs do lancamento (`status`, `number`)    |
 | `POST`   | `/api/rpa/launches/:id/payments` | Previa (`?preview=true`) ou emissao dos RPAs  |
+| `GET`    | `/api/rpa/launches/:id/rpas.zip` | Um PDF por pessoa do pagamento `?payment=n`   |
+| `GET`    | `/api/rpa/launches/:id/email`    | Texto do e-mail de solicitacao (`?payment=n`) |
 | `GET`    | `/api/rpa/workers/:id`           | Detalhe da pessoa                             |
 | `PATCH`  | `/api/rpa/workers/:id`           | Corrige a pessoa e da pendencia por resolvida |
 | `GET`    | `/api/rpa/payments/:id`          | O RPA, com o que levou de cada dia            |
+| `GET`    | `/api/rpa/payments/:id/rpa.pdf`  | O RPA no layout do formulario de emissao      |
 | `POST`   | `/api/rpa/payments/:id/cancel`   | Cancela com motivo e libera os dias           |
 
 O lancamento leva `company_id`, `city`, `state`, `development`, `starts_on` e
@@ -180,6 +183,21 @@ entra de novo; dia pago cujo ponto mudou entra no pagamento seguinte como
 `correction`, a mais ou a menos. O RPA emitido nao muda: `cancel` (com
 `reason`) libera os dias e o numero para emitir de novo, e responde `409` se
 ja esta cancelado ou pago.
+
+`GET /api/rpa/payments/:id/rpa.pdf` devolve o RPA numa pagina Carta, no
+layout do formulario de emissao, com as tabelas de INSS e IRRF que o RPA
+guardou ao ser emitido. O nome do arquivo e `Solicitação - RPA - 1ª Pagto
+-Nome Sobrenome_dd-mm-aaaa_hhmmss.pdf`, com a hora da emissao em Brasilia, no
+`Content-Disposition` com `filename*` em UTF-8 e uma alternativa ASCII. Gerar
+de novo da o mesmo arquivo. RPA cancelado responde `409`; lancamento sem
+tipo de servico ou centro de custo, `422`.
+
+`GET /api/rpa/launches/:id/rpas.zip?payment=n` junta os PDFs dos RPAs validos
+do n-esimo pagamento, um por pessoa, com os nomes em UTF-8.
+`GET /api/rpa/launches/:id/email?payment=n` devolve `subject`, `to`, `cc`,
+`text` e `html` do e-mail de solicitacao (o envio continua pelo Gmail); do 2o
+pagamento em diante, `reply` e `true` e o texto e o da resposta na mesma
+conversa, com o mesmo assunto.
 
 Campos da empresa: `code` (codigo UAU, inteiro, unico), `name` e `cnpj`
 (obrigatorios; o CNPJ entra com ou sem mascara e e conferido pelo
