@@ -4,6 +4,7 @@ const { Router } = require('express');
 const companies = require('../controllers/rpa-company.controller');
 const launches = require('../controllers/rpa-launch.controller');
 const workers = require('../controllers/rpa-worker.controller');
+const timesheet = require('../controllers/rpa-timesheet.controller');
 const asyncHandler = require('../middlewares/async-handler');
 const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireScope } = require('../middlewares/authorize');
@@ -69,6 +70,16 @@ router.get(
   '/launches/:id/workers',
   requireScope('rpa:read'),
   asyncHandler(launches.workers),
+);
+router.get(
+  '/launches/:id/days',
+  requireScope('rpa:read'),
+  asyncHandler(timesheet.show),
+);
+router.put(
+  '/launches/:id/days',
+  requireScope('rpa:write'),
+  asyncHandler(timesheet.update),
 );
 
 router.get(

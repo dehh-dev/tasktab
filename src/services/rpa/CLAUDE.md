@@ -1,8 +1,8 @@
-# RPA: importacao da equipe e pendencias
+# RPA: importacao da equipe, pendencias e calculo
 
 O modulo substitui a planilha `CONTROLE DE DIARIA - <cidade>.xlsb` (plano em
-issue 35). Aqui fica a importacao das respostas do Google Forms (issue 37); o
-calculo das diarias (issue 38) entra nesta pasta e neste arquivo.
+issue 35). Aqui ficam a importacao das respostas do Google Forms (issue 37) e
+a grade do ponto com o calculo das diarias (issue 38).
 
 ## Importacao (`import.service.js`)
 
@@ -59,3 +59,52 @@ pendencia barra a importacao.
   proprio banco viram vazio — e o que o formulario de Avare recebeu.
 - No PATCH o CPF corrigido **tem** de fechar o DV e nao pode repetir outro do
   lancamento. O `number` nao muda: vai no codigo de todo RPA da pessoa.
+
+## Grade do ponto e calculo (`timesheet.js`, `day-value.js`)
+
+- **So a excecao e gravada** (`rpa_days`). A grade nasce do horario padrao do
+  lancamento, do inicio a saida (inclusive) de cada pessoa; dia da semana sem
+  horario e folga (`source: 'off'`). Excecao igual ao padrao, sem observacao,
+  e apagada em vez de gravada. Era a LANCA com o Botao 1, que gerava de novo
+  quem ja tinha saido.
+- **O valor nunca e gravado**: e calculado na leitura, entao mudar a diaria
+  ou o feriado ja muda a grade. O pagamento (issue 39) congela o que levou em
+  `rpa_payment_days` e compara com a grade para achar a correcao.
+- **1/1920 de centavo** (`SUBCENTS_PER_CENT`), inteiro do comeco ao fim: por
+  centavo de diaria, o minuto vale 4 (hora normal = diaria / 8), 6 a 50% e 8 a
+  100%. Nada de float, nada de arredondar por dia.
+- **Regras**, conferidas com a planilha (replica de 70 de 70 linhas) e
+  ajustadas pelas decisoes de 2026-10-31:
+  - dia util e sabado: diaria + o que passa de 8h a 50%;
+  - domingo e feriado: duas diarias + o que passa de 8h a 100%, **mesmo com
+    menos de 8h** (a planilha tirava a dobra do domingo e descontava o
+    feriado);
+  - **abaixo da base nada desconta**, em dia nenhum (a planilha descontava o
+    sabado a 50%): sai a marca `short_day`, e meia diaria ou desconto e
+    decisao de quem lanca;
+  - meia diaria: metade da diaria (dobrada no domingo e no feriado), base de
+    4h e extra com a mesma hora normal de diaria / 8. Na planilha a hora da
+    meia diaria era diaria / 16 e a base seguia 8h por um `0.05` no lugar de
+    `0.5`; nenhum dia real de Avare tinha meio periodo. Confirmado por quem
+    paga em 2026-10-31;
+  - feriado e do lancamento, vale para todos e prevalece sobre o domingo (as
+    regras sao a mesma, e nao somam).
+- Feriado em dia de semana vem **preenchido pelo horario padrao**, ja dobrado:
+  a grade e o ponto previsto, e o RPA sai antes do fim do periodo. Quem nao
+  trabalhou no feriado ganha falta. Confirmado em 2026-10-31, como as duas
+  abaixo: a saida (`left_on`) e o ultimo dia trabalhado, e entra na grade; dia
+  sem horario de almoco e dia sem almoco — o "1h quando nao indicado" da
+  issue 38 descreve so os exemplos dos criterios.
+- Diaria da `rpa_rates` vigente na data, com a funcao sem acento nem caixa, e
+  o adicional de promovido a partir de `promoted_since`. Sem vigencia: na
+  grade o dia vem com valor `null` e `no_rate`; no PUT de um dia trabalhado e
+  `422` com `date` e `role` no `details` — o `#N/D` da planilha.
+- Horarios: entrada e saida obrigatorias, almoco com os dois ou nenhum, em
+  ordem, com no maximo uma virada da meia-noite (turno da noite, marca
+  `overnight`) e menos de 24h. A regra e a mesma do horario padrao
+  (`validators/rpa-times.js`), para o padrao nunca gerar dia que a grade
+  recusa.
+- **Consultas constantes**: o PUT grava e apaga com `unnest` (uma consulta
+  cada), qualquer que seja o lote, com teste pelo `query-counter`. O lote e
+  tudo ou nada; tirar a excecao vale ate fora do periodo da pessoa, para
+  limpar o dia de quem teve a saida antecipada.

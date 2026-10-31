@@ -118,6 +118,8 @@ const ROUTES = [
   { method: 'DELETE', path: '/api/rpa/launches/:id', roles: ADMIN },
   { method: 'POST', path: '/api/rpa/launches/:id/import', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/launches/:id/workers', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id/days', roles: ADMIN },
+  { method: 'PUT', path: '/api/rpa/launches/:id/days', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/workers/:id', roles: ADMIN },
   {
     method: 'PATCH',

@@ -176,6 +176,34 @@ describe('POST /api/rpa/launches', () => {
       'schedule[0].start_time',
     ]);
   });
+
+  it('o horario padrao segue a mesma regra de ordem da grade do ponto', async () => {
+    const response = await request(
+      'POST',
+      '/api/rpa/launches',
+      await validLaunch({
+        schedule: [
+          { ...SCHEDULE[0], end_time: '08:00' },
+          // Turno da noite: a saida no dia seguinte vale.
+          {
+            weekday: 2,
+            start_time: '22:00',
+            lunch_out: '02:00',
+            lunch_in: '03:00',
+            end_time: '07:00',
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      {
+        field: 'schedule[0].start_time',
+        message: 'a jornada chega a 24h: confira a ordem dos horarios',
+      },
+    ]);
+  });
 });
 
 describe('GET /api/rpa/launches', () => {
