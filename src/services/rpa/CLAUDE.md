@@ -1,8 +1,9 @@
-# RPA: importacao da equipe, pendencias e calculo
+# RPA: importacao da equipe, pendencias, calculo e pagamentos
 
 O modulo substitui a planilha `CONTROLE DE DIARIA - <cidade>.xlsb` (plano em
-issue 35). Aqui ficam a importacao das respostas do Google Forms (issue 37) e
-a grade do ponto com o calculo das diarias (issue 38).
+issue 35). Aqui ficam a importacao das respostas do Google Forms (issue 37),
+a grade do ponto com o calculo das diarias (issue 38) e os pagamentos com o
+bruto e os impostos (issue 39).
 
 ## Importacao (`import.service.js`)
 
@@ -108,3 +109,37 @@ pendencia barra a importacao.
   cada), qualquer que seja o lote, com teste pelo `query-counter`. O lote e
   tudo ou nada; tirar a excecao vale ate fora do periodo da pessoa, para
   limpar o dia de quem teve a saida antecipada.
+
+## Pagamentos (`payment-plan.js`, `taxes.js`, `payment.service.js`)
+
+- **Uma regra so** (`planWorker`), no lugar das cinco linhas do RELATORIO: do
+  periodo, a diaria e o extra de cada dia ainda nao pagos; de dia anterior, o
+  extra pendente de diaria ja paga; de todo dia pago, a correcao entre o que
+  a grade vale hoje e o que saiu. Bonus, acrescimo e desconto com motivo. O
+  **bonus e pontual e nao cobre dia nenhum** (decisao de 2026-10-31): pagar
+  dias adiantados e so escolher um periodo que va ate eles — a grade e o
+  ponto previsto, e a mudanca depois vira correcao.
+- **"1o pagamento so com diarias" e por pessoa**: quem entrou depois tambem
+  tem o primeiro dela sem extra. O extra fica em `deferred_extra_subcents` e
+  entra no seguinte.
+- `rpa_payment_days` leva **todo dia do periodo, inclusive o de valor zero**
+  (falta, folga): e o que faz uma falta que vira dia trabalhado aparecer como
+  correcao, e nao sumir.
+- O total da pessoa e arredondado **uma vez**, meio para longe do zero (o
+  ARRED do Excel), em `value_cents`; o resto e subcentavo.
+- **Bruto pelo liquido** (`grossForNet`): o menor bruto cujo liquido fecha no
+  centavo. INSS e IRRF so crescem com o bruto, entao o liquido anda -1, 0 ou
+  +1 por centavo: busca binaria e uma janela de 10 centavos abaixo. Ha teste
+  varrendo liquidos de R$ 1 a R$ 15 mil.
+- **Arredondamento dos impostos** em `ROUNDING` (`taxes.js`): INSS truncado
+  (o financeiro devolveu R$ 650,01 para o RPA de R$ 650,00 da planilha), IRRF
+  no arredondamento comum, os dois **pendentes de confirmacao com o
+  financeiro** (issue 35).
+- **O mes acumula por CPF e CNPJ**, em qualquer lancamento: a base do INSS
+  deste RPA e o que falta para o teto; o IRRF e o do mes inteiro menos o ja
+  retido; a base gravada e a parte deste RPA na base do mes.
+- Previa e emissao fazem a mesma conta (`buildPayments`). A emissao trava o
+  lancamento e o rele dentro da transacao; sao tres INSERTs com `unnest`.
+- O numero do RPA e o menor livre entre os nao cancelados: cancelar o 1o e
+  emitir de novo da o 1 outra vez, com o mesmo codigo. O banco trava o
+  emitido (ver `src/models/CLAUDE.md`); pago nao se cancela pela API.

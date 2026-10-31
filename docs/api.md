@@ -87,19 +87,23 @@ issue 35.
 | `GET`   | `/api/rpa/companies/:id` | Detalhe                                          |
 | `PATCH` | `/api/rpa/companies/:id` | Atualiza (o codigo UAU nao muda: e a identidade) |
 
-| Metodo   | Rota                            | Descricao                                     |
-| -------- | ------------------------------- | --------------------------------------------- |
-| `GET`    | `/api/rpa/launches`             | Lista os lancamentos (filtro por `status`)    |
-| `POST`   | `/api/rpa/launches`             | Cria, com horario padrao e diarias            |
-| `GET`    | `/api/rpa/launches/:id`         | Detalhe                                       |
-| `PATCH`  | `/api/rpa/launches/:id`         | Atualiza; encerrado so aceita reabrir         |
-| `DELETE` | `/api/rpa/launches/:id`         | Apaga (recusa com `409` se ha RPA)            |
-| `POST`   | `/api/rpa/launches/:id/import`  | Importa a equipe das respostas do formulario  |
-| `GET`    | `/api/rpa/launches/:id/workers` | A equipe, pelo numero fixo, com pendencias    |
-| `GET`    | `/api/rpa/launches/:id/days`    | A grade do ponto, com o valor de cada dia     |
-| `PUT`    | `/api/rpa/launches/:id/days`    | Grava em lote so os dias que mudam            |
-| `GET`    | `/api/rpa/workers/:id`          | Detalhe da pessoa                             |
-| `PATCH`  | `/api/rpa/workers/:id`          | Corrige a pessoa e da pendencia por resolvida |
+| Metodo   | Rota                             | Descricao                                     |
+| -------- | -------------------------------- | --------------------------------------------- |
+| `GET`    | `/api/rpa/launches`              | Lista os lancamentos (filtro por `status`)    |
+| `POST`   | `/api/rpa/launches`              | Cria, com horario padrao e diarias            |
+| `GET`    | `/api/rpa/launches/:id`          | Detalhe                                       |
+| `PATCH`  | `/api/rpa/launches/:id`          | Atualiza; encerrado so aceita reabrir         |
+| `DELETE` | `/api/rpa/launches/:id`          | Apaga (recusa com `409` se ha RPA)            |
+| `POST`   | `/api/rpa/launches/:id/import`   | Importa a equipe das respostas do formulario  |
+| `GET`    | `/api/rpa/launches/:id/workers`  | A equipe, pelo numero fixo, com pendencias    |
+| `GET`    | `/api/rpa/launches/:id/days`     | A grade do ponto, com o valor de cada dia     |
+| `PUT`    | `/api/rpa/launches/:id/days`     | Grava em lote so os dias que mudam            |
+| `GET`    | `/api/rpa/launches/:id/payments` | Os RPAs do lancamento (`status`, `number`)    |
+| `POST`   | `/api/rpa/launches/:id/payments` | Previa (`?preview=true`) ou emissao dos RPAs  |
+| `GET`    | `/api/rpa/workers/:id`           | Detalhe da pessoa                             |
+| `PATCH`  | `/api/rpa/workers/:id`           | Corrige a pessoa e da pendencia por resolvida |
+| `GET`    | `/api/rpa/payments/:id`          | O RPA, com o que levou de cada dia            |
+| `POST`   | `/api/rpa/payments/:id/cancel`   | Cancela com motivo e libera os dias           |
 
 O lancamento leva `company_id`, `city`, `state`, `development`, `starts_on` e
 `ends_on` (obrigatorios), `holidays` (datas), `service_type` e `cost_center`
@@ -152,6 +156,30 @@ Calculo, com hora normal = diaria / 8: dia util e sabado pagam a diaria e as
 horas acima de 8h a 50%; domingo e feriado, duas diarias e as horas acima de
 8h a 100%, mesmo com menos de 8h. Abaixo de 8h nada e descontado: o dia sai
 com `short_day`. Meia diaria tem base de 4h.
+
+`POST /api/rpa/launches/:id/payments` recebe `period_start`, `period_end` e
+`payment_date` (obrigatorios), `worker_ids` (sem ele, a equipe inteira) e
+`adjustments` — `[{ worker_id, kind, amount_cents, reason }]`, com `kind`
+`bonus`, `addition` ou `deduction` e motivo obrigatorio. Com `?preview=true`
+nada e gravado; sem ele, os RPAs sao emitidos (`201`). As duas respostas
+fazem a mesma conta: `{ preview, payments, skipped }`. Cada pagamento traz
+`number`, `code` (`no-empresa-pessoa-mmaaaa`), `lines` (o que leva de cada
+dia: `daily`, `extras` ou `correction`, em 1/1920 de centavo), `days` (os
+totais), `deferred_extra_subcents` (extra que o 1o pagamento so com diarias
+deixou para o seguinte), `adjustments`, `value_cents` (os dias, arredondados
+uma vez), `net_cents`, `inss_cents`, `irrf_cents`, `gross_cents`,
+`irrf_base_cents` e `month_before` (o que a pessoa ja recebeu no mes, na
+mesma empresa). `skipped` diz quem ficou de fora e por que: nada a pagar,
+desconto maior que o valor, dia sem diaria vigente.
+
+O liquido e o que a pessoa recebe; o bruto e o menor valor em centavos cujo
+liquido fecha no centavo, com o INSS truncado e o IRRF da tabela vigente na
+data do pagamento (em 2026, com a reducao da Lei 15.270/2025). O teto do
+INSS e o IRRF somam os RPAs do mes do mesmo CPF no mesmo CNPJ. Dia pago nao
+entra de novo; dia pago cujo ponto mudou entra no pagamento seguinte como
+`correction`, a mais ou a menos. O RPA emitido nao muda: `cancel` (com
+`reason`) libera os dias e o numero para emitir de novo, e responde `409` se
+ja esta cancelado ou pago.
 
 Campos da empresa: `code` (codigo UAU, inteiro, unico), `name` e `cnpj`
 (obrigatorios; o CNPJ entra com ou sem mascara e e conferido pelo

@@ -68,7 +68,8 @@ const TABLES = [
     'note',
     'faltou',
   ],
-  ['rpa_payments', () => insertRpaPayment(), 'payment_date', '2026-10-22'],
+  // O RPA emitido so muda de estado (`lock-issued-rpa-payments`).
+  ['rpa_payments', () => insertRpaPayment(), 'paid_at', '2026-10-25T12:00:00Z'],
   [
     'rpa_files',
     async () =>

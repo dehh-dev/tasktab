@@ -46,6 +46,13 @@ cada recusa conferida pelo nome da constraint:
   `EXCLUDE USING gist` — por isso a migration cria o `btree_gist`.
 - `rpa_workers` -> `rpa_payments` e `RESTRICT`: apagar lancamento com RPA
   emitido e recusado pelo banco.
+- **RPA emitido nao muda** (migration `lock-issued-rpa-payments`, teste em
+  `tests/db/rpa-payment-lock.test.js`): triggers recusam mudar valor,
+  periodo, numero ou codigo (`rpa_payments_issued_immutable`), mexer no
+  cancelado (`rpa_payments_canceled_final`) e apagar RPA
+  (`rpa_payments_not_deleted`); em `rpa_payment_days` so `voided` anda, de
+  falso para verdadeiro; ajuste nao muda nem sai. Anda so o estado (pago,
+  cancelado). `created_by` fica livre para o `SET NULL` de apagar usuario.
 - `rpa_banks` e `rpa_tax_tables` sao **sementes publicas** da migration
   `seed-rpa-banks-and-taxes` (lista do Banco Central; INSS e IRRF conferidos na
   Receita). O `clearDatabase` dos testes nao as trunca. Tabela de imposto nova
