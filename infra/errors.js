@@ -155,6 +155,22 @@ class MethodNotAllowedError extends BaseError {
 }
 
 /**
+ * 413 — o corpo passou do limite do `express.json`. Sem isto o erro do
+ * body-parser caia no 500 generico, e o lote da grade do ponto (issue 38) e o
+ * primeiro corpo que chega perto do limite.
+ */
+class PayloadTooLargeError extends BaseError {
+  constructor({ limit, cause } = {}) {
+    super({
+      message: `Corpo da requisicao maior que o limite de ${limit}.`,
+      action: 'Envie os dados em partes menores.',
+      statusCode: 413,
+      cause,
+    });
+  }
+}
+
+/**
  * 422 — a requisicao esta bem formada, mas o conteudo nao passa nas regras.
  * O `details` traz `{ field, message }` por campo: e o que permite a interface
  * exibir cada erro no campo correspondente em vez de um alerta generico.
@@ -182,5 +198,6 @@ module.exports = {
   ForbiddenError,
   ConflictError,
   MethodNotAllowedError,
+  PayloadTooLargeError,
   ValidationError,
 };

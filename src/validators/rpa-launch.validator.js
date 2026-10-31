@@ -10,6 +10,7 @@ const {
   optionalState,
 } = require('./rules');
 const { fold } = require('../services/rpa/text');
+const { validateWorkTimes } = require('./rpa-times');
 
 const BODY_NOT_OBJECT = {
   message: 'Corpo da requisicao deve ser um objeto JSON.',
@@ -22,7 +23,6 @@ const INVALID_ID = {
 };
 
 const STATUSES = ['open', 'closed'];
-const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAILS = 20;
 const MAX_RATES = 50;
@@ -117,17 +117,6 @@ function validateEmails(field, value, errors) {
   return [...new Set(emails)];
 }
 
-function optionalTime(field, value, errors) {
-  if (value === undefined || value === null || value === '') return null;
-
-  if (typeof value !== 'string' || !TIME.test(value)) {
-    errors.push({ field, message: `${field} deve ser um horario HH:MM` });
-    return undefined;
-  }
-
-  return value;
-}
-
 /**
  * O horario padrao por dia da semana (ISO: 1 = segunda, 7 = domingo). Dia
  * que nao vem e folga. A grade do ponto (issue 38) nasce daqui.
@@ -174,35 +163,11 @@ function validateSchedule(value, errors) {
       });
     }
 
-    const start = optionalTime(at('start_time'), day.start_time, errors);
-    const end = optionalTime(at('end_time'), day.end_time, errors);
-    const lunchOut = optionalTime(at('lunch_out'), day.lunch_out, errors);
-    const lunchIn = optionalTime(at('lunch_in'), day.lunch_in, errors);
-
-    if (start === null || end === null) {
-      errors.push({
-        field: at(start === null ? 'start_time' : 'end_time'),
-        message: 'entrada e saida sao obrigatorias',
-      });
-    }
-
-    if ((lunchOut === null) !== (lunchIn === null)) {
-      errors.push({
-        field: at('lunch_out'),
-        message: 'saida e retorno do almoco vao juntos',
-      });
-    }
+    const times = validateWorkTimes(at, day, errors);
 
     if (errors.length === before) {
       seen.add(day.weekday);
-      days.push({
-        weekday: day.weekday,
-        quantity,
-        start_time: start,
-        lunch_out: lunchOut,
-        lunch_in: lunchIn,
-        end_time: end,
-      });
+      days.push({ weekday: day.weekday, quantity, ...times });
     }
   });
 

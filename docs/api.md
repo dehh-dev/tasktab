@@ -96,6 +96,8 @@ issue 35.
 | `DELETE` | `/api/rpa/launches/:id`         | Apaga (recusa com `409` se ha RPA)            |
 | `POST`   | `/api/rpa/launches/:id/import`  | Importa a equipe das respostas do formulario  |
 | `GET`    | `/api/rpa/launches/:id/workers` | A equipe, pelo numero fixo, com pendencias    |
+| `GET`    | `/api/rpa/launches/:id/days`    | A grade do ponto, com o valor de cada dia     |
+| `PUT`    | `/api/rpa/launches/:id/days`    | Grava em lote so os dias que mudam            |
 | `GET`    | `/api/rpa/workers/:id`          | Detalhe da pessoa                             |
 | `PATCH`  | `/api/rpa/workers/:id`          | Corrige a pessoa e da pendencia por resolvida |
 
@@ -124,6 +126,32 @@ Cada pessoa tem `issues`: `[{ code, field, message, source, resolved }]`. O
 inicio real, saida, `promoted_since`, `dependents`, dados do formulario) e da
 pendencias por resolvidas com `resolve_issues: [{ code, field }]`. O `number`
 nao muda.
+
+`GET /api/rpa/launches/:id/days?from=&to=` devolve a grade pessoa x dia,
+preenchida com o horario padrao do inicio a saida de cada pessoa, ate 93 dias
+por vez (sem `from` e `to`, o lancamento inteiro). Cada dia traz `kind`
+(`weekday`, `saturday`, `sunday`, `holiday`), `source` (`schedule`, `exception`
+ou `off`, a folga), `quantity`, os horarios, `worked_minutes`,
+`extra_minutes`, `daily_cents` (a diaria vigente), `daily_subcents`,
+`extra_subcents`, `value_subcents` e `flags` (`short_day`, `no_rate`,
+`overnight`). Os valores vao em **1/1920 de centavo**
+(`subcents_per_cent: 1920`): o extra por minuto nao fecha em centavo, e o
+arredondamento e so no total do pagamento. Dia trabalhado sem diaria vigente
+vem com valor `null` e a marca `no_rate`. Cada pessoa tem `totals`.
+
+`PUT /api/rpa/launches/:id/days` recebe `{ "days": [...] }`, ate 1000 dias:
+`{ worker_id, date, quantity, start_time, lunch_out, lunch_in, end_time, note }`
+para gravar a excecao (`quantity` 0 e falta, sem horario; 0.5 e meio periodo)
+ou `{ worker_id, date, reset: true }` para voltar ao padrao. O dia igual ao
+padrao tambem volta ao padrao. O lote e gravado inteiro ou nada: pessoa de
+outro lancamento, data fora do periodo da pessoa e dia trabalhado sem diaria
+vigente respondem `422` apontando a linha (`days[i].campo`); o ultimo traz
+tambem `date` e `role`. A resposta e a grade do trecho gravado.
+
+Calculo, com hora normal = diaria / 8: dia util e sabado pagam a diaria e as
+horas acima de 8h a 50%; domingo e feriado, duas diarias e as horas acima de
+8h a 100%, mesmo com menos de 8h. Abaixo de 8h nada e descontado: o dia sai
+com `short_day`. Meia diaria tem base de 4h.
 
 Campos da empresa: `code` (codigo UAU, inteiro, unico), `name` e `cnpj`
 (obrigatorios; o CNPJ entra com ou sem mascara e e conferido pelo
@@ -188,5 +216,5 @@ culpado — e o que permite a interface exibir o erro no campo certo.
 Codigos: `400` (id/JSON invalido), `401` (sem sessao), `403` (sem permissao),
 `404` (inexistente), `405` (metodo errado num caminho que existe, com
 `Allow`), `409` (o estado nao permite, como escrever em relatorio fechado),
-`422` (falha de validacao), `429` (limite de requisicoes), `500` (erro
+`413` (corpo JSON acima de 100 KB), `422` (falha de validacao), `429` (limite de requisicoes), `500` (erro
 interno), `503` (dependencia fora do ar).

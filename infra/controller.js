@@ -5,6 +5,7 @@ const {
   InternalServerError,
   BadRequestError,
   NotFoundError,
+  PayloadTooLargeError,
 } = require('./errors');
 
 /** Ultima parada: nenhuma rota respondeu a requisicao. */
@@ -63,6 +64,19 @@ function onErrorHandler(error, req, res, next) {
       new BadRequestError({
         message: 'JSON invalido.',
         action: 'Verifique a sintaxe do corpo enviado.',
+        cause: error,
+      }),
+    );
+  }
+
+  // Corpo acima do limite do express.json: o body-parser marca o tipo e o
+  // limite em bytes.
+  if (error.type === 'entity.too.large') {
+    return respond(
+      res,
+      req,
+      new PayloadTooLargeError({
+        limit: `${Math.floor(error.limit / 1024)} KB`,
         cause: error,
       }),
     );

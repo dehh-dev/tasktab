@@ -17,6 +17,7 @@ Toda resposta de erro nasce de uma classe de `errors.js` que estende
 | `ForbiddenError`        | 403    | ha sessao, mas ela nao alcanca a operacao        |
 | `MethodNotAllowedError` | 405    | metodo errado em caminho que existe (`Allow`)    |
 | `ConflictError`         | 409    | estado nao permite: escrita em relatorio fechado |
+| `PayloadTooLargeError`  | 413    | corpo JSON acima do limite (100 KB)              |
 | `ValidationError`       | 422    | falha de validacao; carrega `details`            |
 | `TooManyRequestsError`  | 429    | teto de requisicoes estourado                    |
 | `ServiceError`          | 503    | dependencia fora do ar (banco)                   |

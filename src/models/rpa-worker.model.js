@@ -56,6 +56,19 @@ async function findByLaunch(launchId, client = db) {
   return rows;
 }
 
+/**
+ * So o que a grade do ponto usa: sem CPF, conta e documento, que a grade nao
+ * mostra e que nao precisam sair do banco a cada abertura dela.
+ */
+async function findRoster(launchId) {
+  const { rows } = await db.query(
+    `SELECT id, number, name, role, starts_on, left_on, promoted_since
+     FROM rpa_workers WHERE launch_id = $1 ORDER BY number`,
+    [launchId],
+  );
+  return rows;
+}
+
 async function findById(id) {
   const { rows } = await db.query(
     `SELECT ${COLUMNS} FROM rpa_workers WHERE id = $1`,
@@ -130,6 +143,7 @@ async function update(id, data, client = db) {
 module.exports = {
   UPDATABLE_COLUMNS,
   findByLaunch,
+  findRoster,
   findById,
   findByCpf,
   nextNumber,
