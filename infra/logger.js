@@ -32,6 +32,10 @@ const SENSITIVE_FIELDS = [
 const REDACT_PATHS = [
   'req.headers.authorization',
   'req.headers.cookie',
+  // O `detail` do erro do Postgres repete o valor que violou a constraint:
+  // `Key (launch_id, cpf)=(1, ...)` no unico e `Failing row contains (...)`,
+  // com a linha inteira, no CHECK. A constraint fica em `err.constraint`.
+  'err.detail',
   ...SENSITIVE_FIELDS.flatMap((field) => [field, `*.${field}`]),
 ];
 
