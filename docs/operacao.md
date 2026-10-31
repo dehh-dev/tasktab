@@ -7,30 +7,31 @@
 em `process.env`, entao em producao basta injetar as variaveis reais pelo
 ambiente (nao existe `env.production` versionado).
 
-| Variavel                                              | Descricao                                 |
-| ----------------------------------------------------- | ----------------------------------------- |
-| `PORT`                                                | Porta HTTP                                |
-| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | Conexao usada pela aplicacao              |
-| `DATABASE_URL`                                        | Consumida pelo `node-pg-migrate`          |
-| `RATE_LIMIT_WINDOW_MS`                                | Janela do limitador (padrao 15min)        |
-| `RATE_LIMIT_MAX`                                      | Teto de leitura (padrao 600)              |
-| `RATE_LIMIT_WRITE_MAX`                                | Teto de escrita (padrao 100)              |
-| `RATE_LIMIT_BATCH_WRITE_MAX`                          | Teto das rotas em lote (padrao 600)       |
-| `RATE_LIMIT_AUTH_MAX`                                 | Teto do login (padrao 20)                 |
-| `RATE_LIMIT_ENABLED`                                  | `true` liga em teste, `false` desliga     |
-| `UPLOAD_DIR`                                          | Onde os PDFs sao gravados                 |
-| `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo                |
-| `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao                   |
-| `OCR_ENABLED`                                         | `false` desliga o degrau de OCR           |
-| `OCR_LANGUAGE`                                        | Idioma do tesseract (padrao `por`)        |
-| `OCR_LANG_PATH`                                       | Dados do idioma (padrao: o pacote `por`)  |
-| `OCR_TIMEOUT_MS`                                      | Teto por pagina (padrao 20s)              |
-| `SESSION_COOKIE_NAME`                                 | Nome do cookie (padrao `tasktab_session`) |
-| `SESSION_TTL_HOURS`                                   | Validade da sessao (padrao 168h)          |
-| `SESSION_COOKIE_SECURE`                               | Forca (ou desliga) o `Secure` do cookie   |
-| `PASSWORD_PEPPER`                                     | Pepper das senhas (obrigatorio)           |
-| `PASSWORD_SCRYPT_P`                                   | Paralelismo do scrypt (padrao 5)          |
-| `LOG_LEVEL`                                           | Nivel do `pino` (padrao `info`)           |
+| Variavel                                              | Descricao                                  |
+| ----------------------------------------------------- | ------------------------------------------ |
+| `PORT`                                                | Porta HTTP                                 |
+| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | Conexao usada pela aplicacao               |
+| `DATABASE_URL`                                        | Consumida pelo `node-pg-migrate`           |
+| `RATE_LIMIT_WINDOW_MS`                                | Janela do limitador (padrao 15min)         |
+| `RATE_LIMIT_MAX`                                      | Teto de leitura (padrao 600)               |
+| `RATE_LIMIT_WRITE_MAX`                                | Teto de escrita (padrao 100)               |
+| `RATE_LIMIT_BATCH_WRITE_MAX`                          | Teto das rotas em lote (padrao 600)        |
+| `RATE_LIMIT_AUTH_MAX`                                 | Teto do login (padrao 20)                  |
+| `RATE_LIMIT_ENABLED`                                  | `true` liga em teste, `false` desliga      |
+| `UPLOAD_DIR`                                          | Onde os PDFs sao gravados                  |
+| `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo                 |
+| `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao                    |
+| `RPA_DOCUMENTS_MAX_BYTES`                             | .zip dos documentos do RPA (padrao 200 MB) |
+| `OCR_ENABLED`                                         | `false` desliga o degrau de OCR            |
+| `OCR_LANGUAGE`                                        | Idioma do tesseract (padrao `por`)         |
+| `OCR_LANG_PATH`                                       | Dados do idioma (padrao: o pacote `por`)   |
+| `OCR_TIMEOUT_MS`                                      | Teto por pagina (padrao 20s)               |
+| `SESSION_COOKIE_NAME`                                 | Nome do cookie (padrao `tasktab_session`)  |
+| `SESSION_TTL_HOURS`                                   | Validade da sessao (padrao 168h)           |
+| `SESSION_COOKIE_SECURE`                               | Forca (ou desliga) o `Secure` do cookie    |
+| `PASSWORD_PEPPER`                                     | Pepper das senhas (obrigatorio)            |
+| `PASSWORD_SCRYPT_P`                                   | Paralelismo do scrypt (padrao 5)           |
+| `LOG_LEVEL`                                           | Nivel do `pino` (padrao `info`)            |
 
 O `.npmrc` liga `engine-strict`: sem ele o campo `engines` seria so um aviso e a
 instalacao seguiria numa versao de Node incompativel.

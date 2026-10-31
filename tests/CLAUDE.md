@@ -89,6 +89,10 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   formulario em .xlsx (como o Sheets exporta: data como data, CPF e CEP como
   numero) e .csv (UTF-8 com virgula, ou Windows-1252 com ponto e virgula), com
   os titulos reais das perguntas e CPF/PIS sinteticos pelo verificador.
+- `tests/fixtures/drive.js` gera o .zip da pasta de respostas do Drive (uma
+  subpasta por pergunta real, `<arquivo> - <conta>`), fotos sinteticas pelo
+  `sharp` (inclusive de celular, 4032 x 3024) e, com `rawZip`, um .zip byte a
+  byte que declara o tamanho que se quiser — e assim que se monta a bomba.
 
 ## Puros
 

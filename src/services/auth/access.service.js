@@ -5,6 +5,7 @@ const Receipt = require('../../models/receipt.model');
 const Launch = require('../../models/rpa-launch.model');
 const Worker = require('../../models/rpa-worker.model');
 const Payment = require('../../models/rpa-payment.model');
+const RpaFile = require('../../models/rpa-file.model');
 const { NotFoundError, ConflictError } = require('../../../infra/errors');
 const ownership = require('./ownership');
 
@@ -128,6 +129,13 @@ function paymentNotFound(id) {
   });
 }
 
+function rpaFileNotFound(id) {
+  return new NotFoundError({
+    message: `Documento ${id} nao encontrado.`,
+    action: 'Verifique o id informado ou liste os documentos do lancamento.',
+  });
+}
+
 /**
  * Lancamento encerrado e somente leitura, como o relatorio fechado: e o que
  * ja foi pago. A excecao e o PATCH que reabre (`allowClosed`).
@@ -188,7 +196,21 @@ async function loadPayment(id, { write = false } = {}) {
   return { payment, launch };
 }
 
+/** O documento do formulario e o lancamento dele, com a trava do encerrado. */
+async function loadRpaFile(id, { write = false } = {}) {
+  const file = await RpaFile.findById(id);
+
+  if (!file) {
+    throw rpaFileNotFound(id);
+  }
+
+  const launch = await loadLaunch(file.launch_id, { write });
+
+  return { file, launch };
+}
+
 module.exports = {
+  loadRpaFile,
   loadReport,
   loadReceipt,
   loadLaunch,

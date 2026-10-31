@@ -4,9 +4,11 @@ const {
   request,
   requestUpload,
   insertRpaLaunch,
+  insertRpaWorker,
   startApiInstance,
 } = require('../../orchestrator');
 const { formResponse, makeFormXlsx } = require('../../fixtures/forms');
+const { QUESTIONS, photo, makeDriveZip } = require('../../fixtures/drive');
 
 /**
  * Criterio da issue 37: nenhum CPF, PIS, RG ou conta no log. A instancia
@@ -113,5 +115,57 @@ describe('o log do RPA', () => {
     ];
 
     expect(personal.filter((value) => output.includes(value))).toEqual([]);
+  });
+
+  it('enviar os documentos nao deixa nome de arquivo nem de pessoa no log', async () => {
+    const launch = await insertRpaLaunch();
+    await insertRpaWorker({
+      launch_id: launch.id,
+      name: 'Pessoa Sintetica Documentada',
+    });
+    const before = instance.output().length;
+    const answered = (await logLines(0)).filter((line) => line.res).length;
+
+    const response = await requestUpload(
+      `/api/rpa/launches/${launch.id}/documents`,
+      [
+        {
+          buffer: await makeDriveZip([
+            {
+              question: QUESTIONS.ctpsFront,
+              name: 'FOTO_UNICA_7781 - Pessoa Documentada.jpg',
+              data: await photo(1),
+            },
+            {
+              question: QUESTIONS.address,
+              name: 'CONTA_UNICA_7782 - Conta Sem Cadastro.jpg',
+              data: await photo(2),
+            },
+          ]),
+          filename: 'ZIP_UNICO_7783.zip',
+        },
+      ],
+      { field: 'file', baseUrl: instance.baseUrl },
+    );
+    expect(response.status).toBe(200);
+
+    // A linha do envio chegou antes de conferir o que nao saiu.
+    const lines = await logLines(answered + 1);
+    expect(lines.find((line) => line.msg === 'documentos importados')).toEqual(
+      expect.objectContaining({ launch_id: launch.id, stored: 2, created: 2 }),
+    );
+
+    const output = instance.output().slice(before);
+    expect(
+      [
+        'FOTO_UNICA_7781',
+        'CONTA_UNICA_7782',
+        'ZIP_UNICO_7783',
+        'Pessoa Documentada',
+        'Conta Sem Cadastro',
+        'Documentada',
+        'File responses',
+      ].filter((value) => output.includes(value)),
+    ).toEqual([]);
   });
 });
