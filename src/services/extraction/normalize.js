@@ -14,10 +14,12 @@ const cnpjRules = require('../../validators/cnpj');
 
 // Ancoras de total, da mais especifica para a mais generica. A ordem importa:
 // "VALOR TOTAL" deve ganhar de "TOTAL" numa nota que traga os dois.
+// "Pagar" aceita o `g` lido como `s` ou `q`: num cupom de Itapipoca a linha
+// saiu "Valor a Pasar R$ 117,14", com o numero limpo, e nenhuma ancora casava.
 const TOTAL_ANCHORS = [
   /valor\s+total\s+(?:d[aeo]\s+nota\s+)?(?:r\$\s*)?/i,
-  /total\s+a\s+pagar\s*(?:r\$\s*)?/i,
-  /valor\s+a\s+pagar\s*(?:r\$\s*)?/i,
+  /total\s+a\s+pa[gsq]ar\s*(?:r\$\s*)?/i,
+  /valor\s+a\s+pa[gsq]ar\s*(?:r\$\s*)?/i,
   /valor\s+cobrado\s*(?:r\$\s*)?/i,
   /total\s+geral\s*(?:r\$\s*)?/i,
   /total\s*r\$\s*/i,

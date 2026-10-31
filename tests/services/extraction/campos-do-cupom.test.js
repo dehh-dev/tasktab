@@ -53,6 +53,23 @@ describe('extractTotal', () => {
   it('devolve null quando a ancora existe mas o numero nao vem colado', () => {
     expect(extractTotal('.. VALOR TOTAL Ri 2... 2.225,49')).toBeNull();
   });
+
+  // Como o OCR leu a linha do total num cupom de Itapipoca: "Pagar" com o `g`
+  // trocado, e o numero limpo. A forma de pagamento sem R$ nao e ancora.
+  it.each([
+    'Valor a Pasar R$ 58,30',
+    'Valor a Paqar R$ 58,30',
+    'TOTAL A PASAR 58,30',
+  ])('le %p com o pagar sujo pelo OCR', (linha) => {
+    const texto = [
+      'Qtde. total de itens 2',
+      linha,
+      'FORMA PAGAMENTO VALOR PAGO',
+      'CARTAO DEBITO 58,30',
+    ].join('\n');
+
+    expect(extractTotal(texto)).toBe(5830);
+  });
 });
 
 describe('extractLooseTotal', () => {
