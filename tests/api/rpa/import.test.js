@@ -1,5 +1,6 @@
 'use strict';
 
+const JSZip = require('jszip');
 const {
   request,
   requestUpload,
@@ -292,6 +293,22 @@ describe('POST /api/rpa/launches/:id/import', () => {
       expect.objectContaining({ field: 'file' }),
     ]);
     expect(response.body.action).toMatch(/\.xlsx ou \.csv/);
+  });
+
+  it('o .xlsb da planilha de controle responde 422 dizendo como salvar', async () => {
+    const launch = await insertRpaLaunch(LAUNCH);
+    // O .xlsb e zip como o .xlsx, mas o livro vem em binario: e o que o
+    // distingue pelo conteudo.
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', '<Types/>');
+    zip.file('xl/workbook.bin', Buffer.from([0x83, 0x01, 0x00]));
+    const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+    const response = await upload(launch.id, buffer, 'respostas.xlsx');
+
+    expect(response.status).toBe(422);
+    expect(response.body.message).toMatch(/\.xlsb/);
+    expect(response.body.message).toMatch(/Salve como \.xlsx/);
   });
 
   it('sem arquivo responde 422 no campo file', async () => {

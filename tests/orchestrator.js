@@ -75,6 +75,10 @@ async function waitForAllServices() {
  * com o disco disputado por outro programa a partida ja levou 38 s — contra
  * os 0,4 s de costume. Se ele morrer no caminho, a falha sai na hora, com o
  * que ele escreveu no stderr.
+ *
+ * `output()` devolve tudo o que ele escreveu na saida padrao: com
+ * `LOG_LEVEL: 'info'` e o log de verdade, que e como se prova o que nao sai
+ * nele. Sem isso o logger de teste e mudo e nada se acumula.
  */
 const INSTANCE_ATTEMPTS = 240;
 
@@ -82,9 +86,14 @@ async function startApiInstance(extraEnv = {}, { port = 3002 } = {}) {
   const child = spawn('node', ['src/server.js'], {
     cwd: ROOT,
     env: { ...process.env, ...extraEnv, NODE_ENV: 'test', PORT: String(port) },
-    stdio: ['ignore', 'ignore', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
   const baseUrl = `http://localhost:${port}`;
+
+  let stdout = '';
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk;
+  });
 
   let stderr = '';
   child.stderr.on('data', (chunk) => {
@@ -114,7 +123,7 @@ async function startApiInstance(extraEnv = {}, { port = 3002 } = {}) {
     throw new Error(`${error.message}\n${stderr}`.trim());
   }
 
-  return { baseUrl, stop };
+  return { baseUrl, stop, output: () => stdout };
 }
 
 /**
