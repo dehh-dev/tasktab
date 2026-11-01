@@ -241,7 +241,32 @@ async function buildPayments(launch, request, client = db) {
     });
   });
 
-  return { payments, skipped };
+  // Codigo ja usado por outro RPA valido (outro lancamento da mesma empresa
+  // no mesmo mes): a pessoa fica de fora com o motivo, em vez de o indice
+  // unico do banco derrubar a emissao inteira.
+  const taken = new Set(
+    payments.length > 0
+      ? await Payment.takenCodes(
+          payments.map((payment) => payment.code),
+          client,
+        )
+      : [],
+  );
+
+  return {
+    payments: payments.filter((payment) => !taken.has(payment.code)),
+    skipped: [
+      ...skipped,
+      ...payments
+        .filter((payment) => taken.has(payment.code))
+        .map((payment) => ({
+          worker_id: payment.worker_id,
+          worker_number: payment.worker_number,
+          worker_name: payment.worker_name,
+          reason: `o codigo ${payment.code} ja e de outro RPA valido da empresa`,
+        })),
+    ],
+  };
 }
 
 /** POST com `preview=true`: a conta inteira, sem gravar nada. */

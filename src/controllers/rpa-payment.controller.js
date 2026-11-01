@@ -101,4 +101,9 @@ async function cancel(req, res) {
   res.json({ data: canceled });
 }
 
-module.exports = { index, create, show, cancel };
+/** GET /api/rpa/summary — o widget do Inicio. */
+async function summary(req, res) {
+  res.json({ data: await Payment.summary() });
+}
+
+module.exports = { index, create, show, cancel, summary };

@@ -46,6 +46,9 @@ Um widget por modulo, com o resumo do proprio modulo e o "Abrir":
   abertas, as em andamento primeiro.
 - **Prestacao de Contas**: quantos relatorios estao abertos e fechados, e os
   abertos. O titulo abre direto o detalhe do relatorio.
+- **RPA de Lancamentos**: os lancamentos abertos, o proximo pagamento (data,
+  pessoas, liquido) e o que esta pendente, escrito: pessoas sem nenhum RPA e
+  RPAs com a data passada sem o recibo assinado (`GET /api/rpa/summary`).
 
 ### Ajustes
 
@@ -119,6 +122,31 @@ Um widget por modulo, com o resumo do proprio modulo e o "Abrir":
   fila. Nenhum status e bloqueado. A exclusao e definitiva e leva o PDF junto
   quando nenhuma outra pagina o referencia, por isso passa sempre pelo
   `ConfirmDialog`, que mostra data e valor do alvo.
+
+## RPA de lancamentos
+
+O processo esta em [rpa.md](rpa.md). A tela segue a ordem dele: a lista de
+lancamentos e, dentro de um, as etapas Equipe, Ponto, Pagamentos, Emissao,
+Documentos e Recibos, uma por vez.
+
+- **Somente leitura** sem `rpa:write` ou com o lancamento encerrado: somem os
+  envios, os botoes de corrigir, emitir e cancelar, e a grade do ponto deixa
+  de ser clicavel.
+- **Pendencia e diferenca tem texto**, nunca so cor: "Pendencia: CPF com
+  digito verificador invalido", "dia curto", "sem diaria", "alterado",
+  "Valor diferente na pagina 3". A celula alterada do ponto tem fundo e a
+  palavra.
+- A grade do ponto mostra uma semana por vez; o valor do dia vem com a fracao
+  de centavo (`R$ 154,375`), porque o arredondamento so acontece no total do
+  pagamento.
+- Os downloads sao `<a href download>` **sem nome**: o nome com acento e o
+  "1ª" vem do servidor, no `filename*`. Um nome no atributo passaria por cima
+  dele. O link so aparece quando ha o que baixar: sem documento ou recibo, o
+  `.zip` responderia 422 e o navegador salvaria o JSON do erro.
+- O e-mail de solicitacao tem botoes de copiar; o do texto copia tambem a
+  versao HTML, e o Gmail cola o negrito vermelho.
+- A leitura dos recibos roda no servidor: a tela consulta o envio com espera
+  crescente ate ele terminar.
 
 ## Paleta
 

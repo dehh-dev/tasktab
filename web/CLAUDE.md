@@ -13,8 +13,8 @@ JSX — o backend e que e CommonJS.
   eixo verde/vermelho. **Cor nunca e o unico canal** — todo badge leva o texto
   do status.
 - `src/constants.js` espelha os enums do banco (`task_status`,
-  `expense_category`, `receipt_status`, `report_status`) e os `LEVELS` da
-  conferencia. Mudou la, mude aqui.
+  `expense_category`, `receipt_status`, `report_status` e os `rpa_*`) e os
+  `LEVELS` da conferencia. Mudou la, mude aqui.
 - Data `YYYY-MM-DD` se formata com `split('-')`, nunca com `Date`.
 
 ## Casca e modulos
@@ -72,6 +72,21 @@ JSX — o backend e que e CommonJS.
   processa. Buscar os tres a cada 1,5 s esgotava o teto de leitura em cinco
   minutos de OCR. Ciclo que falha mostra o motivo e tenta de novo com espera
   crescente.
+
+## RPA (`src/modules/rpa/`)
+
+- O processo esta em `docs/rpa.md`; a tela segue a ordem dele, uma etapa por
+  vez dentro do lancamento (`LaunchDetail`). Sem `rpa:write` ou com o
+  lancamento encerrado, `canWrite` chega falso a todas as abas.
+- **Download sem nome no `download`**: o nome com acento e o "1ª" vem do
+  servidor (`filename*`). Link de `.zip` so aparece quando ha o que baixar;
+  senao o 422 seria salvo como arquivo.
+- O valor do dia e `formatSubcents` (1/1920 de centavo, com as casas que
+  tiver), nunca arredondado na tela.
+- Pendencia, marca do ponto e diferenca do recibo sempre com texto, como os
+  badges.
+- A importacao devolve a equipe resumida: depois dela a lista recarrega da
+  rota da equipe, senao CPF e funcao somem da tela.
 
 ## Imagem do comprovante
 

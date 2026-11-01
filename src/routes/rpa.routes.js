@@ -25,6 +25,11 @@ const router = Router();
 // sozinho decide quem le e quem escreve.
 
 router.get(
+  '/summary',
+  requireScope('rpa:read'),
+  asyncHandler(payments.summary),
+);
+router.get(
   '/companies',
   requireScope('rpa:read'),
   asyncHandler(companies.index),

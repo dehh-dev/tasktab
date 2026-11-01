@@ -1,7 +1,8 @@
 import { lazy } from 'react';
-import { ListTodo, ReceiptText } from 'lucide-react';
+import { HandCoins, ListTodo, ReceiptText } from 'lucide-react';
 import TasksHomeWidget from './tasks/TasksHomeWidget';
 import ExpensesHomeWidget from './expenses/ExpensesHomeWidget';
+import RpaHomeWidget from './rpa/RpaHomeWidget';
 
 /**
  * Os modulos da casca, na ordem da barra lateral — a fonte unica de onde a
@@ -36,6 +37,17 @@ export const MODULES = [
     writeScope: 'reports:write',
     View: lazy(() => import('../components/ExpensesApp')),
     HomeWidget: ExpensesHomeWidget,
+  },
+  {
+    id: 'rpa',
+    name: 'RPA de Lancamentos',
+    description:
+      'Equipe do lancamento, ponto, pagamentos, emissao dos RPAs e recibos.',
+    icon: HandCoins,
+    readScope: 'rpa:read',
+    writeScope: 'rpa:write',
+    View: lazy(() => import('./rpa/RpaApp')),
+    HomeWidget: RpaHomeWidget,
   },
 ];
 

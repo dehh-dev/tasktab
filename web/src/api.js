@@ -304,3 +304,161 @@ export function reportPdfUrl(id) {
 export function reportCategoryPdfsUrl(id) {
   return `${REPORTS_URL}/${id}/export/pdfs-por-categoria.zip`;
 }
+
+// ---------- RPA de lancamentos ----------
+
+const RPA_URL = '/api/rpa';
+
+function query(params) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value));
+    }
+  }
+  const text = search.toString();
+  return text ? `?${text}` : '';
+}
+
+export function getRpaSummary() {
+  return request(`${RPA_URL}/summary`);
+}
+
+export function listRpaCompanies() {
+  return request(`${RPA_URL}/companies?limit=100`);
+}
+
+export function listLaunches({ status, limit = 100 } = {}) {
+  return request(`${RPA_URL}/launches${query({ status, limit })}`);
+}
+
+export function getLaunch(id) {
+  return request(`${RPA_URL}/launches/${id}`);
+}
+
+export function createLaunch(data) {
+  return request(`${RPA_URL}/launches`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateLaunch(id, data) {
+  return request(`${RPA_URL}/launches/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+/** O .xlsx ou .csv das respostas do formulario, no campo `file`. */
+export function importTeam(launchId, file) {
+  const form = new FormData();
+  form.append('file', file);
+  return request(`${RPA_URL}/launches/${launchId}/import`, {
+    method: 'POST',
+    body: form,
+  });
+}
+
+export function listWorkers(launchId) {
+  return request(`${RPA_URL}/launches/${launchId}/workers`);
+}
+
+export function updateWorker(id, data) {
+  return request(`${RPA_URL}/workers/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function getTimesheet(launchId, { from, to } = {}) {
+  return request(`${RPA_URL}/launches/${launchId}/days${query({ from, to })}`);
+}
+
+export function saveDays(launchId, days) {
+  return request(`${RPA_URL}/launches/${launchId}/days`, {
+    method: 'PUT',
+    body: JSON.stringify({ days }),
+  });
+}
+
+export function listPayments(launchId, { number } = {}) {
+  return request(
+    `${RPA_URL}/launches/${launchId}/payments${query({ number, limit: 100 })}`,
+  );
+}
+
+/** Previa (`preview: true`) ou emissao: a mesma conta nos dois. */
+export function postPayments(launchId, body, { preview = false } = {}) {
+  return request(
+    `${RPA_URL}/launches/${launchId}/payments${preview ? '?preview=true' : ''}`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export function cancelPayment(id, reason) {
+  return request(`${RPA_URL}/payments/${id}/cancel`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function getRequestEmail(launchId, number) {
+  return request(
+    `${RPA_URL}/launches/${launchId}/email${query({ payment: number })}`,
+  );
+}
+
+/**
+ * Links de download, para um <a href download> sem nome: o nome vem do
+ * servidor, com acento e o "1ª" (`filename*`). Nao passam por `request()`
+ * pelo mesmo motivo das exportacoes do relatorio (CSP so com `'self'`).
+ */
+export function rpaPdfUrl(paymentId) {
+  return `${RPA_URL}/payments/${paymentId}/rpa.pdf`;
+}
+
+export function rpasZipUrl(launchId, number) {
+  return `${RPA_URL}/launches/${launchId}/rpas.zip${query({ payment: number })}`;
+}
+
+export function documentsZipUrl(launchId, { email = false } = {}) {
+  return `${RPA_URL}/launches/${launchId}/documents.zip${email ? '?email=true' : ''}`;
+}
+
+export function receiptsZipUrl(launchId, number) {
+  return `${RPA_URL}/launches/${launchId}/receipts.zip${query({ payment: number })}`;
+}
+
+export function uploadDocuments(launchId, file) {
+  const form = new FormData();
+  form.append('file', file);
+  return request(`${RPA_URL}/launches/${launchId}/documents`, {
+    method: 'POST',
+    body: form,
+  });
+}
+
+export function listDocuments(launchId) {
+  return request(`${RPA_URL}/launches/${launchId}/documents`);
+}
+
+export function updateDocument(id, data) {
+  return request(`${RPA_URL}/files/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function uploadSignedReceipts(launchId, number, file) {
+  const form = new FormData();
+  form.append('file', file);
+  return request(
+    `${RPA_URL}/launches/${launchId}/receipts${query({ payment: number })}`,
+    { method: 'POST', body: form },
+  );
+}
+
+export function getReceiptBatch(id) {
+  return request(`${RPA_URL}/receipt-batches/${id}`);
+}

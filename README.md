@@ -167,11 +167,12 @@ lint, formatacao, build e `npm test` a cada pull request.
 
 ## Documentacao
 
-| Assunto                                                        | Onde                                                                       |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Rotas, campos, formato de resposta e de erro                   | [docs/api.md](docs/api.md)                                                 |
-| Prestacao de contas: upload, extracao, conferencia, exportacao | [docs/prestacao-de-contas.md](docs/prestacao-de-contas.md)                 |
-| Sessao, papeis, protecoes HTTP, logs, retencao dos arquivos    | [docs/seguranca.md](docs/seguranca.md)                                     |
-| Interface web e paleta                                         | [docs/interface.md](docs/interface.md)                                     |
-| Variaveis de ambiente, producao, container, CI, `npm audit`    | [docs/operacao.md](docs/operacao.md)                                       |
-| Backlog, decisoes e o que falta                                | [docs/backlog-prestacao-de-contas.md](docs/backlog-prestacao-de-contas.md) |
+| Assunto                                                          | Onde                                                                       |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Rotas, campos, formato de resposta e de erro                     | [docs/api.md](docs/api.md)                                                 |
+| Prestacao de contas: upload, extracao, conferencia, exportacao   | [docs/prestacao-de-contas.md](docs/prestacao-de-contas.md)                 |
+| RPA de lancamentos: o processo, as regras e o que esta em aberto | [docs/rpa.md](docs/rpa.md)                                                 |
+| Sessao, papeis, protecoes HTTP, logs, retencao dos arquivos      | [docs/seguranca.md](docs/seguranca.md)                                     |
+| Interface web e paleta                                           | [docs/interface.md](docs/interface.md)                                     |
+| Variaveis de ambiente, producao, container, CI, `npm audit`      | [docs/operacao.md](docs/operacao.md)                                       |
+| Backlog, decisoes e o que falta                                  | [docs/backlog-prestacao-de-contas.md](docs/backlog-prestacao-de-contas.md) |

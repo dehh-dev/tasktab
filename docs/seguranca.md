@@ -127,3 +127,36 @@ protege o `raw_text` e o cerco em volta dele:
   `pis`, `rg`, `agency`, `account`, `pix_key`, `raw_text`, `access_key` e
   `password` no topo do objeto logado e um nivel abaixo. Ele casa o nome do
   campo, nao o conteudo: um CPF dentro de uma mensagem de texto passa.
+
+## RPA: dado pessoal de terceiros
+
+O modulo RPA ([rpa.md](rpa.md)) guarda dados de quem presta servico, que nao
+e usuario do sistema:
+
+- **Cadastro da pessoa** (`rpa_workers`): nome, CPF, PIS, RG e emissao,
+  nascimento e local, nome da mae e do pai, endereco, banco, agencia, conta e
+  chave Pix, e-mail.
+- **Documentos** (`rpa_files`, no diretorio de upload): fotos e PDFs de CTPS,
+  RG ou CNH, comprovante de endereco e dados bancarios, e os recibos assinados.
+- **Recibos escaneados** (`rpa_receipt_batches`): o PDF que o financeiro
+  devolve, com o resultado da leitura.
+
+O que o protege:
+
+- So o papel `admin` tem `rpa:read` e `rpa:write`.
+- A **planilha de respostas do formulario nao e guardada**: e lida em memoria
+  na importacao e descartada. O `.zip` dos documentos sai do disco depois de
+  lido.
+- **Nada disso vai para o log**: o `redact` cobre CPF, PIS, RG, agencia, conta
+  e chave Pix, mais o `detail` do erro do Postgres, que repetiria a linha que
+  violou uma constraint. Ha teste lendo a saida de uma API com o log ligado na
+  importacao, nos documentos e nos recibos.
+- O nome de arquivo do `.zip` do Drive nunca vira caminho no disco: o arquivo
+  e gravado pelo SHA-256, como o comprovante.
+
+**Por quanto tempo**: hoje, enquanto o lancamento existir. Apagar o lancamento
+apaga a equipe e os documentos (o arquivo sai do disco pela mesma retencao por
+referencia dos comprovantes), mas **lancamento com RPA emitido nao se apaga**:
+o RPA, mesmo cancelado, e o historico do que foi pedido ao financeiro. Na
+pratica, CPF, conta e documentos ficam guardados sem prazo. Por quanto tempo
+guarda-los depois do ultimo recibo e decisao em aberto (issue 35).

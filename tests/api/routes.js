@@ -97,6 +97,7 @@ const ROUTES = [
   },
 
   // RPA: so o admin ate a decisao "quem acessa" da issue 35.
+  { method: 'GET', path: '/api/rpa/summary', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/companies', roles: ADMIN },
   { method: 'POST', path: '/api/rpa/companies', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/companies/:id', roles: ADMIN },
