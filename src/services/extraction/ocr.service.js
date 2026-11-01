@@ -117,7 +117,11 @@ function withTimeout(promise, ms, onTimeout) {
  * endireita a pagina sozinho, e um cupom de cabeca para baixo sai como ruido.
  * O QR nao precisa disso — o zxing acha o codigo em qualquer orientacao.
  */
-async function readPage(buffer, pageNumber, { rotation = 0, png = null } = {}) {
+async function readPage(
+  buffer,
+  pageNumber,
+  { rotation = 0, png = null, normalise = true } = {},
+) {
   if (!env.ocr.enabled) {
     return null;
   }
@@ -127,12 +131,16 @@ async function readPage(buffer, pageNumber, { rotation = 0, png = null } = {}) {
   const image = png ?? (await qrService.renderPageToPng(buffer, pageNumber));
 
   // Cinza e normalizacao: e no pre-processamento que o OCR ganha ou perde.
+  //
+  // `normalise: false` e do recibo assinado do RPA (issue 42): numa pagina
+  // quase toda branca com uma linha de assinatura (`____`), a normalizacao
+  // engrossa o traco e o Tesseract perde a pagina inteira — o CPF saia como
+  // "STI.AT1./33-13". O cupom segue normalizado: trocar para ele pede medir
+  // antes e depois (`npm run extraction:evaluate`).
   const sharp = require('sharp');
-  const prepared = await sharp(image)
-    .rotate(rotation)
-    .greyscale()
-    .normalise()
-    .toBuffer();
+  let pipeline = sharp(image).rotate(rotation).greyscale();
+  if (normalise) pipeline = pipeline.normalise();
+  const prepared = await pipeline.toBuffer();
 
   const worker = await getWorker();
 

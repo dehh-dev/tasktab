@@ -21,8 +21,11 @@ async function countByHash(fileHash) {
  * FK leva as linhas, e depois nao ha mais como saber o que estava no disco.
  */
 async function findFilesByLaunch(launchId) {
+  // O PDF escaneado dos recibos (issue 42) divide o diretorio tambem.
   const { rows } = await db.query(
-    'SELECT file_hash, file_path FROM rpa_files WHERE launch_id = $1',
+    `SELECT file_hash, file_path FROM rpa_files WHERE launch_id = $1
+     UNION
+     SELECT file_hash, file_path FROM rpa_receipt_batches WHERE launch_id = $1`,
     [launchId],
   );
   return rows;
@@ -95,6 +98,51 @@ async function insertDocuments(launchId, files) {
   return { created, assigned: rows.length - created };
 }
 
+/**
+ * Os recibos separados (issue 42), uma pagina por pessoa, ligados ao
+ * pagamento. A pagina separada do mesmo PDF da o mesmo arquivo: reenviar nao
+ * duplica.
+ */
+async function insertReceipts(launchId, receipts) {
+  if (receipts.length === 0) return;
+
+  const column = (name) => receipts.map((receipt) => receipt[name]);
+  await db.query(
+    `INSERT INTO rpa_files
+       (launch_id, worker_id, payment_id, kind, file_hash, file_path,
+        content_type, byte_size)
+     SELECT $1, worker_id, payment_id, 'signed_receipt', file_hash, file_path,
+            'application/pdf', byte_size
+     FROM unnest($2::int[], $3::int[], $4::varchar[], $5::text[], $6::int[])
+          AS r(worker_id, payment_id, file_hash, file_path, byte_size)
+     ON CONFLICT (launch_id, file_hash) DO NOTHING`,
+    [
+      launchId,
+      column('worker_id'),
+      column('payment_id'),
+      column('file_hash'),
+      column('file_path'),
+      column('byte_size'),
+    ],
+  );
+}
+
+/** Os recibos do n-esimo pagamento, com o nome do cadastro, pela pessoa. */
+async function findReceipts(launchId, number) {
+  const { rows } = await db.query(
+    `SELECT f.id, f.file_path, f.payment_id, w.number AS worker_number,
+            w.name AS worker_name, p.code
+     FROM rpa_files f
+     JOIN rpa_payments p ON p.id = f.payment_id
+     JOIN rpa_workers w ON w.id = f.worker_id
+     WHERE f.launch_id = $1 AND f.kind = 'signed_receipt'
+       AND p.number = $2 AND p.status <> 'canceled'
+     ORDER BY w.number, f.id`,
+    [launchId, number],
+  );
+  return rows;
+}
+
 const UPDATABLE_COLUMNS = ['worker_id', 'kind', 'side'];
 
 async function update(id, data) {
@@ -123,5 +171,7 @@ module.exports = {
   findDocuments,
   findById,
   insertDocuments,
+  insertReceipts,
+  findReceipts,
   update,
 };

@@ -84,6 +84,19 @@ const TABLES = [
     'side',
     'front',
   ],
+  [
+    'rpa_receipt_batches',
+    async () =>
+      insertRow('rpa_receipt_batches', {
+        launch_id: (await insertRpaLaunch()).id,
+        payment_number: 1,
+        file_hash: 'b'.repeat(64),
+        file_path: `${'b'.repeat(64)}.pdf`,
+        page_count: 5,
+      }),
+    'status',
+    'processing',
+  ],
 ];
 
 describe('trigger de updated_at', () => {

@@ -8,10 +8,15 @@ const timesheet = require('../controllers/rpa-timesheet.controller');
 const payments = require('../controllers/rpa-payment.controller');
 const documents = require('../controllers/rpa-document.controller');
 const files = require('../controllers/rpa-file.controller');
+const receipts = require('../controllers/rpa-receipt.controller');
 const asyncHandler = require('../middlewares/async-handler');
 const rejectOtherMethods = require('../middlewares/method-not-allowed');
 const { requireScope } = require('../middlewares/authorize');
-const { spreadsheetUpload, documentsUpload } = require('../middlewares/upload');
+const {
+  spreadsheetUpload,
+  documentsUpload,
+  scannedReceiptsUpload,
+} = require('../middlewares/upload');
 
 const router = Router();
 
@@ -122,6 +127,17 @@ router.get(
   requireScope('rpa:read'),
   asyncHandler(files.zip),
 );
+router.post(
+  '/launches/:id/receipts',
+  requireScope('rpa:write'),
+  scannedReceiptsUpload,
+  asyncHandler(receipts.create),
+);
+router.get(
+  '/launches/:id/receipts.zip',
+  requireScope('rpa:read'),
+  asyncHandler(receipts.zip),
+);
 
 router.get(
   '/workers/:id',
@@ -138,6 +154,11 @@ router.get(
   '/payments/:id',
   requireScope('rpa:read'),
   asyncHandler(payments.show),
+);
+router.get(
+  '/receipt-batches/:id',
+  requireScope('rpa:read'),
+  asyncHandler(receipts.show),
 );
 router.patch(
   '/files/:id',

@@ -58,7 +58,8 @@ cada recusa conferida pelo nome da constraint:
   Receita). O `clearDatabase` dos testes nao as trunca. Tabela de imposto nova
   e linha nova numa migration nova: o IRRF vale pela maior `starts_on` ate a
   data, e o RPA emitido guarda o id da que usou.
-- `rpa_files` divide o diretorio de upload com `receipts`: a retencao conta as
-  duas tabelas (`REFERENCE_COUNTERS` em `retention.service.js`). Tabela nova
-  que grave ali entra na lista. Apagar lancamento leva `rpa_files` em cascata
+- `rpa_files` e `rpa_receipt_batches` (o PDF escaneado dos recibos, issue 42)
+  dividem o diretorio de upload com `receipts`: a retencao conta as tres
+  tabelas (`REFERENCE_COUNTERS` em `retention.service.js`). Tabela nova que
+  grave ali entra na lista. Apagar lancamento leva `rpa_files` em cascata
   — levante os arquivos **antes**, como no `report.destroy`.

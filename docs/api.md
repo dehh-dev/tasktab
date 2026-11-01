@@ -87,30 +87,33 @@ issue 35.
 | `GET`   | `/api/rpa/companies/:id` | Detalhe                                          |
 | `PATCH` | `/api/rpa/companies/:id` | Atualiza (o codigo UAU nao muda: e a identidade) |
 
-| Metodo   | Rota                                  | Descricao                                     |
-| -------- | ------------------------------------- | --------------------------------------------- |
-| `GET`    | `/api/rpa/launches`                   | Lista os lancamentos (filtro por `status`)    |
-| `POST`   | `/api/rpa/launches`                   | Cria, com horario padrao e diarias            |
-| `GET`    | `/api/rpa/launches/:id`               | Detalhe                                       |
-| `PATCH`  | `/api/rpa/launches/:id`               | Atualiza; encerrado so aceita reabrir         |
-| `DELETE` | `/api/rpa/launches/:id`               | Apaga (recusa com `409` se ha RPA)            |
-| `POST`   | `/api/rpa/launches/:id/import`        | Importa a equipe das respostas do formulario  |
-| `GET`    | `/api/rpa/launches/:id/workers`       | A equipe, pelo numero fixo, com pendencias    |
-| `GET`    | `/api/rpa/launches/:id/days`          | A grade do ponto, com o valor de cada dia     |
-| `PUT`    | `/api/rpa/launches/:id/days`          | Grava em lote so os dias que mudam            |
-| `GET`    | `/api/rpa/launches/:id/payments`      | Os RPAs do lancamento (`status`, `number`)    |
-| `POST`   | `/api/rpa/launches/:id/payments`      | Previa (`?preview=true`) ou emissao dos RPAs  |
-| `GET`    | `/api/rpa/launches/:id/rpas.zip`      | Um PDF por pessoa do pagamento `?payment=n`   |
-| `GET`    | `/api/rpa/launches/:id/email`         | Texto do e-mail de solicitacao (`?payment=n`) |
-| `POST`   | `/api/rpa/launches/:id/documents`     | Importa o .zip dos documentos do formulario   |
-| `GET`    | `/api/rpa/launches/:id/documents`     | Os documentos, pela pessoa; sem pessoa no fim |
-| `GET`    | `/api/rpa/launches/:id/documents.zip` | Uma pasta por pessoa (`?email=true` reduz)    |
-| `GET`    | `/api/rpa/workers/:id`                | Detalhe da pessoa                             |
-| `PATCH`  | `/api/rpa/workers/:id`                | Corrige a pessoa e da pendencia por resolvida |
-| `PATCH`  | `/api/rpa/files/:id`                  | Pessoa, tipo ou lado do documento, na mao     |
-| `GET`    | `/api/rpa/payments/:id`               | O RPA, com o que levou de cada dia            |
-| `GET`    | `/api/rpa/payments/:id/rpa.pdf`       | O RPA no layout do formulario de emissao      |
-| `POST`   | `/api/rpa/payments/:id/cancel`        | Cancela com motivo e libera os dias           |
+| Metodo   | Rota                                  | Descricao                                       |
+| -------- | ------------------------------------- | ----------------------------------------------- |
+| `GET`    | `/api/rpa/launches`                   | Lista os lancamentos (filtro por `status`)      |
+| `POST`   | `/api/rpa/launches`                   | Cria, com horario padrao e diarias              |
+| `GET`    | `/api/rpa/launches/:id`               | Detalhe                                         |
+| `PATCH`  | `/api/rpa/launches/:id`               | Atualiza; encerrado so aceita reabrir           |
+| `DELETE` | `/api/rpa/launches/:id`               | Apaga (recusa com `409` se ha RPA)              |
+| `POST`   | `/api/rpa/launches/:id/import`        | Importa a equipe das respostas do formulario    |
+| `GET`    | `/api/rpa/launches/:id/workers`       | A equipe, pelo numero fixo, com pendencias      |
+| `GET`    | `/api/rpa/launches/:id/days`          | A grade do ponto, com o valor de cada dia       |
+| `PUT`    | `/api/rpa/launches/:id/days`          | Grava em lote so os dias que mudam              |
+| `GET`    | `/api/rpa/launches/:id/payments`      | Os RPAs do lancamento (`status`, `number`)      |
+| `POST`   | `/api/rpa/launches/:id/payments`      | Previa (`?preview=true`) ou emissao dos RPAs    |
+| `GET`    | `/api/rpa/launches/:id/rpas.zip`      | Um PDF por pessoa do pagamento `?payment=n`     |
+| `GET`    | `/api/rpa/launches/:id/email`         | Texto do e-mail de solicitacao (`?payment=n`)   |
+| `POST`   | `/api/rpa/launches/:id/documents`     | Importa o .zip dos documentos do formulario     |
+| `GET`    | `/api/rpa/launches/:id/documents`     | Os documentos, pela pessoa; sem pessoa no fim   |
+| `GET`    | `/api/rpa/launches/:id/documents.zip` | Uma pasta por pessoa (`?email=true` reduz)      |
+| `POST`   | `/api/rpa/launches/:id/receipts`      | PDF dos recibos assinados (`?payment=n`), `202` |
+| `GET`    | `/api/rpa/launches/:id/receipts.zip`  | Os recibos separados do pagamento `?payment=n`  |
+| `GET`    | `/api/rpa/workers/:id`                | Detalhe da pessoa                               |
+| `PATCH`  | `/api/rpa/workers/:id`                | Corrige a pessoa e da pendencia por resolvida   |
+| `PATCH`  | `/api/rpa/files/:id`                  | Pessoa, tipo ou lado do documento, na mao       |
+| `GET`    | `/api/rpa/receipt-batches/:id`        | Andamento e resultado da leitura dos recibos    |
+| `GET`    | `/api/rpa/payments/:id`               | O RPA, com o que levou de cada dia              |
+| `GET`    | `/api/rpa/payments/:id/rpa.pdf`       | O RPA no layout do formulario de emissao        |
+| `POST`   | `/api/rpa/payments/:id/cancel`        | Cancela com motivo e libera os dias             |
 
 O lancamento leva `company_id`, `city`, `state`, `development`, `starts_on` e
 `ends_on` (obrigatorios), `holidays` (datas), `service_type` e `cost_center`
@@ -221,6 +224,19 @@ por pessoa, com `CTPS`, `RG-CNH`, `CE` (comprovante de endereco) e `DB`
 (dados bancarios), e `FRENTE`/`VERSO` quando sao arquivos diferentes. Com
 `?email=true`, fotos acima de 1 MB saem reduzidas a 2.400 px no lado maior
 (JPEG q85); passando ainda de 25 MB, o cabecalho `X-Email-Warning` avisa.
+
+`POST /api/rpa/launches/:id/receipts?payment=n` recebe, no campo `file`, o
+PDF escaneado dos recibos assinados que o financeiro devolve (uma pagina por
+pessoa) e responde `202` com o envio (`pending`) e o `Location` dele. A
+leitura roda na fila: texto da pagina ou, sem texto, OCR. A pessoa sai do CPF
+(com o verificador conferido) e, sem CPF legivel, do primeiro e ultimo nome
+do cadastro. Em `GET /api/rpa/receipt-batches/:id`, quando `status` e `done`,
+`result` traz `matched` (pagina, pessoa, pagamento, como casou e o que foi
+lido), `missing` (quem nao teve recibo), `unmatched_pages`,
+`name_differences`, `value_differences` e `date_differences` — apontadas,
+nunca corrigidas. Cada pagina casada vira um PDF so dela, sem recomprimir, e o
+pagamento passa a `paid`. `GET /api/rpa/launches/:id/receipts.zip?payment=n`
+junta os recibos como `RECIBO NOME COMPLETO.pdf`, com o nome do cadastro.
 
 Campos da empresa: `code` (codigo UAU, inteiro, unico), `name` e `cnpj`
 (obrigatorios; o CNPJ entra com ou sem mascara e e conferido pelo

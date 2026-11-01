@@ -127,6 +127,9 @@ const ROUTES = [
   { method: 'POST', path: '/api/rpa/launches/:id/documents', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/launches/:id/documents', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/launches/:id/documents.zip', roles: ADMIN },
+  { method: 'POST', path: '/api/rpa/launches/:id/receipts', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id/receipts.zip', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/receipt-batches/:id', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/workers/:id', roles: ADMIN },
   {
     method: 'PATCH',
