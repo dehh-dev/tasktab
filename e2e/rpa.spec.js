@@ -4,7 +4,11 @@ const fs = require('fs');
 const JSZip = require('jszip');
 const { test, expect } = require('@playwright/test');
 const { openSection, createUser, deleteUser } = require('./helpers');
-const { formResponse, makeFormXlsx } = require('../tests/fixtures/forms');
+const {
+  formResponse,
+  makeFormXlsx,
+  syntheticCpf,
+} = require('../tests/fixtures/forms');
 const { QUESTIONS, photo, makeDriveZip } = require('../tests/fixtures/drive');
 const { makeScannedRpaReceipts } = require('../tests/fixtures/rpa-receipts');
 
@@ -146,21 +150,25 @@ test('do .xlsx do formulario ao .zip dos RPAs, pela tela', async ({
 });
 
 /**
- * Lancamento, equipe e RPAs pela API (o assunto aqui sao as duas ultimas
- * abas): os documentos do Drive e os recibos assinados.
+ * Lancamento, equipe e RPAs pela API, para as specs cujo assunto vem depois
+ * da emissao. Cada uma usa empresa propria: o codigo do RPA
+ * (no-empresa-pessoa-mmaaaa) repetiria o de outro teste, que emite para a
+ * mesma pessoa 1 no mesmo mes.
  */
-async function arrangeIssuedLaunch(request) {
+async function arrangeIssuedLaunch(
+  request,
+  { code, development, responses = [formResponse(1), formResponse(2)] },
+) {
+  await arrangeCompany(request, code);
   const companies = await request.get('/api/rpa/companies?limit=100');
   const { data } = await companies.json();
-  // Empresa propria: o codigo do RPA (no-empresa-pessoa-mmaaaa) repetiria o
-  // do outro teste, que emite para a mesma pessoa 1 no mesmo mes.
-  const company = data.find((entry) => entry.code === COMPANY_CODE + 1);
+  const company = data.find((entry) => entry.code === code);
   const launch = await request.post('/api/rpa/launches', {
     data: {
       company_id: company.id,
       city: 'Avaré',
       state: 'SP',
-      development: `${DEVELOPMENT} documentos`,
+      development,
       starts_on: '2026-10-13',
       ends_on: '2026-11-30',
       schedule: [1, 2, 3, 4, 5].map((weekday) => ({
@@ -188,7 +196,7 @@ async function arrangeIssuedLaunch(request) {
         file: {
           name: 'respostas.xlsx',
           mimeType: 'application/octet-stream',
-          buffer: await makeFormXlsx([formResponse(1), formResponse(2)]),
+          buffer: await makeFormXlsx(responses),
         },
       },
     },
@@ -213,8 +221,10 @@ test('documentos do Drive e recibos assinados, pela tela', async ({
   request,
 }) => {
   test.setTimeout(120000);
-  await arrangeCompany(request, COMPANY_CODE + 1);
-  const { launch } = await arrangeIssuedLaunch(request);
+  const { launch } = await arrangeIssuedLaunch(request, {
+    code: COMPANY_CODE + 1,
+    development: `${DEVELOPMENT} documentos`,
+  });
   const workers = await (
     await request.get(`/api/rpa/launches/${launch.id}/workers`)
   ).json();
@@ -255,16 +265,20 @@ test('documentos do Drive e recibos assinados, pela tela', async ({
   await orphan.selectOption({ label: `${second.number}. ${second.name}` });
   await expect(page.getByText('2 documento(s), 0 sem pessoa')).toBeVisible();
 
-  // Recibos: o PDF escaneado das duas pessoas, lido no servidor.
+  // Recibos: um PDF escaneado por pessoa, como o RH manda e cada um devolve,
+  // enviados juntos e lidos no servidor.
   await page.getByRole('button', { name: 'Recibos', exact: true }).click();
-  await page.getByLabel(/Arraste o PDF dos recibos assinados/).setInputFiles({
-    name: 'RPCI.pdf',
-    mimeType: 'application/pdf',
-    buffer: await makeScannedRpaReceipts([
-      { name: second.name.toUpperCase(), cpf: second.cpf },
-      { name: first.name.toUpperCase(), cpf: first.cpf },
-    ]),
-  });
+  await page.getByLabel(/Arraste o PDF dos recibos assinados/).setInputFiles(
+    await Promise.all(
+      [second, first].map(async (person, index) => ({
+        name: `RECIBO ${index + 1}.pdf`,
+        mimeType: 'application/pdf',
+        buffer: await makeScannedRpaReceipts([
+          { name: person.name.toUpperCase(), cpf: person.cpf },
+        ]),
+      })),
+    ),
+  );
 
   const matched = page.getByRole('list', { name: 'Recibos que casaram' });
   await expect(matched).toBeVisible({ timeout: 60000 });
@@ -272,6 +286,39 @@ test('documentos do Drive e recibos assinados, pela tela', async ({
   await expect(
     page.getByRole('link', { name: 'Recibos do 1º pagamento (.zip)' }),
   ).toBeVisible();
+});
+
+test('com mais de 100 RPAs, a tela mostra todos, e nao so a primeira pagina', async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(90000);
+  const development = `${DEVELOPMENT} equipe grande`;
+  // CPF proprio: o sintetico pela semente repete a partir de 71 (1 e 71 dao
+  // o mesmo).
+  await arrangeIssuedLaunch(request, {
+    code: COMPANY_CODE + 3,
+    development,
+    responses: Array.from({ length: 101 }, (_, index) =>
+      formResponse(index + 1, {
+        cpf: syntheticCpf(1000 + index),
+        form_submitted_at: '13/10/2026 09:00:00',
+      }),
+    ),
+  });
+
+  await page.goto('/');
+  await openSection(page, 'RPA de Lancamentos');
+  await page.getByRole('button', { name: `${development} — Avaré/SP` }).click();
+  await page.getByRole('button', { name: 'Emissao', exact: true }).click();
+
+  // A API pagina em 100, pelo numero do pagamento e da pessoa: parar na
+  // primeira pagina escondia os mais novos.
+  await expect(
+    page
+      .getByRole('list', { name: 'RPAs do 1º pagamento' })
+      .getByRole('listitem'),
+  ).toHaveCount(101);
 });
 
 test.describe('quem alcanca o modulo', () => {
@@ -304,6 +351,68 @@ test.describe('quem alcanca o modulo', () => {
     ).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: 'RPA de Lancamentos' }),
+    ).toHaveCount(0);
+  });
+
+  test('o auditor confere tudo, sem botao de escrita', async ({
+    page,
+    request,
+  }) => {
+    const development = `${DEVELOPMENT} auditoria`;
+    await arrangeIssuedLaunch(request, {
+      code: COMPANY_CODE + 2,
+      development,
+    });
+    user = await createUser(request, {
+      name: 'Auditora do RPA',
+      role: 'auditor',
+    });
+
+    await page.context().clearCookies();
+    await page.goto('/');
+    const login = page.locator('form.form');
+    await login.getByLabel('E-mail').fill(user.email);
+    await login.getByLabel('Senha').fill(user.password);
+    await login.getByRole('button', { name: 'Entrar' }).click();
+    await openSection(page, 'RPA de Lancamentos');
+
+    // A ausencia so prova algo com a lista ja montada.
+    const open = page.getByRole('button', {
+      name: `${development} — Avaré/SP`,
+    });
+    await expect(open).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Novo lancamento' }),
+    ).toHaveCount(0);
+
+    await open.click();
+    await expect(page.getByText('2 pessoas, 0 com pendencia')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Encerrar lancamento' }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Editar lancamento' }),
+    ).toHaveCount(0);
+    await expect(page.getByLabel(/Arraste o \.xlsx ou \.csv/)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Corrigir / })).toHaveCount(
+      0,
+    );
+
+    // O ponto e lido, mas o dia nao abre o editor.
+    await page.getByRole('button', { name: 'Ponto', exact: true }).click();
+    const grid = page.getByRole('table', { name: /Ponto de 13\/10\/2026/ });
+    await expect(grid.getByText('08:00-17:00').first()).toBeVisible();
+    await expect(grid.getByRole('button')).toHaveCount(0);
+
+    // Os RPAs emitidos aparecem, sem previa, emissao nem cancelamento.
+    await page.getByRole('button', { name: 'Pagamentos', exact: true }).click();
+    const issued = page.getByRole('table', { name: 'RPAs emitidos' });
+    await expect(issued.getByText('Emitido', { exact: true })).toHaveCount(2);
+    await expect(page.getByRole('button', { name: 'Ver previa' })).toHaveCount(
+      0,
+    );
+    await expect(
+      issued.getByRole('button', { name: /^Cancelar RPA/ }),
     ).toHaveCount(0);
   });
 });
