@@ -138,12 +138,14 @@ e usuario do sistema:
   chave Pix, e-mail.
 - **Documentos** (`rpa_files`, no diretorio de upload): fotos e PDFs de CTPS,
   RG ou CNH, comprovante de endereco e dados bancarios, e os recibos assinados.
-- **Recibos escaneados** (`rpa_receipt_batches`): o PDF que o financeiro
-  devolve, com o resultado da leitura.
+- **Recibos enviados** (`rpa_receipt_batches`): os PDFs assinados, como
+  vieram, e o resultado da leitura (nome, CPF e valor lidos).
 
 O que o protege:
 
-- So o papel `admin` tem `rpa:read` e `rpa:write`.
+- So o `admin` escreve (`rpa:write`). O `auditor` le (`rpa:read`), para
+  conferir antes de o RPA sair: ve CPF, conta e documentos da equipe, sem
+  alterar nada.
 - A **planilha de respostas do formulario nao e guardada**: e lida em memoria
   na importacao e descartada. O `.zip` dos documentos sai do disco depois de
   lido.
@@ -154,9 +156,18 @@ O que o protege:
 - O nome de arquivo do `.zip` do Drive nunca vira caminho no disco: o arquivo
   e gravado pelo SHA-256, como o comprovante.
 
-**Por quanto tempo**: hoje, enquanto o lancamento existir. Apagar o lancamento
-apaga a equipe e os documentos (o arquivo sai do disco pela mesma retencao por
-referencia dos comprovantes), mas **lancamento com RPA emitido nao se apaga**:
-o RPA, mesmo cancelado, e o historico do que foi pedido ao financeiro. Na
-pratica, CPF, conta e documentos ficam guardados sem prazo. Por quanto tempo
-guarda-los depois do ultimo recibo e decisao em aberto (issue 35).
+**Por quanto tempo**: ate um mes depois de o lancamento ser encerrado
+(decisao de 2026-11-01). Nesse dia a propria API apaga os documentos, os
+recibos e os envios de recibo, do banco e do disco (pela mesma retencao por
+referencia dos comprovantes), e deixa nulos RG, nascimento, PIS, endereco,
+filiacao, e-mail, banco, conta e chave Pix da equipe. Ficam nome, CPF, funcao
+e os valores dos RPAs: o historico do que foi pedido ao financeiro, que guarda
+a via oficial. O RPA, mesmo cancelado, nao se apaga.
+
+- O prazo conta de `closed_at`, que o banco marca ao encerrar e limpa ao
+  reabrir; reabrir antes do prazo adia a retencao.
+- Depois dela o lancamento **nao reabre** (o banco recusa) e o PDF do RPA
+  nao sai mais, porque traz conta e endereco.
+- A varredura roda na subida da API e a cada seis horas, e loga so o id do
+  lancamento e contagens.
+- Lancamento sem RPA emitido pode ser apagado antes disso, inteiro.
