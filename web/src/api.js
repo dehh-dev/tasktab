@@ -382,10 +382,27 @@ export function saveDays(launchId, days) {
   });
 }
 
-export function listPayments(launchId, { number } = {}) {
-  return request(
-    `${RPA_URL}/launches/${launchId}/payments${query({ number, limit: 100 })}`,
-  );
+/**
+ * Todos os RPAs do lancamento, pagina a pagina: a API devolve no maximo 100
+ * por vez, e 26 pessoas com 4 pagamentos ja passam disso. Parar na primeira
+ * pagina escondia justamente os RPAs mais novos (a lista vem pelo numero).
+ */
+export async function listPayments(launchId, { number } = {}) {
+  const data = [];
+
+  for (;;) {
+    const page = await request(
+      `${RPA_URL}/launches/${launchId}/payments${query({
+        number,
+        limit: 100,
+        offset: data.length,
+      })}`,
+    );
+    data.push(...page.data);
+    if (page.data.length === 0 || data.length >= page.meta.total) {
+      return { data, meta: { ...page.meta, limit: data.length, offset: 0 } };
+    }
+  }
 }
 
 /** Previa (`preview: true`) ou emissao: a mesma conta nos dois. */
