@@ -26,11 +26,12 @@ porta baixava a imagem de qualquer cupom, com CNPJ e as vezes CPF.
 - O auditor e o unico com `:any` de leitura sem o de escrita: **nao junte os
   dois num escopo so**.
 - A posse e do **relatorio**; comprovante, imagem e exportacao herdam a dele.
-- `rpa:read` / `rpa:write` (issue 36) so o `admin` tem, pelo `SCOPES`
-  inteiro: o modulo guarda CPF, RG e conta de terceiros, e "quem acessa" e
-  decisao aberta na issue 35. Dar a outro papel e uma linha em `ROLE_SCOPES`
-  e outra em `tests/api/routes.js`. O lancamento e compartilhado entre quem
-  tem o escopo, como `tasks`.
+- `rpa:write` (issue 36) so o `admin` tem; `rpa:read` tambem o `auditor`,
+  que confere a equipe antes de o RPA sair (decisao de 2026-11-01). O modulo
+  guarda CPF, RG e conta de terceiros: dar a outro papel e uma linha em
+  `ROLE_SCOPES` e outra em `tests/api/routes.js`, e e decisao de privacidade,
+  nao de conveniencia. O lancamento e compartilhado entre quem tem o escopo,
+  como `tasks`.
 - `merchants` e `tasks` sao compartilhados: a categoria de um CNPJ vale para
   todos, e o quadro e um so. Se cada pessoa precisar do seu quadro, o caminho
   e `tasks.owner_id` mais `tasks:read:any`, como nos relatorios.

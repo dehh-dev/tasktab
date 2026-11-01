@@ -16,6 +16,7 @@
 const EVERYONE = ['admin', 'user', 'auditor'];
 const WRITERS = ['admin', 'user'];
 const ADMIN = ['admin'];
+const RPA_READERS = ['admin', 'auditor'];
 
 const ROUTES = [
   { method: 'POST', path: '/api/auth/logout', roles: EVERYONE },
@@ -96,20 +97,21 @@ const ROUTES = [
     body: { default_category: 'outros' },
   },
 
-  // RPA: so o admin ate a decisao "quem acessa" da issue 35.
-  { method: 'GET', path: '/api/rpa/summary', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/companies', roles: ADMIN },
+  // RPA: o admin le e escreve; o auditor so le (decisao de 2026-11-01), e
+  // ve CPF e conta da equipe para conferir.
+  { method: 'GET', path: '/api/rpa/summary', roles: RPA_READERS },
+  { method: 'GET', path: '/api/rpa/companies', roles: RPA_READERS },
   { method: 'POST', path: '/api/rpa/companies', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/companies/:id', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/companies/:id', roles: RPA_READERS },
   {
     method: 'PATCH',
     path: '/api/rpa/companies/:id',
     roles: ADMIN,
     body: { name: 'Outra Razao Social' },
   },
-  { method: 'GET', path: '/api/rpa/launches', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches', roles: RPA_READERS },
   { method: 'POST', path: '/api/rpa/launches', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id', roles: RPA_READERS },
   {
     method: 'PATCH',
     path: '/api/rpa/launches/:id',
@@ -118,20 +120,32 @@ const ROUTES = [
   },
   { method: 'DELETE', path: '/api/rpa/launches/:id', roles: ADMIN },
   { method: 'POST', path: '/api/rpa/launches/:id/import', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id/workers', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id/days', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id/workers', roles: RPA_READERS },
+  { method: 'GET', path: '/api/rpa/launches/:id/days', roles: RPA_READERS },
   { method: 'PUT', path: '/api/rpa/launches/:id/days', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id/payments', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id/payments', roles: RPA_READERS },
   { method: 'POST', path: '/api/rpa/launches/:id/payments', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id/rpas.zip', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id/email', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id/rpas.zip', roles: RPA_READERS },
+  { method: 'GET', path: '/api/rpa/launches/:id/email', roles: RPA_READERS },
   { method: 'POST', path: '/api/rpa/launches/:id/documents', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id/documents', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id/documents.zip', roles: ADMIN },
+  {
+    method: 'GET',
+    path: '/api/rpa/launches/:id/documents',
+    roles: RPA_READERS,
+  },
+  {
+    method: 'GET',
+    path: '/api/rpa/launches/:id/documents.zip',
+    roles: RPA_READERS,
+  },
   { method: 'POST', path: '/api/rpa/launches/:id/receipts', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/launches/:id/receipts.zip', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/receipt-batches/:id', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/workers/:id', roles: ADMIN },
+  {
+    method: 'GET',
+    path: '/api/rpa/launches/:id/receipts.zip',
+    roles: RPA_READERS,
+  },
+  { method: 'GET', path: '/api/rpa/receipt-batches/:id', roles: RPA_READERS },
+  { method: 'GET', path: '/api/rpa/workers/:id', roles: RPA_READERS },
   {
     method: 'PATCH',
     path: '/api/rpa/workers/:id',
@@ -144,8 +158,8 @@ const ROUTES = [
     roles: ADMIN,
     body: { side: null },
   },
-  { method: 'GET', path: '/api/rpa/payments/:id', roles: ADMIN },
-  { method: 'GET', path: '/api/rpa/payments/:id/rpa.pdf', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/payments/:id', roles: RPA_READERS },
+  { method: 'GET', path: '/api/rpa/payments/:id/rpa.pdf', roles: RPA_READERS },
   { method: 'POST', path: '/api/rpa/payments/:id/cancel', roles: ADMIN },
 ];
 
