@@ -278,6 +278,51 @@ async function findDocumentsByNumber(launchId, number) {
   return rows;
 }
 
+/**
+ * O resumo do Inicio (issue 43), dos lancamentos abertos e com o "hoje" de
+ * Brasilia: o proximo pagamento (data, pessoas, liquido), os RPAs emitidos
+ * cuja data passou sem recibo, e quem esta na equipe e ainda nao teve RPA.
+ */
+async function summary() {
+  const { rows } = await db.query(
+    `WITH today AS (
+       SELECT (now() AT TIME ZONE 'America/Sao_Paulo')::date AS day
+     ),
+     open_payments AS (
+       SELECT p.* FROM rpa_payments p
+       JOIN rpa_workers w ON w.id = p.worker_id
+       JOIN rpa_launches l ON l.id = w.launch_id
+       WHERE l.status = 'open'
+     ),
+     next_payment AS (
+       SELECT payment_date, COUNT(*)::int AS people,
+              SUM(net_cents)::int AS net_cents
+       FROM open_payments, today
+       WHERE status = 'issued' AND payment_date >= today.day
+       GROUP BY payment_date
+       ORDER BY payment_date
+       LIMIT 1
+     )
+     SELECT
+       (SELECT COUNT(*)::int FROM rpa_launches WHERE status = 'open')
+         AS open_launches,
+       (SELECT row_to_json(next_payment) FROM next_payment) AS next_payment,
+       (SELECT COUNT(*)::int FROM open_payments, today
+        WHERE status = 'issued' AND payment_date < today.day)
+         AS awaiting_receipt,
+       (SELECT COUNT(*)::int
+        FROM rpa_workers w JOIN rpa_launches l ON l.id = w.launch_id, today
+        WHERE l.status = 'open'
+          AND COALESCE(w.starts_on, l.starts_on) <= today.day
+          AND (w.left_on IS NULL OR w.left_on >= l.starts_on)
+          AND NOT EXISTS (
+            SELECT 1 FROM rpa_payments p
+            WHERE p.worker_id = w.id AND p.status <> 'canceled'
+          )) AS without_payment`,
+  );
+  return rows[0];
+}
+
 /** O recibo assinado voltou: o emitido vira pago. O ja pago fica como esta. */
 async function markPaid(ids) {
   if (ids.length === 0) return;
@@ -315,5 +360,6 @@ module.exports = {
   findDocument,
   findDocumentsByNumber,
   markPaid,
+  summary,
   cancel,
 };

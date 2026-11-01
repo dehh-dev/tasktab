@@ -80,12 +80,13 @@ Escopos `rpa:read` / `rpa:write`, por enquanto so do papel `admin`: o modulo
 guarda CPF, RG e conta bancaria de terceiros. O plano e as etapas estao na
 issue 35.
 
-| Metodo  | Rota                     | Descricao                                        |
-| ------- | ------------------------ | ------------------------------------------------ |
-| `GET`   | `/api/rpa/companies`     | Lista as empresas pelo codigo UAU (paginada)     |
-| `POST`  | `/api/rpa/companies`     | Cadastra uma empresa                             |
-| `GET`   | `/api/rpa/companies/:id` | Detalhe                                          |
-| `PATCH` | `/api/rpa/companies/:id` | Atualiza (o codigo UAU nao muda: e a identidade) |
+| Metodo  | Rota                     | Descricao                                          |
+| ------- | ------------------------ | -------------------------------------------------- |
+| `GET`   | `/api/rpa/summary`       | O resumo do Inicio: proximo pagamento e pendencias |
+| `GET`   | `/api/rpa/companies`     | Lista as empresas pelo codigo UAU (paginada)       |
+| `POST`  | `/api/rpa/companies`     | Cadastra uma empresa                               |
+| `GET`   | `/api/rpa/companies/:id` | Detalhe                                            |
+| `PATCH` | `/api/rpa/companies/:id` | Atualiza (o codigo UAU nao muda: e a identidade)   |
 
 | Metodo   | Rota                                  | Descricao                                       |
 | -------- | ------------------------------------- | ----------------------------------------------- |

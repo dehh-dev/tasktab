@@ -1732,3 +1732,175 @@ textarea.field__input {
   white-space: nowrap;
   width: 1px;
 }
+
+/* ---------- RPA de lancamentos ---------- */
+
+.rpa,
+.rpa-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rpa-section__title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.rpa-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rpa-subsection > h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 8px 0 0;
+}
+
+.rpa-tabs {
+  flex-wrap: wrap;
+}
+
+.rpa-fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 16px 0 0;
+  padding: 12px 16px 16px;
+}
+
+.rpa-fieldset > legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.rpa-grid-scroll {
+  overflow-x: auto;
+}
+
+.rpa-table {
+  border-collapse: collapse;
+  font-size: 13px;
+  width: 100%;
+}
+
+.rpa-table th,
+.rpa-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.rpa-table thead th {
+  color: var(--fg-subtle);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rpa-table .field__input {
+  min-width: 90px;
+}
+
+/* A grade do ponto: uma coluna por dia, celulas compactas. */
+.rpa-grid td,
+.rpa-grid th {
+  min-width: 96px;
+}
+
+.rpa-grid tbody th {
+  min-width: 160px;
+}
+
+.rpa-grid__button {
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font: inherit;
+  gap: 2px;
+  padding: 2px;
+  text-align: left;
+  width: 100%;
+}
+
+.rpa-grid__button:hover {
+  background: var(--bg-subtle);
+}
+
+.rpa-grid__button:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.rpa-grid__cell--off,
+.rpa-grid__out {
+  color: var(--fg-subtle);
+}
+
+/* A excecao tem fundo, e tambem o texto "alterado": cor nunca sozinha. */
+.rpa-grid__cell--exception {
+  background: var(--attention-muted);
+}
+
+.rpa-grid__value,
+.rpa-grid__total {
+  font-variant-numeric: tabular-nums;
+}
+
+.rpa-flag {
+  color: var(--fg-muted);
+  display: block;
+  font-size: 12px;
+}
+
+.rpa-details {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.rpa-issues {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.rpa-issues li {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rpa-inline-form {
+  margin-top: 12px;
+}
+
+.rpa-adjustment {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 2fr 1fr 1fr 2fr auto;
+  margin-bottom: 8px;
+}
+
+.rpa-copy {
+  align-items: flex-start;
+  display: flex;
+  gap: 8px;
+}
+
+.rpa-copy .field__input {
+  flex: 1;
+}
+
+.rpa-nowrap {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

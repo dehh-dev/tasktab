@@ -23,7 +23,7 @@ derrubou o `npm test`, e derrubaria o `npm run dev` e o CI.
   reaplica num `finally`.
 - Mudou um enum? Atualize o espelho em `web/src/constants.js` e, se for
   categoria, os rotulos de `src/services/export/labels.js`. Os enums do RPA
-  entram no espelho com a interface (issue 43).
+  (`rpa_*`) estao no mesmo espelho, desde a interface (issue 43).
 
 ## RPA (`rpa_*`, issue 36)
 
