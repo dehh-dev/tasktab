@@ -114,6 +114,19 @@ describe('irrfFor', () => {
     });
   });
 
+  it('o IRRF corta o que passa de duas casas, como o INSS', () => {
+    // Base 4.000,03 a 22,5% menos 662,77 = 237,23675: arredondado seria
+    // 237,24.
+    expect(
+      irrfFor({
+        incomeCents: 400003 + 56480,
+        inssCents: 50000,
+        dependents: 0,
+        table: IRRF_2024,
+      }),
+    ).toEqual({ base_cents: 400003, irrf_cents: 23723 });
+  });
+
   it('a base e o menor entre o desconto simplificado e o legal', () => {
     // Com 3 dependentes o legal (4.800 - 528 - 568,77) fica abaixo do
     // simplificado (4.800 - 607,20).
