@@ -164,10 +164,31 @@ async function update(id, data) {
   return findById(id);
 }
 
+/**
+ * A retencao: documentos e recibos do lancamento saem, com o PDF dos envios
+ * de recibos (que guarda nome, CPF e valor lidos). Devolve os arquivos, para
+ * o disco ser limpo depois do commit.
+ */
+async function deleteByLaunch(client, launchId) {
+  const { rows } = await client.query(
+    `WITH files AS (
+       DELETE FROM rpa_files WHERE launch_id = $1
+       RETURNING file_hash, file_path
+     ), batches AS (
+       DELETE FROM rpa_receipt_batches WHERE launch_id = $1
+       RETURNING file_hash, file_path
+     )
+     SELECT * FROM files UNION SELECT * FROM batches`,
+    [launchId],
+  );
+  return rows;
+}
+
 module.exports = {
   UPDATABLE_COLUMNS,
   countByHash,
   findFilesByLaunch,
+  deleteByLaunch,
   findDocuments,
   findById,
   insertDocuments,

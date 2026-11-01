@@ -544,3 +544,49 @@ describe('sementes publicas do RPA', () => {
     expect(Math.round((base * rate) / 10000) - deduction).toBe(29015);
   });
 });
+
+describe('retencao do lancamento (decisao de 2026-11-01)', () => {
+  async function launchRow(id) {
+    const { rows } = await db.query(
+      'SELECT status, closed_at FROM rpa_launches WHERE id = $1',
+      [id],
+    );
+    return rows[0];
+  }
+
+  it('encerrar marca closed_at, inclusive por psql; reabrir limpa', async () => {
+    const launch = await insertRpaLaunch();
+
+    await updateColumnDirectly('rpa_launches', launch.id, 'status', 'closed');
+    const closed = await launchRow(launch.id);
+    await updateColumnDirectly('rpa_launches', launch.id, 'status', 'open');
+
+    expect(closed.closed_at).toEqual(expect.any(Date));
+    expect(await launchRow(launch.id)).toEqual({
+      status: 'open',
+      closed_at: null,
+    });
+  });
+
+  it('closed_at nao existe sem o lancamento encerrado', async () => {
+    const launch = await insertRpaLaunch();
+
+    await expect(
+      updateColumnDirectly('rpa_launches', launch.id, 'closed_at', new Date()),
+    ).rejects.toEqual(violates('rpa_launches_closed_at_matches_status'));
+  });
+
+  it('o lancamento cujos dados a retencao apagou nao reabre', async () => {
+    const launch = await insertRpaLaunch({ status: 'closed' });
+    await updateColumnDirectly(
+      'rpa_launches',
+      launch.id,
+      'purged_at',
+      new Date(),
+    );
+
+    await expect(
+      updateColumnDirectly('rpa_launches', launch.id, 'status', 'open'),
+    ).rejects.toEqual(violates('rpa_launches_purged_stays_closed'));
+  });
+});

@@ -111,13 +111,15 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
                 Editar lancamento
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn--sm"
-              onClick={() => setStatus(open ? 'closed' : 'open')}
-            >
-              {open ? 'Encerrar lancamento' : 'Reabrir lancamento'}
-            </button>
+            {!launch.purged_at && (
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={() => setStatus(open ? 'closed' : 'open')}
+              >
+                {open ? 'Encerrar lancamento' : 'Reabrir lancamento'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -156,8 +158,19 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
             <dd>{launch.cost_center || 'Nao informado'}</dd>
           </div>
         </dl>
-        {!open && (
-          <p className="state">Lancamento encerrado: so leitura ate reabrir.</p>
+        {!open && !launch.purged_at && (
+          <p className="state">
+            Lancamento encerrado: so leitura ate reabrir. Os dados pessoais da
+            equipe e os arquivos sao apagados a partir de{' '}
+            {formatDate(launch.purge_on)}, um mes depois de encerrar.
+          </p>
+        )}
+        {launch.purged_at && (
+          <p className="state">
+            Dados pessoais da equipe e arquivos apagados pela retencao em{' '}
+            {formatDate(launch.purged_on)}. Ficam nomes, CPFs e os valores dos
+            RPAs; o lancamento nao reabre.
+          </p>
         )}
       </section>
 
