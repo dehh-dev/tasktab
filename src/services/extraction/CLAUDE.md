@@ -71,6 +71,9 @@ nao por deixar de olhar.
   issue 42), com ou sem CNPJ; a cidade vai tambem para `merchants.city`. Lista
   e saidas usam o cadastro quando ha e o papel quando nao ha, num lugar so
   (`ISSUER_NAME` / `ISSUER_CITY` em `receipt.model.js`).
+- `readPage` aceita `normalise: false`, que so o recibo assinado do RPA usa:
+  normalizada, a pagina com linha de assinatura se perde no Tesseract. O
+  cupom segue normalizado; trocar para ele pede medir antes e depois.
 - Hora e numero do documento chegaram a ser extraidos e foram **removidos** no
   uso real: ninguem os consultava. Voltam por pedido, nao por completude.
 - **Manuscrito fica de fora**, por decisao consciente: o Tesseract nao le

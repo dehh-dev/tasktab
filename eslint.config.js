@@ -30,6 +30,9 @@ module.exports = [
       reportUnusedDisableDirectives: true,
     },
     rules: {
+      // Sem ele, um identificador que nao existe so aparece quando o codigo
+      // roda: um import esquecido derrubou a API na subida (issue 42).
+      'no-undef': 'error',
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'no-console': 'off',
       eqeqeq: ['error', 'always'],
@@ -37,6 +40,16 @@ module.exports = [
       'no-var': 'error',
       'object-shorthand': 'error',
       'no-return-await': 'error',
+    },
+  },
+  // O E2E roda no Node, mas o que vai em `page.evaluate` roda no navegador.
+  {
+    files: ['e2e/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
     },
   },
   {
@@ -72,6 +85,7 @@ module.exports = [
       'react/jsx-uses-vars': 'error',
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+      'no-undef': 'error',
       'no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

@@ -6,6 +6,7 @@ const Launch = require('../../models/rpa-launch.model');
 const Worker = require('../../models/rpa-worker.model');
 const Payment = require('../../models/rpa-payment.model');
 const RpaFile = require('../../models/rpa-file.model');
+const RpaReceiptBatch = require('../../models/rpa-receipt-batch.model');
 const { NotFoundError, ConflictError } = require('../../../infra/errors');
 const ownership = require('./ownership');
 
@@ -196,6 +197,22 @@ async function loadPayment(id, { write = false } = {}) {
   return { payment, launch };
 }
 
+/** O envio de recibos assinados e o lancamento dele. */
+async function loadReceiptBatch(id) {
+  const batch = await RpaReceiptBatch.findById(id);
+
+  if (!batch) {
+    throw new NotFoundError({
+      message: `Envio de recibos ${id} nao encontrado.`,
+      action: 'Use o id devolvido pelo envio do PDF dos recibos.',
+    });
+  }
+
+  const launch = await loadLaunch(batch.launch_id);
+
+  return { batch, launch };
+}
+
 /** O documento do formulario e o lancamento dele, com a trava do encerrado. */
 async function loadRpaFile(id, { write = false } = {}) {
   const file = await RpaFile.findById(id);
@@ -210,6 +227,7 @@ async function loadRpaFile(id, { write = false } = {}) {
 }
 
 module.exports = {
+  loadReceiptBatch,
   loadRpaFile,
   loadReport,
   loadReceipt,

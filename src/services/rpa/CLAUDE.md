@@ -3,8 +3,8 @@
 O modulo substitui a planilha `CONTROLE DE DIARIA - <cidade>.xlsb` (plano em
 issue 35). Aqui ficam a importacao das respostas do Google Forms (issue 37),
 a grade do ponto com o calculo das diarias (issue 38), os pagamentos com o
-bruto e os impostos (issue 39), a emissao: PDF, .zip e e-mail (issue 40), e
-os documentos do formulario (issue 41).
+bruto e os impostos (issue 39), a emissao: PDF, .zip e e-mail (issue 40), os
+documentos do formulario (issue 41) e os recibos assinados (issue 42).
 
 ## Importacao (`import.service.js`)
 
@@ -211,3 +211,32 @@ pendencia barra a importacao.
 - **Nada de nome de arquivo, de conta ou de documento no log**: so contagens
   e o id do lancamento, com teste lendo a saida de uma API de verdade
   (`tests/api/rpa/log.test.js`). Os nomes so voltam na resposta.
+
+## Recibos assinados (`receipt-reading.js`, `receipts.service.js`)
+
+- **A leitura roda na fila** (`extraction/queue.js`), como o reprocessamento
+  do comprovante: o `POST` grava o PDF pelo hash, cria o envio
+  (`rpa_receipt_batches`, `pending`) e responde `202`. A tela acompanha pelo
+  `GET` do envio, que termina `done` com o resultado ou `failed` com mensagem
+  publica.
+- Texto pela camada da pagina; sem texto util, **OCR sem normalizar**
+  (`readPage(..., { normalise: false })`). Normalizada, a pagina quase toda
+  branca com uma linha de assinatura (`____` ou `....`) se perde inteira no
+  Tesseract: o CPF saia "STI.AT1./33-13" e linhas sumiam. O fixture de teste
+  tem a linha de assinatura de proposito.
+- **Pessoa pelo CPF, com o verificador**: o CPF que o OCR trocou um digito nao
+  fecha o DV e nao casa com ninguem. Sem CPF que case, pelo primeiro e ultimo
+  nome do cadastro, quando so uma pessoa do pagamento os tem na pagina. **O CPF
+  vale mais que o nome.** Cada pessoa pega a primeira pagina dela; a segunda
+  vai para as sem pessoa, como repetida.
+- Nome, liquido e data lidos pela palavra da linha (`nome`, `liquido`,
+  `data`). Diferenca e **apontada, nunca corrigida** — o recibo de R$ 650,01
+  continua contra o RPA de R$ 650,00, e o pagamento vira pago assim mesmo.
+- A pagina separada e **copiada** (`copyPages`), sem recomprimir: a imagem e a
+  mesma, byte a byte (ha teste do stream). O PDF dela sai sem data
+  (`updateMetadata: false`), entao reenviar o mesmo lote da o mesmo arquivo e
+  nao duplica o recibo.
+- O nome do arquivo e o do **cadastro** (`RECIBO NOME COMPLETO.pdf`), nunca o
+  do recibo, que pode vir com erro de digitacao.
+- O log leva so o id do envio e contagens; CPF, nome e valor ficam no
+  resultado, no banco.

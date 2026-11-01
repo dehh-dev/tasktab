@@ -264,6 +264,17 @@ async function findDocumentsByNumber(launchId, number) {
   return rows;
 }
 
+/** O recibo assinado voltou: o emitido vira pago. O ja pago fica como esta. */
+async function markPaid(ids) {
+  if (ids.length === 0) return;
+
+  await db.query(
+    `UPDATE rpa_payments SET status = 'paid', paid_at = now()
+     WHERE id = ANY($1::int[]) AND status = 'issued'`,
+    [ids],
+  );
+}
+
 /** Cancela com motivo; o trigger do banco anula os dias que ele levou. */
 async function cancel(id, reason) {
   await db.query(
@@ -288,5 +299,6 @@ module.exports = {
   insertAdjustments,
   findDocument,
   findDocumentsByNumber,
+  markPaid,
   cancel,
 };

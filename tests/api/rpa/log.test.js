@@ -5,15 +5,18 @@ const {
   requestUpload,
   insertRpaLaunch,
   insertRpaWorker,
+  insertRpaPayment,
   startApiInstance,
 } = require('../../orchestrator');
 const { formResponse, makeFormXlsx } = require('../../fixtures/forms');
 const { QUESTIONS, photo, makeDriveZip } = require('../../fixtures/drive');
+const { makeScannedRpaReceipts } = require('../../fixtures/rpa-receipts');
 
 /**
- * Criterio da issue 37: nenhum CPF, PIS, RG ou conta no log. A instancia
- * principal da suite tem o log mudo; esta sobe com o log ligado, e o teste le
- * a saida dela depois de importar e corrigir a equipe pela API.
+ * Criterio das issues 37, 41 e 42: nenhum CPF, PIS, RG, conta, nome de
+ * pessoa ou de arquivo no log. A instancia principal da suite tem o log mudo;
+ * esta sobe com o log ligado, e o teste le a saida dela depois de mexer na
+ * equipe, nos documentos e nos recibos pela API.
  */
 let instance = null;
 
@@ -168,4 +171,60 @@ describe('o log do RPA', () => {
       ].filter((value) => output.includes(value)),
     ).toEqual([]);
   });
+
+  it('ler os recibos assinados nao deixa CPF nem nome no log', async () => {
+    const launch = await insertRpaLaunch();
+    const worker = await insertRpaWorker({
+      launch_id: launch.id,
+      name: 'Recebedora Sintetica Assinante',
+    });
+    await insertRpaPayment({ worker_id: worker.id });
+    const before = instance.output().length;
+
+    const response = await requestUpload(
+      `/api/rpa/launches/${launch.id}/receipts?payment=1`,
+      [
+        {
+          buffer: await makeScannedRpaReceipts([
+            { name: 'RECEBEDORA SINTETICA ASSINANTE', cpf: worker.cpf },
+          ]),
+          filename: 'RPCI_UNICO_7791.pdf',
+        },
+      ],
+      { field: 'file', baseUrl: instance.baseUrl },
+    );
+    expect(response.status).toBe(202);
+
+    // A leitura e na fila desta instancia: espera o envio terminar.
+    const deadline = Date.now() + 60000;
+    let batch;
+    do {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      batch = await request(
+        'GET',
+        `/api/rpa/receipt-batches/${response.body.data.id}`,
+        undefined,
+        { baseUrl: instance.baseUrl },
+      );
+    } while (
+      ['pending', 'processing'].includes(batch.body.data.status) &&
+      Date.now() < deadline
+    );
+    expect(batch.body.data.status).toBe('done');
+    expect(batch.body.data.result.matched).toHaveLength(1);
+
+    const output = instance.output().slice(before);
+    expect(output).toContain('recibos lidos');
+    expect(
+      [
+        worker.cpf,
+        worker.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+        'RECEBEDORA',
+        'Recebedora',
+        'Assinante',
+        'RPCI_UNICO_7791',
+        '650,00',
+      ].filter((value) => output.includes(value)),
+    ).toEqual([]);
+  }, 90000);
 });

@@ -51,6 +51,15 @@ const receiveDocuments = multer({
 }).single('file');
 
 /**
+ * O PDF escaneado dos recibos assinados (issue 42): um arquivo, no campo
+ * `file`. Fica em memoria: o servico confere que e PDF e o grava pelo hash.
+ */
+const receiveScannedReceipts = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: env.upload.maxBytes, files: 1 },
+}).single('file');
+
+/**
  * Envolve o middleware do multer para que os erros dele saiam no formato da
  * API. Sem isso, estourar o limite de tamanho viraria um 500 generico em vez
  * de dizer ao usuario qual e o limite.
@@ -106,4 +115,14 @@ const documentsUpload = withApiErrors(receiveDocuments, 'file', {
   maxBytes: env.upload.documentsMaxBytes,
 });
 
-module.exports = { receiptUpload, spreadsheetUpload, documentsUpload };
+const scannedReceiptsUpload = withApiErrors(receiveScannedReceipts, 'file', {
+  count: 'Envie um PDF por vez.',
+  unexpected: 'Envie o PDF no campo "file".',
+});
+
+module.exports = {
+  receiptUpload,
+  spreadsheetUpload,
+  documentsUpload,
+  scannedReceiptsUpload,
+};

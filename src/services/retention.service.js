@@ -5,6 +5,7 @@ const path = require('path');
 
 const Receipt = require('../models/receipt.model');
 const RpaFile = require('../models/rpa-file.model');
+const RpaReceiptBatch = require('../models/rpa-receipt-batch.model');
 const env = require('../config/env');
 
 /**
@@ -13,7 +14,11 @@ const env = require('../config/env');
  * ser um cupom e o recibo de uma pessoa. Tabela nova que grave ali entra
  * nesta lista, ou a primeira exclusao leva o arquivo dela.
  */
-const REFERENCE_COUNTERS = [Receipt.countByHash, RpaFile.countByHash];
+const REFERENCE_COUNTERS = [
+  Receipt.countByHash,
+  RpaFile.countByHash,
+  RpaReceiptBatch.countByHash,
+];
 
 async function countReferences(fileHash) {
   const counts = await Promise.all(
