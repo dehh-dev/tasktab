@@ -450,9 +450,10 @@ export function updateDocument(id, data) {
   });
 }
 
-export function uploadSignedReceipts(launchId, number, file) {
+/** O PDF escaneado com todos, ou um PDF por pessoa: todos no campo `file`. */
+export function uploadSignedReceipts(launchId, number, files) {
   const form = new FormData();
-  form.append('file', file);
+  for (const file of [files].flat()) form.append('file', file);
   return request(
     `${RPA_URL}/launches/${launchId}/receipts${query({ payment: number })}`,
     { method: 'POST', body: form },

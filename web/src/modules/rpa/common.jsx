@@ -35,10 +35,15 @@ export function toError(caught) {
 
 /**
  * Envio de um arquivo, clicando ou arrastando, como o upload de comprovante.
- * O servidor confere o conteudo: nada e filtrado por extensao aqui.
+ * O servidor confere o conteudo: nada e filtrado por extensao aqui. Com
+ * `multiple`, `onFile` recebe a lista dos arquivos.
  */
-export function FileDrop({ label, accept, disabled, onFile }) {
+export function FileDrop({ label, accept, disabled, multiple, onFile }) {
   const [active, setActive] = useState(false);
+  const deliver = (files) => {
+    if (files.length === 0) return;
+    onFile(multiple ? [...files] : files[0]);
+  };
 
   return (
     <label
@@ -51,7 +56,7 @@ export function FileDrop({ label, accept, disabled, onFile }) {
       onDrop={(event) => {
         event.preventDefault();
         setActive(false);
-        if (event.dataTransfer.files[0]) onFile(event.dataTransfer.files[0]);
+        deliver(event.dataTransfer.files);
       }}
     >
       <input
@@ -59,9 +64,10 @@ export function FileDrop({ label, accept, disabled, onFile }) {
         className="sr-only"
         accept={accept}
         disabled={disabled}
+        multiple={multiple}
         aria-label={label}
         onChange={(event) => {
-          if (event.target.files[0]) onFile(event.target.files[0]);
+          deliver(event.target.files);
           event.target.value = '';
         }}
       />

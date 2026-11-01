@@ -134,12 +134,12 @@ export default function ReceiptsTab({ launch, canWrite }) {
     }, delay);
   }, []);
 
-  async function upload(file) {
+  async function upload(files) {
     setSending(true);
     setError(null);
     setBatch(null);
     try {
-      const response = await api.uploadSignedReceipts(launch.id, number, file);
+      const response = await api.uploadSignedReceipts(launch.id, number, files);
       setBatch(response.data);
       follow(response.data.id);
     } catch (caught) {
@@ -180,9 +180,10 @@ export default function ReceiptsTab({ launch, canWrite }) {
 
           {canWrite && (
             <FileDrop
-              label={`Arraste o PDF dos recibos assinados do ${number}º pagamento, ou clique para escolher`}
+              label={`Arraste o PDF dos recibos assinados do ${number}º pagamento (o escaneado com todos, ou um PDF por pessoa), ou clique para escolher`}
               accept="application/pdf"
               disabled={sending}
+              multiple
               onFile={upload}
             />
           )}

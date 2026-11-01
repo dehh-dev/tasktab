@@ -40,23 +40,109 @@ function readCpfs(text) {
   );
 }
 
-/** O nome depois de "Nome:" (ou "Nome do prestador:"). */
-function readName(text) {
-  const line = lineWith(text, /^nome\b/);
-  if (!line) return null;
+// Palavras dos rotulos do recibo: linha com uma delas nao e o nome de
+// ninguem. Vem do RPCI do RH (Senior), onde o nome fica numa linha so dele.
+const LABEL_WORDS = new Set([
+  'assinatura',
+  'cnpj',
+  'completo',
+  'competencia',
+  'cpf',
+  'data',
+  'demonstrativo',
+  'descontos',
+  'empresa',
+  'endereco',
+  'especificacao',
+  'identidade',
+  'inscricao',
+  'liquido',
+  'localidade',
+  'matricula',
+  'nome',
+  'razao',
+  'recibo',
+  'social',
+  'totais',
+]);
 
-  const value = line.includes(':')
-    ? line.slice(line.indexOf(':') + 1)
-    : line.replace(/^\S+/, '');
-  const name = squish(value);
-  return name === '' ? null : name;
+function isLabel(value) {
+  const words = fold(value)
+    .split(/[^a-z]+/)
+    .filter(Boolean);
+  return words.length > 0 && words.every((word) => LABEL_WORDS.has(word));
 }
 
-/** O liquido: o ultimo valor da linha que diz "liquido". */
+/** Linha que e so um nome: letras, duas palavras ou mais, nenhum rotulo. */
+function looksLikeName(line) {
+  const folded = fold(line);
+  if (!/^[a-z' ]+$/.test(folded)) return false;
+
+  const words = folded.split(' ');
+  return words.length >= 2 && !words.some((word) => LABEL_WORDS.has(word));
+}
+
+/**
+ * O nome da pessoa. "Nome: Fulano" vale como esta. O rotulo sozinho ("NOME
+ * COMPLETO" do RPCI do RH) tem o nome na linha vizinha: a de baixo na ordem da
+ * pagina (OCR), a de cima na camada de texto do Senior. "Nome ou razao
+ * social" e a empresa, nunca a pessoa.
+ */
+function readName(text) {
+  const all = lines(text);
+
+  for (let index = 0; index < all.length; index += 1) {
+    const line = all[index];
+    const folded = fold(line);
+    if (!/^nome\b/.test(folded) || /^nome ou razao social\b/.test(folded)) {
+      continue;
+    }
+
+    const inline = squish(
+      line.includes(':')
+        ? line.slice(line.indexOf(':') + 1)
+        : line.replace(/^\S+/, ''),
+    );
+    if (inline !== '' && !isLabel(inline)) return inline;
+
+    const neighbour = [all[index + 1], all[index - 1]].find(
+      (candidate) => candidate && looksLikeName(candidate),
+    );
+    if (neighbour) return neighbour;
+  }
+
+  return null;
+}
+
+/**
+ * "a importancia de R$ 650,00" do corpo do RPCI: o valor vem na mesma linha
+ * ou na de baixo.
+ */
+function readImportance(text) {
+  const all = lines(text).map((line) => fold(line));
+  const phrase = 'importancia de r$';
+
+  for (let index = 0; index < all.length; index += 1) {
+    const at = all[index].indexOf(phrase);
+    if (at === -1) continue;
+
+    const after = `${all[index].slice(at + phrase.length)} ${all[index + 1] ?? ''}`;
+    const value = after.match(MONEY);
+    return value ? parseAmountToCents(value[0]) : null;
+  }
+
+  return null;
+}
+
+/**
+ * O liquido: o ultimo valor da linha que diz "liquido". Na camada de texto do
+ * RPCI do RH o "LIQUIDO:" vem sem o valor, longe dele; ai vale o mesmo
+ * liquido escrito no corpo ("a importancia de R$").
+ */
 function readNetCents(text) {
   const line = lineWith(text, /liquido/);
   const values = line?.match(MONEY);
-  return values ? parseAmountToCents(values.at(-1)) : null;
+  return values ? parseAmountToCents(values.at(-1)) : readImportance(text);
 }
 
 /** A data da linha que diz "data"; sem ela, a primeira data da pagina. */
