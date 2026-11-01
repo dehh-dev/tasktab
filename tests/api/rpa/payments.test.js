@@ -303,6 +303,29 @@ describe('POST /api/rpa/launches/:id/payments: os criterios da issue 39', () => 
   });
 });
 
+describe('POST /api/rpa/launches/:id/payments: codigo repetido', () => {
+  it('o codigo que outro lancamento da mesma empresa ja usou no mes deixa a pessoa de fora, sem 500', async () => {
+    const { company, launch } = await arrangeLaunch();
+    await arrangeWorker(launch, { number: 1 });
+    const other = await arrangeLaunch({ company });
+    await arrangeWorker(other.launch, { number: 1, cpf: '11144477735' });
+    await pay(launch.id, FIRST_WEEK);
+
+    const preview = await pay(other.launch.id, FIRST_WEEK, { preview: true });
+    const issue = await pay(other.launch.id, FIRST_WEEK);
+
+    const reason = `o codigo 1-${company.code}-1-102026 ja e de outro RPA valido da empresa`;
+    expect(preview.body.data).toMatchObject({
+      payments: [],
+      skipped: [expect.objectContaining({ reason })],
+    });
+    expect(issue.status).toBe(422);
+    expect(issue.body.details).toEqual([
+      { field: 'worker_ids', message: `1: ${reason}` },
+    ]);
+  });
+});
+
 describe('POST /api/rpa/launches/:id/payments: ponto de dia ja pago', () => {
   it('a diferenca entra na previa seguinte como correcao, com o dia', async () => {
     const { launch } = await arrangeLaunch({

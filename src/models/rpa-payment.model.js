@@ -138,6 +138,20 @@ async function monthTotals({ cnpj, cpfs, paymentDate }, client = db) {
   return rows;
 }
 
+/**
+ * Os codigos que ja sao de um RPA valido. O numero da pessoa recomeca em cada
+ * lancamento, e dois lancamentos da mesma empresa no mesmo mes dariam o
+ * mesmo `no-empresa-pessoa-mmaaaa`.
+ */
+async function takenCodes(codes, client = db) {
+  const { rows } = await client.query(
+    `SELECT code FROM rpa_payments
+     WHERE code = ANY($1::varchar[]) AND status <> 'canceled'`,
+    [codes],
+  );
+  return rows.map((row) => row.code);
+}
+
 /** As tabelas de INSS e IRRF vigentes na data: a de maior inicio ate ela. */
 async function taxTables(date, client = db) {
   const { rows } = await client.query(
@@ -292,6 +306,7 @@ module.exports = {
   findById,
   ledgerByLaunch,
   numbersByWorkers,
+  takenCodes,
   monthTotals,
   taxTables,
   insertMany,
