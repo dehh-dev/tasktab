@@ -135,8 +135,8 @@ async function readPage(
   // `normalise: false` e do recibo assinado do RPA (issue 42): numa pagina
   // quase toda branca com uma linha de assinatura (`____`), a normalizacao
   // engrossa o traco e o Tesseract perde a pagina inteira — o CPF saia como
-  // "STI.AT1./33-13". O cupom segue normalizado: trocar para ele pede medir
-  // antes e depois (`npm run extraction:evaluate`).
+  // "STI.AT1./33-13". O cupom segue normalizado: medido sem ela, perdeu datas
+  // e valores (ver o CLAUDE.md desta pasta).
   const sharp = require('sharp');
   let pipeline = sharp(image).rotate(rotation).greyscale();
   if (normalise) pipeline = pipeline.normalise();
