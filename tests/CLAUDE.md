@@ -23,6 +23,14 @@ importar `src/app`.
 sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 "404 para id inexistente" em cada arquivo.
 
+- `tests/api/rpa/launch-lifecycle.test.js` percorre o modulo RPA inteiro so
+  pela API, da empresa ao lancamento encerrado, com a equipe sorteada (semente
+  fixa no nome do teste; `RPA_SEED=<n>` sorteia outra). Os outros arquivos do
+  RPA provam cada parte com dado escolhido; este prova que elas se encaixam, e
+  confere o bruto por uma conta propria, nao pelo `taxes.js`. E um `it` so
+  porque o `setup.js` trunca o banco entre os testes. Etapa nova do modulo
+  entra nele tambem.
+
 ## Ciclo
 
 | Onde              | Quando                  | O que faz                                                                           |
