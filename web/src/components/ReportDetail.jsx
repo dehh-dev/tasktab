@@ -195,11 +195,17 @@ export default function ReportDetail({ reportId, onBack, canWrite = true }) {
     return () => clearTimeout(timer);
   }, [receipts, pollFailures, poll]);
 
-  /** Recarrega e avanca para o proximo pendente — ou fecha, se a fila esvaziou. */
+  /**
+   * Recarrega e avanca para o proximo pendente — ou fecha, se a fila esvaziou.
+   * Quem clicou em "Voltar a lista" enquanto o recarregamento corria fica na
+   * lista: a revisao reabria sozinha quando ele terminava.
+   */
   async function handleAction() {
     const fresh = await load();
     const queue = needsReviewQueue(fresh);
-    setReviewingId(queue.length > 0 ? queue[0] : null);
+    setReviewingId((current) =>
+      current !== null && queue.length > 0 ? queue[0] : null,
+    );
   }
 
   /**
