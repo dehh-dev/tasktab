@@ -23,6 +23,9 @@ const ROOT = path.resolve(__dirname, '..');
 module.exports = async function globalSetup() {
   orchestrator.runPendingMigrations();
   await orchestrator.closeDatabase();
+  // Uma vez por execucao: as specs nao truncam o banco entre si, entao o
+  // disco tambem nao. O que sobra da suite de API sai aqui.
+  orchestrator.clearUploads();
 
   execFileSync(
     'node',

@@ -25,10 +25,10 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 
 ## Ciclo
 
-| Onde              | Quando                  | O que faz                                                 |
-| ----------------- | ----------------------- | --------------------------------------------------------- |
-| `global-setup.js` | uma vez por execucao    | espera a API, aplica migrations                           |
-| `setup.js`        | antes de **cada** teste | espera a fila, trunca as tabelas, recria o usuario padrao |
+| Onde              | Quando                  | O que faz                                                                           |
+| ----------------- | ----------------------- | ----------------------------------------------------------------------------------- |
+| `global-setup.js` | uma vez por execucao    | espera a API, aplica migrations                                                     |
+| `setup.js`        | antes de **cada** teste | espera a fila, trunca as tabelas, esvazia `uploads-test/` e recria o usuario padrao |
 
 - Arquivo novo nao precisa de preambulo: `require` do orchestrator e os
   `describe`.
@@ -36,6 +36,12 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   `npx`). Marca em `process.env` nao deduplica: cada arquivo do Jest tem a
   propria copia.
 - Rodam em serie (`--runInBand`), porque compartilham as tabelas.
+- O disco e da suite: `env.test` aponta `UPLOAD_DIR` para `uploads-test/`, e
+  `clearUploads` o esvazia junto com o banco. No `uploads/` do dev a suite
+  deixou milhares de PDFs, e a contagem de referencias de um banco podia
+  apagar o arquivo que o outro ainda usava. `clearUploads` so apaga nesse
+  caminho fixo: uma `UPLOAD_DIR` exportada no shell vence o `env.test`, e ai
+  a suite para em vez de esvaziar outro diretorio.
 
 ## `orchestrator.js`
 

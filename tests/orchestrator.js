@@ -263,6 +263,32 @@ function clearDatabase() {
   );
 }
 
+// O caminho que o `env.test` declara, fixo aqui de proposito: uma UPLOAD_DIR
+// exportada no shell vence o arquivo (o dotenv nao sobrescreve), e esvaziar o
+// que ela apontasse seria apagar arquivo de verdade.
+const TEST_UPLOAD_DIR = path.join(ROOT, 'uploads-test');
+
+/**
+ * O disco acompanha o banco: com as linhas truncadas, o PDF que sobrou de um
+ * teste faria o seguinte achar que gravou um arquivo que nunca gravou.
+ */
+function clearUploads() {
+  if (env.upload.dir !== TEST_UPLOAD_DIR) {
+    throw new Error(
+      `A suite grava em ${TEST_UPLOAD_DIR}, mas UPLOAD_DIR aponta para ` +
+        `${env.upload.dir}. Nada foi apagado.`,
+    );
+  }
+
+  fs.mkdirSync(TEST_UPLOAD_DIR, { recursive: true });
+  for (const name of fs.readdirSync(TEST_UPLOAD_DIR)) {
+    fs.rmSync(path.join(TEST_UPLOAD_DIR, name), {
+      recursive: true,
+      force: true,
+    });
+  }
+}
+
 /**
  * Arranjo de autenticacao.
  *
@@ -858,6 +884,7 @@ module.exports = {
   migrationsFrom,
   runScript,
   clearDatabase,
+  clearUploads,
   closeDatabase,
   insertTask,
   insertReport,
