@@ -42,9 +42,8 @@ const SCOPES = [
   'merchants:write',
   'users:read',
   'users:write',
-  // Modulo RPA (issue 36). Por enquanto so o admin, pelo `SCOPES` inteiro:
-  // o lancamento guarda CPF, RG e conta de terceiros, e quem mais o acessa
-  // ainda e decisao em aberto na issue 35.
+  // Modulo RPA (issue 36). O lancamento guarda CPF, RG e conta de terceiros:
+  // escreve so o admin, e o auditor le para conferir (decisao de 2026-11-01).
   'rpa:read',
   'rpa:write',
 ];
@@ -58,6 +57,7 @@ const ROLES = ['admin', 'user', 'auditor'];
  * - `user` e quem presta contas: cria e revisa **os seus** relatorios.
  * - `auditor` e quem confere e assina: le tudo, escreve nada. E o unico papel
  *   com `:any` sem o par de escrita, e a razao de os dois serem separados.
+ *   No RPA ele confere a equipe e os pagamentos, sem emitir nem corrigir.
  */
 const ROLE_SCOPES = {
   admin: SCOPES,
@@ -79,6 +79,7 @@ const ROLE_SCOPES = {
     'reports:read:any',
     'receipts:read',
     'merchants:read',
+    'rpa:read',
   ],
 };
 

@@ -71,8 +71,10 @@ test.describe('sessao', () => {
 
     // O Inicio busca o resumo de cada modulo ao abrir. A queda vem depois
     // dessas respostas: senao quem a descobre e um widget, antes do clique, e
-    // o menu some antes de a spec chegar nele.
-    await expect(page.locator('.widget__stats')).toHaveCount(2);
+    // o menu some antes de a spec chegar nele. O admin ve tres: tarefas,
+    // prestacao de contas e RPA. Com 2, a spec seguia antes do resumo do RPA
+    // chegar, e passava ou nao conforme quem respondia primeiro.
+    await expect(page.locator('.widget__stats')).toHaveCount(3);
 
     // Revoga a sessao por fora da tela, como fariam a troca de senha em outro
     // navegador ou o fim do prazo. O `page.request` divide os cookies com a

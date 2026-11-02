@@ -51,13 +51,17 @@ const receiveDocuments = multer({
 }).single('file');
 
 /**
- * O PDF escaneado dos recibos assinados (issue 42): um arquivo, no campo
- * `file`. Fica em memoria: o servico confere que e PDF e o grava pelo hash.
+ * Os recibos assinados (issue 42): o PDF escaneado com todos, ou um PDF por
+ * pessoa (como o RH manda), no campo `file`. Ficam em memoria, porque a
+ * leitura junta todos num PDF so: o servico confere que sao PDF e os grava
+ * pelo hash. Os tetos sao os do upload de comprovantes; o pior caso
+ * (`UPLOAD_MAX_FILES` x `UPLOAD_MAX_BYTES`) fica restrito a quem tem
+ * `rpa:write`.
  */
 const receiveScannedReceipts = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: env.upload.maxBytes, files: 1 },
-}).single('file');
+  limits: { fileSize: env.upload.maxBytes, files: env.upload.maxFiles },
+}).array('file', env.upload.maxFiles);
 
 /**
  * Envolve o middleware do multer para que os erros dele saiam no formato da
@@ -116,8 +120,8 @@ const documentsUpload = withApiErrors(receiveDocuments, 'file', {
 });
 
 const scannedReceiptsUpload = withApiErrors(receiveScannedReceipts, 'file', {
-  count: 'Envie um PDF por vez.',
-  unexpected: 'Envie o PDF no campo "file".',
+  count: `Envie no maximo ${env.upload.maxFiles} PDFs de recibo por vez.`,
+  unexpected: 'Envie os PDFs no campo "file".',
 });
 
 module.exports = {

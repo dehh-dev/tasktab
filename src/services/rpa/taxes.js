@@ -10,11 +10,12 @@
  * RPAs ja emitidos no mes para a mesma pessoa e o mesmo CNPJ.
  */
 
-// Pendente de confirmacao com o financeiro (issue 35). O recibo RPCI de Avare
-// devolveu R$ 650,01 para um RPA de R$ 650,00 da planilha: so fecha com o
-// INSS truncado no centavo. O IRRF fica no arredondamento comum ate alguem
-// confirmar — para os valores destes RPAs ele e zero em 2026.
-const ROUNDING = { inss: 'truncate', irrf: 'round' };
+// Imposto corta o que passa de duas casas, sem arredondar (decisao de
+// 2026-11-01). E o que o sistema do RH faz: o recibo RPCI de Avare devolveu
+// R$ 650,01 para um RPA de R$ 650,00 da planilha, com o INSS de 80,3374
+// cobrado como 80,33. O IRRF segue a mesma regra, inclusive na reducao da Lei
+// 15.270.
+const ROUNDING = { inss: 'truncate', irrf: 'truncate' };
 
 const BASIS_POINTS = 10000;
 const MILLIONTHS = 1000000;

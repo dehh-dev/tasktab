@@ -21,11 +21,16 @@ async function countByHash(fileHash) {
  * FK leva as linhas, e depois nao ha mais como saber o que estava no disco.
  */
 async function findFilesByLaunch(launchId) {
-  // O PDF escaneado dos recibos (issue 42) divide o diretorio tambem.
+  // O PDF dos recibos (issue 42) e cada arquivo enviado com ele dividem o
+  // diretorio tambem.
   const { rows } = await db.query(
     `SELECT file_hash, file_path FROM rpa_files WHERE launch_id = $1
      UNION
-     SELECT file_hash, file_path FROM rpa_receipt_batches WHERE launch_id = $1`,
+     SELECT file_hash, file_path FROM rpa_receipt_batches WHERE launch_id = $1
+     UNION
+     SELECT source ->> 'file_hash', source ->> 'file_path'
+     FROM rpa_receipt_batches b, jsonb_array_elements(b.sources) source
+     WHERE b.launch_id = $1`,
     [launchId],
   );
   return rows;
@@ -164,10 +169,34 @@ async function update(id, data) {
   return findById(id);
 }
 
+/**
+ * A retencao: documentos e recibos do lancamento saem, com o PDF dos envios
+ * de recibos (que guarda nome, CPF e valor lidos). Devolve os arquivos, para
+ * o disco ser limpo depois do commit.
+ */
+async function deleteByLaunch(client, launchId) {
+  const { rows } = await client.query(
+    `WITH files AS (
+       DELETE FROM rpa_files WHERE launch_id = $1
+       RETURNING file_hash, file_path
+     ), batches AS (
+       DELETE FROM rpa_receipt_batches WHERE launch_id = $1
+       RETURNING file_hash, file_path, sources
+     )
+     SELECT * FROM files
+     UNION SELECT file_hash, file_path FROM batches
+     UNION SELECT source ->> 'file_hash', source ->> 'file_path'
+           FROM batches, jsonb_array_elements(batches.sources) source`,
+    [launchId],
+  );
+  return rows;
+}
+
 module.exports = {
   UPDATABLE_COLUMNS,
   countByHash,
   findFilesByLaunch,
+  deleteByLaunch,
   findDocuments,
   findById,
   insertDocuments,

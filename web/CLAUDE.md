@@ -87,6 +87,15 @@ JSX — o backend e que e CommonJS.
   badges.
 - A importacao devolve a equipe resumida: depois dela a lista recarrega da
   rota da equipe, senao CPF e funcao somem da tela.
+- Lancamento com `purged_at` (retencao, um mes depois de encerrar): sem
+  "Reabrir" e sem link de PDF de RPA, que a API recusa com 409. A data vem
+  pronta em Brasilia (`purge_on`, `purged_on`), formatada com `formatDate`.
+- O envio dos recibos e `FileDrop` com `multiple`: `onFile` recebe a lista, e
+  todos vao no campo `file`. O acompanhamento do envio para quando a aba sai
+  (a resposta atrasada nao agenda outra consulta) e quando a API recusa (4xx).
+- `listPayments` percorre as paginas ate o `meta.total`: a API devolve 100 por
+  vez, ordenados pelo numero do pagamento, e parar na primeira escondia os
+  RPAs mais novos (ha E2E com 101).
 
 ## Imagem do comprovante
 

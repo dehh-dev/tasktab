@@ -158,11 +158,18 @@ export default function EmissionTab({ launch }) {
             ))}
           </div>
 
-          <div className="toolbar">
-            <DownloadLink href={api.rpasZipUrl(launch.id, number)}>
-              RPAs do {number}º pagamento (.zip)
-            </DownloadLink>
-          </div>
+          {launch.purged_at ? (
+            <p className="state">
+              O PDF dos RPAs nao e mais gerado: a retencao apagou conta,
+              endereco e PIS da equipe.
+            </p>
+          ) : (
+            <div className="toolbar">
+              <DownloadLink href={api.rpasZipUrl(launch.id, number)}>
+                RPAs do {number}º pagamento (.zip)
+              </DownloadLink>
+            </div>
+          )}
 
           <ul className="list" aria-label={`RPAs do ${number}º pagamento`}>
             {current.map((payment) => (
@@ -177,11 +184,13 @@ export default function EmissionTab({ launch }) {
                     <span>Pagamento {formatDate(payment.payment_date)}</span>
                   </div>
                 </div>
-                <div className="list-item__actions">
-                  <DownloadLink href={api.rpaPdfUrl(payment.id)}>
-                    PDF
-                  </DownloadLink>
-                </div>
+                {!launch.purged_at && (
+                  <div className="list-item__actions">
+                    <DownloadLink href={api.rpaPdfUrl(payment.id)}>
+                      PDF
+                    </DownloadLink>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

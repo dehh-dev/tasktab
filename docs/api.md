@@ -76,9 +76,9 @@ Base: `/api/merchants` — o cadastro que da categoria ao comprovante.
 
 ### RPA de lancamentos
 
-Escopos `rpa:read` / `rpa:write`, por enquanto so do papel `admin`: o modulo
-guarda CPF, RG e conta bancaria de terceiros. O plano e as etapas estao na
-issue 35.
+Escopo `rpa:write` so do `admin`; `rpa:read` do `admin` e do `auditor`, que
+confere sem alterar. O modulo guarda CPF, RG e conta bancaria de terceiros. O
+plano e as etapas estao na issue 35.
 
 | Metodo  | Rota                     | Descricao                                          |
 | ------- | ------------------------ | -------------------------------------------------- |
@@ -125,6 +125,13 @@ lunch_in, end_time }]`, com `weekday` de 1 (segunda) a 7 (domingo); dia que
 nao vem e folga — e `rates` — as diarias por funcao, `[{ role, starts_on,
 ends_on, daily_cents, promoted_bonus_cents }]`, sem vigencias sobrepostas da
 mesma funcao. No `PATCH`, `schedule` e `rates` substituem a lista inteira.
+
+O lancamento devolve tambem `closed_at` (quando foi encerrado; reabrir limpa),
+`purge_on` (o dia, em Brasilia, a partir do qual a retencao apaga os dados
+pessoais: um mes depois de encerrar), `purged_at` e `purged_on` (quando
+apagou). Depois da retencao o lancamento nao reabre, e `rpa.pdf` e
+`rpas.zip` respondem `409`: o RPA impresso traz conta e endereco. Ver
+[seguranca.md](seguranca.md).
 
 `POST /api/rpa/launches/:id/import` recebe o `.xlsx` ou `.csv` baixado das
 respostas do Google Forms, em multipart no campo `file`. O arquivo e lido e
@@ -184,8 +191,9 @@ mesma empresa). `skipped` diz quem ficou de fora e por que: nada a pagar,
 desconto maior que o valor, dia sem diaria vigente.
 
 O liquido e o que a pessoa recebe; o bruto e o menor valor em centavos cujo
-liquido fecha no centavo, com o INSS truncado e o IRRF da tabela vigente na
-data do pagamento (em 2026, com a reducao da Lei 15.270/2025). O teto do
+liquido fecha no centavo, com INSS e IRRF cortados em duas casas (sem
+arredondar, como o sistema do RH) e o IRRF da tabela vigente na data do
+pagamento (em 2026, com a reducao da Lei 15.270/2025). O teto do
 INSS e o IRRF somam os RPAs do mes do mesmo CPF no mesmo CNPJ. Dia pago nao
 entra de novo; dia pago cujo ponto mudou entra no pagamento seguinte como
 `correction`, a mais ou a menos. O RPA emitido nao muda: `cancel` (com
@@ -226,17 +234,23 @@ por pessoa, com `CTPS`, `RG-CNH`, `CE` (comprovante de endereco) e `DB`
 `?email=true`, fotos acima de 1 MB saem reduzidas a 2.400 px no lado maior
 (JPEG q85); passando ainda de 25 MB, o cabecalho `X-Email-Warning` avisa.
 
-`POST /api/rpa/launches/:id/receipts?payment=n` recebe, no campo `file`, o
-PDF escaneado dos recibos assinados que o financeiro devolve (uma pagina por
-pessoa) e responde `202` com o envio (`pending`) e o `Location` dele. A
-leitura roda na fila: texto da pagina ou, sem texto, OCR. A pessoa sai do CPF
+`POST /api/rpa/launches/:id/receipts?payment=n` recebe, no campo `file`, os
+recibos assinados: um PDF por pessoa (o RPCI que o RH manda, de volta
+assinado), ou um PDF escaneado com todos, ate `UPLOAD_MAX_FILES` arquivos. O
+arquivo que nao e PDF e apontado pela ordem (`o 2º arquivo nao e um PDF`).
+Responde `202` com o envio (`pending`) e o `Location` dele. A leitura roda na
+fila, pelos arquivos na ordem do envio: texto da pagina ou, sem texto, OCR.
+Nome, liquido e data saem pela palavra da linha, inclusive no layout do RPCI
+do RH, onde o nome fica junto de "NOME COMPLETO" e o liquido vem tambem em
+"a importancia de R$". A pessoa sai do CPF
 (com o verificador conferido) e, sem CPF legivel, do primeiro e ultimo nome
 do cadastro. Em `GET /api/rpa/receipt-batches/:id`, quando `status` e `done`,
 `result` traz `matched` (pagina, pessoa, pagamento, como casou e o que foi
 lido), `missing` (quem nao teve recibo), `unmatched_pages`,
 `name_differences`, `value_differences` e `date_differences` — apontadas,
-nunca corrigidas. Cada pagina casada vira um PDF so dela, sem recomprimir, e o
-pagamento passa a `paid`. `GET /api/rpa/launches/:id/receipts.zip?payment=n`
+nunca corrigidas. O PDF de uma pagina so vai para a pessoa como veio (uma
+assinatura digital continua valendo); do PDF com varias, cada pagina casada
+vira um PDF so dela, sem recomprimir. O pagamento passa a `paid`. `GET /api/rpa/launches/:id/receipts.zip?payment=n`
 junta os recibos como `RECIBO NOME COMPLETO.pdf`, com o nome do cadastro.
 
 Campos da empresa: `code` (codigo UAU, inteiro, unico), `name` e `cnpj`

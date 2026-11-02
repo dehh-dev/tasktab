@@ -97,8 +97,12 @@ export default function ReceiptsTab({ launch, canWrite }) {
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
   const timer = useRef(null);
+  // A resposta que chega depois de sair da aba nao agenda outra consulta: o
+  // `clearTimeout` da limpeza so alcanca o timer que ainda nao disparou.
+  const active = useRef(true);
 
   useEffect(() => {
+    active.current = true;
     api
       .listPayments(launch.id)
       .then((response) => {
@@ -116,30 +120,42 @@ export default function ReceiptsTab({ launch, canWrite }) {
         setNumber((current) => current ?? found.at(-1) ?? null);
       })
       .catch((caught) => setError(toError(caught)));
-    return () => clearTimeout(timer.current);
+    return () => {
+      active.current = false;
+      clearTimeout(timer.current);
+    };
   }, [launch.id]);
 
+  // Um envio acompanhado por vez: o novo cancela o anterior. Falha de rede ou
+  // do servidor tenta de novo com espera crescente; recusa (4xx) para, porque
+  // repetir daria a mesma resposta.
   const follow = useCallback((id, delay = 1000) => {
+    clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
         const response = await api.getReceiptBatch(id);
+        if (!active.current) return;
         setBatch(response.data);
+        setError(null);
         if (['pending', 'processing'].includes(response.data.status)) {
           follow(id, Math.min(delay * 1.5, 5000));
         }
       } catch (caught) {
+        if (!active.current) return;
         setError(toError(caught));
-        follow(id, Math.min(delay * 2, 10000));
+        const refused =
+          caught.status >= 400 && caught.status < 500 && caught.status !== 429;
+        if (!refused) follow(id, Math.min(delay * 2, 10000));
       }
     }, delay);
   }, []);
 
-  async function upload(file) {
+  async function upload(files) {
     setSending(true);
     setError(null);
     setBatch(null);
     try {
-      const response = await api.uploadSignedReceipts(launch.id, number, file);
+      const response = await api.uploadSignedReceipts(launch.id, number, files);
       setBatch(response.data);
       follow(response.data.id);
     } catch (caught) {
@@ -180,9 +196,10 @@ export default function ReceiptsTab({ launch, canWrite }) {
 
           {canWrite && (
             <FileDrop
-              label={`Arraste o PDF dos recibos assinados do ${number}º pagamento, ou clique para escolher`}
+              label={`Arraste o PDF dos recibos assinados do ${number}º pagamento (o escaneado com todos, ou um PDF por pessoa), ou clique para escolher`}
               accept="application/pdf"
               disabled={sending}
+              multiple
               onFile={upload}
             />
           )}

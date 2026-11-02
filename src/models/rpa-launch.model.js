@@ -2,6 +2,11 @@
 
 const db = require('../config/database');
 
+// Retencao (decisao de 2026-11-01): um mes depois de encerrado, os dados
+// pessoais da equipe e os arquivos saem. `purge_on` e o dia em Brasilia a
+// partir do qual a varredura os apaga; `purged_on`, o dia em que apagou.
+const RETENTION = "interval '1 month'";
+
 // O horario padrao e as diarias vem junto, como arrays: sao parte da
 // definicao do lancamento, e a tela os edita com ele.
 const SELECT = `
@@ -10,6 +15,10 @@ const SELECT = `
          l.city, l.state, l.development, l.starts_on, l.ends_on, l.holidays,
          l.service_type, l.cost_center, l.site, l.product, l.supply,
          l.email_to, l.email_cc, l.first_payment_daily_only, l.status,
+         l.closed_at, l.purged_at,
+         ((l.closed_at AT TIME ZONE 'America/Sao_Paulo') + ${RETENTION})::date
+           AS purge_on,
+         (l.purged_at AT TIME ZONE 'America/Sao_Paulo')::date AS purged_on,
          l.created_by, l.created_at, l.updated_at,
          COALESCE((
            SELECT json_agg(json_build_object(
@@ -238,6 +247,39 @@ async function remove(id) {
   return rows[0] || null;
 }
 
+/** Os lancamentos encerrados ha mais de um mes que ainda tem os dados. */
+async function findExpired() {
+  const { rows } = await db.query(
+    `SELECT id FROM rpa_launches
+     WHERE status = 'closed' AND purged_at IS NULL
+       AND closed_at <= now() - ${RETENTION}
+     ORDER BY id`,
+  );
+  return rows.map((row) => row.id);
+}
+
+/**
+ * Trava o lancamento vencido e confere de novo, dentro da transacao: quem o
+ * reabriu entre a busca e a trava fica com os dados. `null` se nao vale mais.
+ */
+async function lockExpired(client, id) {
+  const { rows } = await client.query(
+    `SELECT id FROM rpa_launches
+     WHERE id = $1 AND status = 'closed' AND purged_at IS NULL
+       AND closed_at <= now() - ${RETENTION}
+     FOR UPDATE`,
+    [id],
+  );
+  return rows[0] || null;
+}
+
+async function markPurged(client, id) {
+  await client.query(
+    'UPDATE rpa_launches SET purged_at = now() WHERE id = $1',
+    [id],
+  );
+}
+
 /** Trava o lancamento ate o fim da transacao: duas importacoes nao se cruzam. */
 async function lock(client, id) {
   await client.query('SELECT id FROM rpa_launches WHERE id = $1 FOR UPDATE', [
@@ -255,4 +297,7 @@ module.exports = {
   countPayments,
   remove,
   lock,
+  findExpired,
+  lockExpired,
+  markPurged,
 };

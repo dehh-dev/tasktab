@@ -4,7 +4,8 @@ O modulo substitui a planilha `CONTROLE DE DIARIA - <cidade>.xlsb` (plano em
 issue 35). Aqui ficam a importacao das respostas do Google Forms (issue 37),
 a grade do ponto com o calculo das diarias (issue 38), os pagamentos com o
 bruto e os impostos (issue 39), a emissao: PDF, .zip e e-mail (issue 40), os
-documentos do formulario (issue 41) e os recibos assinados (issue 42).
+documentos do formulario (issue 41), os recibos assinados (issue 42) e a
+retencao dos dados pessoais.
 
 ## Importacao (`import.service.js`)
 
@@ -132,10 +133,11 @@ pendencia barra a importacao.
   centavo. INSS e IRRF so crescem com o bruto, entao o liquido anda -1, 0 ou
   +1 por centavo: busca binaria e uma janela de 10 centavos abaixo. Ha teste
   varrendo liquidos de R$ 1 a R$ 15 mil.
-- **Arredondamento dos impostos** em `ROUNDING` (`taxes.js`): INSS truncado
-  (o financeiro devolveu R$ 650,01 para o RPA de R$ 650,00 da planilha), IRRF
-  no arredondamento comum, os dois **pendentes de confirmacao com o
-  financeiro** (issue 35).
+- **Imposto corta em duas casas, sem arredondar** (`ROUNDING` em
+  `taxes.js`), INSS e IRRF, decisao de 2026-11-01. E o que o sistema do RH
+  (Senior) faz: o RPCI de Avare devolveu R$ 650,01 para o RPA de R$ 650,00 da
+  planilha, com o INSS de 80,3374 cobrado como 80,33. O total da pessoa nao
+  muda: continua arredondado como no item acima.
 - **O mes acumula por CPF e CNPJ**, em qualquer lancamento: a base do INSS
   deste RPA e o que falta para o teto; o IRRF e o do mes inteiro menos o ja
   retido; a base gravada e a parte deste RPA na base do mes.
@@ -214,6 +216,15 @@ pendencia barra a importacao.
 
 ## Recibos assinados (`receipt-reading.js`, `receipts.service.js`)
 
+- **O RH manda um RPCI por pessoa** (Senior, A4, com camada de texto; visto
+  num recibo real de Avare em 2026-11-01), e cada um volta assinado no proprio
+  PDF. O envio aceita varios PDFs no campo `file` (ate `UPLOAD_MAX_FILES`) ou
+  o escaneado com todos. A leitura percorre um PDF so, os enviados juntos na
+  ordem; cada original fica em `sources`, com a faixa de paginas dele.
+- **PDF de uma pagina vai para a pessoa como veio**, sem `copyPages`: e o
+  recibo inteiro, e uma copia perderia a assinatura digital (gov.br). Do PDF
+  com varias paginas, a pagina e copiada (abaixo). Ha teste byte a byte dos
+  dois.
 - **A leitura roda na fila** (`extraction/queue.js`), como o reprocessamento
   do comprovante: o `POST` grava o PDF pelo hash, cria o envio
   (`rpa_receipt_batches`, `pending`) e responde `202`. A tela acompanha pelo
@@ -230,7 +241,14 @@ pendencia barra a importacao.
   vale mais que o nome.** Cada pessoa pega a primeira pagina dela; a segunda
   vai para as sem pessoa, como repetida.
 - Nome, liquido e data lidos pela palavra da linha (`nome`, `liquido`,
-  `data`). Diferenca e **apontada, nunca corrigida** — o recibo de R$ 650,01
+  `data`). No RPCI do RH a camada de texto vem fora da ordem da pagina: o nome
+  fica numa linha so, **antes** do rotulo "NOME COMPLETO" (no OCR, depois), e
+  o "LIQUIDO:" vem sem o valor. Por isso o rotulo sozinho busca o nome na
+  linha vizinha que so tem nome (`LABEL_WORDS` barra os rotulos), "nome ou
+  razao social" e sempre a empresa, e o liquido sem valor na linha sai de "a
+  importancia de R$". O teste reproduz as duas ordens com dados sinteticos; o
+  recibo real nao entra no repositorio. Diferenca e **apontada, nunca
+  corrigida** — o recibo de R$ 650,01
   continua contra o RPA de R$ 650,00, e o pagamento vira pago assim mesmo.
 - A pagina separada e **copiada** (`copyPages`), sem recomprimir: a imagem e a
   mesma, byte a byte (ha teste do stream). O PDF dela sai sem data
@@ -240,3 +258,23 @@ pendencia barra a importacao.
   do recibo, que pode vir com erro de digitacao.
 - O log leva so o id do envio e contagens; CPF, nome e valor ficam no
   resultado, no banco.
+
+## Retencao (`retention.service.js`, decisao de 2026-11-01)
+
+- **Um mes depois de encerrado**, o lancamento perde documentos, recibos e
+  envios de recibo (banco e disco, pela contagem por referencia de
+  `src/services/retention.service.js`) e os dados pessoais da equipe
+  (`Worker.PERSONAL_COLUMNS` viram nulo, pendencias somem). Ficam nome, CPF,
+  funcao, datas, dependentes e os RPAs inteiros.
+- O prazo conta de `closed_at`, mantido pelo banco (ver `src/models/CLAUDE.md`).
+  `purge_on` e `purged_on` saem do model ja em Brasilia.
+- A varredura roda **dentro da API**: na subida e a cada seis horas
+  (`startRetentionSweep` no `server.js`), sem cron. Cada lancamento e uma
+  transacao que trava e confere de novo (`lockExpired`): quem reabriu no meio
+  fica com os dados. O disco so e limpo depois do commit. Falha vira `warn` e
+  a proxima rodada tenta de novo.
+- Depois dela, **nao reabre** e o PDF do RPA (`rpa.pdf`, `rpas.zip`) e `409`
+  (`launchPurged` em `access.service.js`): o RPA impresso traz conta e
+  endereco, que ja nao existem.
+- O log leva so o id do lancamento e contagens. O teste sobe uma API propria
+  (`startApiInstance`) para exercitar a varredura de verdade, e confere o log.

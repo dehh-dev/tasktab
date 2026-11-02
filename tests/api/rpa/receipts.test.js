@@ -238,3 +238,103 @@ describe('POST /api/rpa/launches/:id/receipts', () => {
     expect(refused.status).toBe(409);
   });
 });
+
+/**
+ * O RPCI do RH (Senior), como o recibo real de Avare: um PDF por pessoa, de
+ * uma pagina, com camada de texto. O nome fica embaixo do rotulo "NOME
+ * COMPLETO", e o liquido esta em "a importancia de R$". Dados sinteticos.
+ */
+function seniorReceipt(person, { net = '650,00' } = {}) {
+  const cpf = person.worker.cpf.replace(
+    /(\d{3})(\d{3})(\d{3})(\d{2})/,
+    '$1.$2.$3-$4',
+  );
+  return makePdf({
+    size: [596, 842],
+    lines: [
+      'Recibo de Pagamento a Contribuinte Individual - RPCI',
+      'NOME OU RAZAO SOCIAL DA EMPRESA',
+      'EMPRESA SINTETICA SPE LTDA',
+      `Recebi da empresa acima identificada a importancia de R$ ${net} -- ( reais )`,
+      `CPF: ${cpf}`,
+      'LIQUIDO:',
+      'Avare - SP',
+      'NOME COMPLETO',
+      person.receipt,
+    ],
+  });
+}
+
+describe('POST /api/rpa/launches/:id/receipts: um PDF por pessoa', () => {
+  it('le os PDFs enviados juntos, e o recibo de cada um e o arquivo como veio', async () => {
+    const { launch, people } = await arrange();
+    const sent = [
+      await seniorReceipt(people[1]),
+      await seniorReceipt(people[0], { net: '650,01' }),
+    ];
+
+    const response = await requestUpload(
+      `/api/rpa/launches/${launch.id}/receipts?payment=1`,
+      sent.map((buffer, index) => ({
+        buffer,
+        filename: `RECIBO ${index}.pdf`,
+      })),
+      { field: 'file' },
+    );
+    await waitForQueue({ timeoutMs: 120000 });
+    const batch = await batchOf(response);
+
+    expect(response.status).toBe(202);
+    expect(batch).toMatchObject({ status: 'done', page_count: 2 });
+    expect(
+      batch.result.matched.map(({ page, by, worker_number: n }) => ({
+        page,
+        by,
+        n,
+      })),
+    ).toEqual([
+      { page: 1, by: 'cpf', n: 2 },
+      { page: 2, by: 'cpf', n: 1 },
+    ]);
+    expect(batch.result.name_differences).toEqual([]);
+    expect(batch.result.value_differences).toEqual([
+      expect.objectContaining({
+        worker_number: 1,
+        net_read_cents: 65001,
+        net_cents: 65000,
+      }),
+    ]);
+    expect(batch.result.missing.map((entry) => entry.worker_number)).toEqual([
+      3, 4, 5,
+    ]);
+
+    // Byte a byte o arquivo enviado: nem a pagina e copiada.
+    const files = await receiptsZip(launch.id);
+    expect(Object.keys(files)).toEqual([
+      'RECIBO JOÃO ARAÚJO.pdf',
+      'RECIBO MARIA DA CONCEIÇÃO SILVA.pdf',
+    ]);
+    expect(files['RECIBO JOÃO ARAÚJO.pdf'].equals(sent[0])).toBe(true);
+    expect(files['RECIBO MARIA DA CONCEIÇÃO SILVA.pdf'].equals(sent[1])).toBe(
+      true,
+    );
+  }, 120000);
+
+  it('o arquivo que nao e PDF e apontado pela ordem, sem o nome', async () => {
+    const { launch, people } = await arrange();
+
+    const response = await requestUpload(
+      `/api/rpa/launches/${launch.id}/receipts?payment=1`,
+      [
+        { buffer: await seniorReceipt(people[0]), filename: 'RECIBO A.pdf' },
+        { buffer: Buffer.from('nao e pdf'), filename: 'RECIBO MARIA.pdf' },
+      ],
+      { field: 'file' },
+    );
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      { field: 'file', message: 'o 2º arquivo nao e um PDF' },
+    ]);
+  });
+});

@@ -58,6 +58,97 @@ describe('leitura do recibo', () => {
   });
 });
 
+/**
+ * O RPCI que o RH gera no Senior (FPTE004.COL), um PDF por pessoa e com
+ * camada de texto, conferido contra um recibo real de Avare (out/2026). Os
+ * dados aqui sao sinteticos; a forma e a do real.
+ *
+ * Na camada de texto as linhas vem fora da ordem da pagina: o nome fica
+ * **antes** do rotulo "NOME COMPLETO", e o valor do "LIQUIDO:" vem depois do
+ * total de descontos. O OCR do recibo assinado e escaneado le na ordem da
+ * pagina, com o nome **depois** do rotulo.
+ */
+const SENIOR_TEXT_LAYER = [
+  'N* RECIBO',
+  '000000007',
+  'MATRÍCULA (CEI ou CNPJ)',
+  'INSS/PIS:',
+  'CPF:',
+  'NÚMERO DE INSCRIÇÃO',
+  'Valor Serviço Prestado:',
+  'DATALOCALIDADE',
+  '22/10/2026',
+  '00000000000',
+  '529.982.247-25',
+  'NOME OU RAZÃO SOCIAL DA EMPRESA',
+  'Recibo de Pagamento a Contribuinte Individual - RPCI',
+  'RUA SINTETICA , 100',
+  'BAIRRO SINTETICO',
+  'EMPRESA SINTETICA SPE LTDA',
+  'Avare - SP',
+  'MARIA DA CONCEICAO SILVA',
+  'NOME COMPLETO',
+  'ASSINATURA',
+  '1. Contr. INSS:',
+  '730,33',
+  '80,33',
+  'LÍQUIDO:',
+  '80,33',
+  '650,00',
+  'Total Desctos:',
+  '26.048.802/0001-65',
+  'Recebi da empresa acima identificada, pela prestação dos serviços de SERVIÇOS ADMINISTRATIVOS DE VENDAS, a importância de R$',
+  '650,00 -- ( seiscentos e cinquenta reais ), conforme discriminativo abaixo :',
+  'Data Pagto Empresa Base INSS Base Acumulada Desconto INSSCompetência',
+  '22/10/2026 730,33 730,33 80,33EMPRESA SINTETICA SPE LTDA10/2026',
+  'TETO INSS: 8.475,55',
+].join('\n');
+
+const SENIOR_PAGE_ORDER = [
+  'Recibo de Pagamento a Contribuinte Individual - RPCI   N* RECIBO',
+  'NOME OU RAZAO SOCIAL DA EMPRESA   MATRICULA (CEI ou CNPJ)',
+  'EMPRESA SINTETICA SPE LTDA   26.048.802/0001-65',
+  'Recebi da empresa acima identificada, pela prestacao dos servicos de SERVICOS ADMINISTRATIVOS DE VENDAS, a importancia de R$',
+  '650,00 -- ( seiscentos e cinquenta reais ), conforme discriminativo abaixo :',
+  'INSS/PIS: 00000000000   Valor Servico Prestado: 730,33',
+  'CPF: 529.982.247-25',
+  '1. Contr. INSS: 80,33',
+  'Total Desctos: 80,33',
+  'LOCALIDADE   DATA   LIQUIDO: 650,00',
+  'ASSINATURA',
+  'Avare - SP   22/10/2026',
+  'NOME COMPLETO',
+  'MARIA DA CONCEICAO SILVA',
+].join('\n');
+
+describe('o RPCI do RH (Senior)', () => {
+  it.each([
+    ['camada de texto', SENIOR_TEXT_LAYER],
+    ['ordem da pagina (OCR)', SENIOR_PAGE_ORDER],
+  ])('na %s, le nome, CPF, liquido e data', (_, page) => {
+    expect(readName(page)).toBe('MARIA DA CONCEICAO SILVA');
+    expect(readCpfs(page)).toEqual(['52998224725']);
+    expect(readNetCents(page)).toBe(65000);
+    expect(readDate(page)).toBe('2026-10-22');
+  });
+
+  it('"nome ou razao social" e a empresa, nunca a pessoa', () => {
+    expect(
+      readName('NOME OU RAZÃO SOCIAL DA EMPRESA\nEMPRESA SINTETICA SPE LTDA'),
+    ).toBeNull();
+  });
+
+  it('o rotulo sozinho sem um nome ao lado nao inventa um', () => {
+    expect(readName('NOME COMPLETO\nASSINATURA\n22/10/2026')).toBeNull();
+  });
+
+  it('sem valor na linha do liquido, vale "a importancia de R$" do corpo', () => {
+    expect(
+      readNetCents('LIQUIDO:\n17,30\na importancia de R$ 1.140,00 -- ( mil )'),
+    ).toBe(114000);
+  });
+});
+
 describe('matchPage', () => {
   it('casa pelo CPF, mesmo com o nome errado no recibo', () => {
     expect(matchPage(PAGE, CANDIDATES)).toMatchObject({

@@ -14,8 +14,9 @@ const launchValidator = require('../validators/rpa-launch.validator');
 const paymentValidator = require('../validators/rpa-payment.validator');
 
 /**
- * POST /api/rpa/launches/:id/receipts?payment=n — o PDF escaneado dos
- * recibos. Responde 202: a leitura segue na fila, e o resultado sai em
+ * POST /api/rpa/launches/:id/receipts?payment=n — os recibos assinados: o
+ * PDF escaneado com todos, ou um PDF por pessoa, no campo `file`. Responde
+ * 202: a leitura segue na fila, e o resultado sai em
  * GET /api/rpa/receipt-batches/:id.
  */
 async function create(req, res) {
@@ -23,10 +24,11 @@ async function create(req, res) {
   const launch = await loadLaunch(id, { write: true });
   const number = paymentValidator.validateDocumentQuery(req.query);
 
-  if (!req.file) {
+  if (!req.files?.length) {
     throw new ValidationError({
-      message: 'Envie o PDF escaneado dos recibos.',
-      action: 'Anexe o PDF que o financeiro devolveu no campo "file".',
+      message: 'Envie o PDF dos recibos assinados.',
+      action:
+        'Anexe no campo "file" o PDF escaneado com todos, ou um PDF por pessoa.',
       details: [{ field: 'file', message: 'arquivo obrigatorio' }],
     });
   }
@@ -34,13 +36,18 @@ async function create(req, res) {
   const batch = await startReceipts({
     launch,
     number,
-    buffer: req.file.buffer,
+    buffers: req.files.map((file) => file.buffer),
     createdBy: req.user.id,
     log: req.log,
   });
 
   req.log.info(
-    { launch_id: id, batch_id: batch.id, pages: batch.page_count },
+    {
+      launch_id: id,
+      batch_id: batch.id,
+      files: req.files.length,
+      pages: batch.page_count,
+    },
     'recibos enviados',
   );
 

@@ -163,22 +163,35 @@ describe('PATCH /api/rpa/companies/:id', () => {
 });
 
 describe('quem alcanca o cadastro de empresas', () => {
-  it.each(['user', 'auditor'])(
-    'o papel %s nao le nem escreve: o modulo e so do admin por enquanto',
-    async (role) => {
-      const { token } = await createUserWithSession({ role });
+  it('o papel user nao le nem escreve', async () => {
+    const { token } = await createUserWithSession({ role: 'user' });
 
-      const list = await request('GET', '/api/rpa/companies', undefined, {
-        token,
-      });
-      const create = await request('POST', '/api/rpa/companies', VALID, {
-        token,
-      });
+    const list = await request('GET', '/api/rpa/companies', undefined, {
+      token,
+    });
+    const create = await request('POST', '/api/rpa/companies', VALID, {
+      token,
+    });
 
-      expect([list.status, create.status]).toEqual([403, 403]);
-      expect(list.body.message).toBe(
-        'Sua conta nao tem permissao para: rpa:read.',
-      );
-    },
-  );
+    expect([list.status, create.status]).toEqual([403, 403]);
+    expect(list.body.message).toBe(
+      'Sua conta nao tem permissao para: rpa:read.',
+    );
+  });
+
+  it('o auditor le para conferir, mas nao escreve', async () => {
+    const { token } = await createUserWithSession({ role: 'auditor' });
+
+    const list = await request('GET', '/api/rpa/companies', undefined, {
+      token,
+    });
+    const create = await request('POST', '/api/rpa/companies', VALID, {
+      token,
+    });
+
+    expect([list.status, create.status]).toEqual([200, 403]);
+    expect(create.body.message).toBe(
+      'Sua conta nao tem permissao para: rpa:write.',
+    );
+  });
 });

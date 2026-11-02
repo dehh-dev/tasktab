@@ -58,8 +58,15 @@ cada recusa conferida pelo nome da constraint:
   Receita). O `clearDatabase` dos testes nao as trunca. Tabela de imposto nova
   e linha nova numa migration nova: o IRRF vale pela maior `starts_on` ate a
   data, e o RPA emitido guarda o id da que usou.
-- `rpa_files` e `rpa_receipt_batches` (o PDF escaneado dos recibos, issue 42)
-  dividem o diretorio de upload com `receipts`: a retencao conta as tres
-  tabelas (`REFERENCE_COUNTERS` em `retention.service.js`). Tabela nova que
-  grave ali entra na lista. Apagar lancamento leva `rpa_files` em cascata
-  — levante os arquivos **antes**, como no `report.destroy`.
+- `rpa_files` e `rpa_receipt_batches` (o PDF dos recibos, issue 42, e cada
+  arquivo enviado com ele em `sources`) dividem o diretorio de upload com
+  `receipts`: a retencao conta as tres tabelas, `sources` inclusive
+  (`REFERENCE_COUNTERS` em `retention.service.js`). Tabela ou coluna nova que
+  aponte para o disco entra na contagem. Apagar lancamento leva `rpa_files` em
+  cascata — levante os arquivos **antes**, como no `report.destroy`.
+- **Retencao do lancamento** (migration `add-rpa-launch-retention`): o trigger
+  `rpa_launches_track_closed` marca `closed_at` ao encerrar e limpa ao
+  reabrir, inclusive por psql; `rpa_launches_closed_at_matches_status` amarra
+  os dois, e `rpa_launches_purged_stays_closed` recusa reabrir o lancamento
+  cujos dados a retencao ja apagou. O encerrado antes da migration conta do
+  ultimo `updated_at`. Teste em `tests/db/rpa-schema.test.js`.

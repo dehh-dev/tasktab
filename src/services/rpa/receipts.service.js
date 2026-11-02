@@ -51,19 +51,50 @@ async function store(hash, data) {
   return filePath;
 }
 
-/**
- * Recebe o PDF, confere que e PDF e que o pagamento existe, e enfileira a
- * leitura. Devolve o envio `pending`: a tela acompanha pelo id.
- */
-async function startReceipts({ launch, number, buffer, createdBy, log }) {
-  if (!isPdf(buffer)) throw invalidFile('o arquivo nao e um PDF');
+/** Cada arquivo conferido; o erro diz qual pela ordem, nunca pelo nome. */
+async function readSources(buffers) {
+  const sources = [];
+  let firstPage = 1;
 
-  let pageCount;
-  try {
-    pageCount = await countPages(buffer);
-  } catch {
-    throw invalidFile('o PDF nao abre');
+  for (const [index, buffer] of buffers.entries()) {
+    const which = buffers.length > 1 ? `o ${index + 1}º arquivo` : 'o arquivo';
+    if (!isPdf(buffer)) throw invalidFile(`${which} nao e um PDF`);
+
+    let pageCount;
+    try {
+      pageCount = await countPages(buffer);
+    } catch {
+      throw invalidFile(`${which} nao abre como PDF`);
+    }
+
+    sources.push({ buffer, first_page: firstPage, page_count: pageCount });
+    firstPage += pageCount;
   }
+
+  return sources;
+}
+
+/** Os PDFs enviados juntos, na ordem, num so: e o que a leitura percorre. */
+async function joined(sources) {
+  if (sources.length === 1) return sources[0].buffer;
+
+  const document = await PDFDocument.create({ updateMetadata: false });
+  for (const { buffer } of sources) {
+    const source = await PDFDocument.load(buffer, { updateMetadata: false });
+    const pages = await document.copyPages(source, source.getPageIndices());
+    for (const page of pages) document.addPage(page);
+  }
+  return Buffer.from(await document.save());
+}
+
+/**
+ * Recebe os PDFs (o escaneado com todos, ou um por pessoa), confere que sao
+ * PDF e que o pagamento existe, e enfileira a leitura. Devolve o envio
+ * `pending`: a tela acompanha pelo id.
+ */
+async function startReceipts({ launch, number, buffers, createdBy, log }) {
+  const sources = await readSources(buffers);
+  const pageCount = sources.reduce((total, src) => total + src.page_count, 0);
 
   const payments = await Payment.findDocumentsByNumber(launch.id, number);
   if (payments.length === 0) {
@@ -74,13 +105,26 @@ async function startReceipts({ launch, number, buffer, createdBy, log }) {
     });
   }
 
-  const hash = sha256(buffer);
+  const stored = [];
+  for (const { buffer, ...pages } of sources) {
+    const hash = sha256(buffer);
+    stored.push({
+      file_hash: hash,
+      file_path: await store(hash, buffer),
+      byte_size: buffer.length,
+      ...pages,
+    });
+  }
+
+  const read = await joined(sources);
+  const hash = sha256(read);
   const batch = await Batch.create({
     launch_id: launch.id,
     payment_number: number,
     file_hash: hash,
-    file_path: await store(hash, buffer),
+    file_path: await store(hash, read),
     page_count: pageCount,
+    sources: stored,
     created_by: createdBy,
   });
 
@@ -220,6 +264,21 @@ function analyze(texts, payments) {
   return result;
 }
 
+/** Os arquivos do envio; o anterior a `sources` e o proprio PDF lido. */
+function sourcesOf(batch, buffer) {
+  if (batch.sources.length > 0) return batch.sources;
+
+  return [
+    {
+      file_hash: batch.file_hash,
+      file_path: batch.file_path,
+      byte_size: buffer.length,
+      first_page: 1,
+      page_count: batch.page_count,
+    },
+  ];
+}
+
 /**
  * A leitura de um envio, na fila. Falha vira `failed` com mensagem publica;
  * o erro de verdade vai para o log so com o id do envio.
@@ -239,9 +298,28 @@ async function processBatch(id, log = logger) {
     const texts = await pageTexts(buffer);
     const result = analyze(texts, payments);
     const source = await PDFDocument.load(buffer, { updateMetadata: false });
+    const files = sourcesOf(batch, buffer);
     const receipts = [];
 
     for (const entry of result.matched) {
+      const from = files.find(
+        (file) =>
+          entry.page >= file.first_page &&
+          entry.page < file.first_page + file.page_count,
+      );
+      // Arquivo de uma pagina so vai como veio: e o recibo inteiro da pessoa,
+      // e uma copia da pagina perderia a assinatura digital dele.
+      if (from?.page_count === 1) {
+        receipts.push({
+          worker_id: entry.worker_id,
+          payment_id: entry.payment_id,
+          file_hash: from.file_hash,
+          file_path: from.file_path,
+          byte_size: from.byte_size,
+        });
+        continue;
+      }
+
       const data = await singlePage(source, entry.page - 1);
       const hash = sha256(data);
       receipts.push({

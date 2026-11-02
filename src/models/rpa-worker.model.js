@@ -44,6 +44,32 @@ const UPDATABLE_COLUMNS = [
 
 const WRITABLE = [...UPDATABLE_COLUMNS, 'form_submitted_at', 'issues'];
 
+// O que a retencao apaga um mes depois de encerrar (decisao de 2026-11-01).
+// Ficam nome e CPF, que estao no codigo e no historico dos RPAs, e o que e do
+// trabalho: funcao, datas e dependentes.
+const PERSONAL_COLUMNS = [
+  'email',
+  'rg',
+  'rg_issued_on',
+  'birth_date',
+  'birth_place',
+  'pis',
+  'address',
+  'district',
+  'city',
+  'cep',
+  'mother_name',
+  'father_name',
+  'bank_code',
+  'bank_name',
+  'agency',
+  'bank_operation',
+  'account',
+  'account_type',
+  'pix_key_type',
+  'pix_key',
+];
+
 function valueOf(column, value) {
   return column === 'issues' ? JSON.stringify(value ?? []) : (value ?? null);
 }
@@ -140,8 +166,22 @@ async function update(id, data, client = db) {
   return rows[0] || null;
 }
 
+/** A retencao: os dados pessoais da equipe inteira viram nulo. */
+async function erasePersonalData(client, launchId) {
+  const { rowCount } = await client.query(
+    `UPDATE rpa_workers
+     SET ${PERSONAL_COLUMNS.map((column) => `${column} = NULL`).join(', ')},
+         issues = '[]'
+     WHERE launch_id = $1`,
+    [launchId],
+  );
+  return rowCount;
+}
+
 module.exports = {
   UPDATABLE_COLUMNS,
+  PERSONAL_COLUMNS,
+  erasePersonalData,
   findByLaunch,
   findRoster,
   findById,

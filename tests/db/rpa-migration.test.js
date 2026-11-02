@@ -37,8 +37,9 @@ describe('migrations do RPA', () => {
     }
 
     expect(removed).toEqual({ enums: 0, tables: 0, functions: 0 });
-    // A que anula os dias do cancelado e as tres travas do RPA emitido.
-    expect(await rpaObjects()).toEqual({ enums: 10, tables: 13, functions: 4 });
+    // A que anula os dias do cancelado, as tres travas do RPA emitido e a que
+    // marca quando o lancamento foi encerrado (retencao).
+    expect(await rpaObjects()).toEqual({ enums: 10, tables: 13, functions: 5 });
     expect(await enumLabels('rpa_adjustment_kind')).toEqual([
       'bonus',
       'addition',

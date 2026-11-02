@@ -129,9 +129,14 @@ O processo esta em [rpa.md](rpa.md). A tela segue a ordem dele: a lista de
 lancamentos e, dentro de um, as etapas Equipe, Ponto, Pagamentos, Emissao,
 Documentos e Recibos, uma por vez.
 
-- **Somente leitura** sem `rpa:write` ou com o lancamento encerrado: somem os
-  envios, os botoes de corrigir, emitir e cancelar, e a grade do ponto deixa
-  de ser clicavel.
+- **Somente leitura** sem `rpa:write` (o auditor) ou com o lancamento
+  encerrado: somem os envios, os botoes de corrigir, emitir e cancelar, e a
+  grade do ponto deixa de ser clicavel.
+- O lancamento encerrado diz a partir de que dia os dados pessoais saem (um
+  mes depois). Depois da retencao, a tela avisa, o "Reabrir" some e os links
+  do PDF dos RPAs tambem.
+- Os recibos assinados vao de uma vez: varios PDFs (um por pessoa) ou o
+  escaneado com todos, no mesmo campo.
 - **Pendencia e diferenca tem texto**, nunca so cor: "Pendencia: CPF com
   digito verificador invalido", "dia curto", "sem diaria", "alterado",
   "Valor diferente na pagina 3". A celula alterada do ponto tem fundo e a

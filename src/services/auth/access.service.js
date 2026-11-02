@@ -149,6 +149,19 @@ function launchClosed(id) {
 }
 
 /**
+ * A retencao ja apagou os dados pessoais (um mes depois de encerrar): o que
+ * dependia deles, como o PDF do RPA e reabrir, nao volta.
+ */
+function launchPurged(launch) {
+  const day = launch.purged_on.split('-').reverse().join('/');
+  return new ConflictError({
+    message: `O lancamento ${launch.id} teve os dados pessoais apagados pela retencao em ${day}.`,
+    action:
+      'Os valores dos RPAs continuam no historico; a via assinada fica com o financeiro.',
+  });
+}
+
+/**
  * O lancamento do RPA. Nao tem dono: e compartilhado entre quem tem `rpa:*`,
  * como tarefas e emitentes, e o escopo ja foi conferido na rota. Fica aqui
  * mesmo assim para o 404 sair de um lugar so, como no `loadReport`.
@@ -227,6 +240,7 @@ async function loadRpaFile(id, { write = false } = {}) {
 }
 
 module.exports = {
+  launchPurged,
   loadReceiptBatch,
   loadRpaFile,
   loadReport,

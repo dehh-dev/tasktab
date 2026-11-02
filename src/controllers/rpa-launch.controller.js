@@ -4,7 +4,7 @@ const Launch = require('../models/rpa-launch.model');
 const Company = require('../models/rpa-company.model');
 const Worker = require('../models/rpa-worker.model');
 const RpaFile = require('../models/rpa-file.model');
-const { loadLaunch } = require('../services/auth/access.service');
+const { loadLaunch, launchPurged } = require('../services/auth/access.service');
 const { importResponses } = require('../services/rpa/import.service');
 const retention = require('../services/retention.service');
 const { ConflictError, ValidationError } = require('../../infra/errors');
@@ -73,6 +73,12 @@ async function update(req, res) {
   const current = await loadLaunch(id, { write: true, allowClosed: true });
   const data = validator.validateUpdate(req.body, current);
   const reopening = Object.keys(data).length === 1 && data.status === 'open';
+
+  // Sem os dados pessoais, reabrir so serviria para emitir RPA sem conta nem
+  // endereco.
+  if (current.purged_at) {
+    throw launchPurged(current);
+  }
 
   if (current.status === 'closed' && !reopening) {
     throw new ConflictError({
