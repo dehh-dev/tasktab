@@ -2,8 +2,9 @@ node_modules/
 coverage/
 web/dist/
 
-# Arquivos enviados pelos usuarios
+# Arquivos enviados pelos usuarios, e os da suite (env.test)
 uploads/
+uploads-test/
 
 # Dados de idioma do tesseract
 .cache/

@@ -10,6 +10,9 @@
 - Dev usa `tasktab_development`; testes, `tasktab_test`, criado pelo
   `docker/initdb/` so na **primeira** subida do volume. Se o de teste sumir:
   `npm run services:down -- -v` e subir de novo.
+- Arquivo enviado: dev em `uploads/`, testes em `uploads-test/`
+  (`UPLOAD_DIR` do `env.test`). A retencao conta referencias no banco do
+  proprio ambiente; com um diretorio so, um podia apagar o arquivo do outro.
 
 ## Datas
 

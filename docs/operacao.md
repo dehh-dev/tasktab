@@ -18,7 +18,7 @@ ambiente (nao existe `env.production` versionado).
 | `RATE_LIMIT_BATCH_WRITE_MAX`                          | Teto das rotas em lote (padrao 600)        |
 | `RATE_LIMIT_AUTH_MAX`                                 | Teto do login (padrao 20)                  |
 | `RATE_LIMIT_ENABLED`                                  | `true` liga em teste, `false` desliga      |
-| `UPLOAD_DIR`                                          | Onde os PDFs sao gravados                  |
+| `UPLOAD_DIR`                                          | Onde os PDFs sao gravados (`uploads`)      |
 | `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo                 |
 | `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao                    |
 | `RPA_DOCUMENTS_MAX_BYTES`                             | .zip dos documentos do RPA (padrao 200 MB) |

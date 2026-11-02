@@ -215,16 +215,44 @@ test('sugestao de duplicata: marcar avanca, dispensar so esconde', async ({
   const alert = page.locator('.alert', { hasText: 'Mesma data e mesmo valor' });
   await expect(alert).toBeVisible();
 
+  await expect(page.getByText('1 de 2 pendentes')).toBeVisible();
   await alert.getByRole('button', { name: 'Marcar como duplicata' }).click();
 
-  // Avancou para o outro pendente sem fechar a tela.
-  await page.waitForFunction(
-    () => document.querySelector('.review__image')?.complete,
-  );
+  // Avancou para o outro pendente sem fechar a tela. Imagem carregada e
+  // campos visiveis ja valiam antes do avanco: o sinal e a fila encurtar.
+  await expect(page.getByText('1 de 1 pendentes')).toBeVisible();
   await expect(page.locator('.review__fields')).toBeVisible();
 
   await page.getByRole('button', { name: 'Voltar a lista' }).click();
   await expect(page.locator('.badge--duplicate')).toHaveText('Duplicata');
+});
+
+test('voltar a lista enquanto a duplicata grava fica na lista', async ({
+  page,
+  request,
+}) => {
+  const report = await createReport(request, { title: 'Voltar no meio' });
+  const pdfA = await makeReceiptPdf({
+    total: '10,00',
+    date: '20/06/2026',
+    extra: ['via cliente'],
+  });
+  const pdfB = await makeReceiptPdf({
+    total: '10,00',
+    date: '20/06/2026',
+    extra: ['via estabelecimento'],
+  });
+
+  await uploadAndOpenReview(page, request, report, [pdfA, pdfB]);
+
+  const alert = page.locator('.alert', { hasText: 'Mesma data e mesmo valor' });
+  await alert.getByRole('button', { name: 'Marcar como duplicata' }).click();
+  // Sem esperar o avanco: o recarregamento da lista ainda corre. Quando ele
+  // terminava, a revisao do proximo pendente reabria por cima da lista.
+  await page.getByRole('button', { name: 'Voltar a lista' }).click();
+
+  await expect(page.locator('.badge--duplicate')).toHaveText('Duplicata');
+  await expect(page.locator('.review__fields')).toHaveCount(0);
 });
 
 test('a categoria adivinhada chega marcada, e a marca some ao escolher', async ({
