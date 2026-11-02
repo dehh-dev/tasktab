@@ -72,8 +72,15 @@ nao por deixar de olhar.
   e saidas usam o cadastro quando ha e o papel quando nao ha, num lugar so
   (`ISSUER_NAME` / `ISSUER_CITY` em `receipt.model.js`).
 - `readPage` aceita `normalise: false`, que so o recibo assinado do RPA usa:
-  normalizada, a pagina com linha de assinatura se perde no Tesseract. O
-  cupom segue normalizado; trocar para ele pede medir antes e depois.
+  normalizada, a pagina com linha de assinatura se perde no Tesseract. **O
+  cupom fica normalizado, e isso foi medido** (2026-11-02, `--reextract`):
+  sem a normalizacao, os 57 comprovantes por OCR do dev caem de 7 para 4
+  datas certas (3 erradas) e de 7 para 6 valores, e no corpus de Itapipoca
+  uma data certa vira errada sem nenhuma pagina melhorar. Os recibos com
+  linha de assinatura do corpus tem camada de texto e nem chegam ao OCR.
+  Tentar sem normalizar so quando a normalizada nao le nada tambem nao
+  mudaria nada: o OCR devolveu texto em todas as paginas. Nao desligue sem
+  medicao nova que mostre ganho.
 - Hora e numero do documento chegaram a ser extraidos e foram **removidos** no
   uso real: ninguem os consultava. Voltam por pedido, nao por completude.
 - **Manuscrito fica de fora**, por decisao consciente: o Tesseract nao le
