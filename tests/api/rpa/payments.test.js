@@ -2,6 +2,7 @@
 
 const {
   request,
+  refusedFields,
   insertRow,
   insertRpaCompany,
   insertRpaLaunch,
@@ -431,6 +432,62 @@ describe('POST /api/rpa/launches/:id/payments: o que nao passa', () => {
       'adjustments[0].amount_cents',
       'adjustments[0].reason',
     ]);
+  });
+
+  it('cada campo fora do formato responde 422 apontando o campo', async () => {
+    const { launch } = await arrangeLaunch();
+    const worker = await arrangeWorker(launch);
+    const adjustment = {
+      worker_id: worker.id,
+      kind: 'addition',
+      amount_cents: 2500,
+      reason: 'alimentacao extra',
+    };
+    const send = (change) => () => pay(launch.id, { ...FIRST_WEEK, ...change });
+    const payments = `/api/rpa/launches/${launch.id}/payments`;
+
+    const refused = await refusedFields({
+      'data fora do formato': send({ payment_date: '20/10/2026' }),
+      'fim antes do inicio': send({
+        period_start: '2026-10-19',
+        period_end: '2026-10-13',
+      }),
+      'worker_ids vazia': send({ worker_ids: [] }),
+      'worker_ids com texto': send({ worker_ids: [String(worker.id)] }),
+      'adjustments sem lista': send({ adjustments: {} }),
+      'ajuste que nao e objeto': send({ adjustments: [1] }),
+      'ajuste sem pessoa': send({
+        adjustments: [{ ...adjustment, worker_id: 0 }],
+      }),
+      'ajuste em reais': send({
+        adjustments: [{ ...adjustment, amount_cents: 25.5 }],
+      }),
+      'motivo longo': send({
+        adjustments: [{ ...adjustment, reason: 'x'.repeat(256) }],
+      }),
+      'previa fora de true ou false': () =>
+        request('POST', `${payments}?preview=talvez`, {
+          ...FIRST_WEEK,
+          payment_date: '2026-10-20',
+        }),
+      'filtro de status': () => request('GET', `${payments}?status=pago`),
+      'filtro de numero': () => request('GET', `${payments}?number=0`),
+    });
+
+    expect(refused).toEqual({
+      'data fora do formato': ['payment_date'],
+      'fim antes do inicio': ['period_end'],
+      'worker_ids vazia': ['worker_ids'],
+      'worker_ids com texto': ['worker_ids'],
+      'adjustments sem lista': ['adjustments'],
+      'ajuste que nao e objeto': ['adjustments[0]'],
+      'ajuste sem pessoa': ['adjustments[0].worker_id'],
+      'ajuste em reais': ['adjustments[0].amount_cents'],
+      'motivo longo': ['adjustments[0].reason'],
+      'previa fora de true ou false': ['preview'],
+      'filtro de status': ['status'],
+      'filtro de numero': ['number'],
+    });
   });
 
   it('ajuste de quem nao e do lancamento, ou nao foi escolhido, responde 422 no worker_id', async () => {

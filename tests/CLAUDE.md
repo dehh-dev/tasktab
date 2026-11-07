@@ -62,6 +62,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 | Funcao                                                             | Para que                                                   |
 | ------------------------------------------------------------------ | ---------------------------------------------------------- |
 | `request(m, path, body, { token, baseUrl })`                       | HTTP; `body` string vai cru, `token: null` = sem sessao    |
+| `refusedFields({ caso: () => request(...) })`                      | `{ caso: campos do 422 }`, para comparar o mapa inteiro    |
 | `requestUpload` / `requestBinary`                                  | multipart (`baseUrl`, `field`); resposta binaria           |
 | `insertTask` / `insertReport` / `insertReceipt` / `insertMerchant` | arranjo direto no banco, sem passar pela API               |
 | `insertRow(tabela, valores)` / `insertRpa*`                        | qualquer linha crua; empresa, lancamento, pessoa e RPA     |
@@ -100,7 +101,12 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 - Prepare estado com `insert*()`, fora da rota: um teste de leitura nao quebra
   por bug na escrita.
 - Asserte o contrato: status e shape do JSON. Em erro, `name` e `status_code`;
-  em 422, tambem o `field` de `details`.
+  em 422, tambem o `field` de `details` — so o status passa com a recusa
+  vindo de outro campo.
+- **Recusa de entrada e uma tabela por rota** (`refusedFields`), nao um teste
+  por campo: cada caso muda um campo do corpo valido, e o mapa inteiro e
+  comparado. Assim os ramos dos validators custam uma requisicao cada, e a
+  falha diz o caso pelo nome (`"diaria em reais": 500`).
 - Compare instantes **no Postgres**: o `Date` so vai ate milissegundo, e
   `not.toEqual` entre a string ISO e o `Date` do `pg` passa sempre.
 - Conteudo extraido, so depois de `waitForProcessing`.

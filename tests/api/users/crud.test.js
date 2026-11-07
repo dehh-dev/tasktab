@@ -73,8 +73,18 @@ describe('POST /api/users', () => {
   it.each([
     ['email', 'sem arroba', { email: 'ana.tasktab.test' }],
     ['email', 'em branco', { email: '  ' }],
+    ['email', 'que nao e texto', { email: 42 }],
+    [
+      'email',
+      'com mais de 255 caracteres',
+      { email: `${'a'.repeat(250)}@t.test` },
+    ],
     ['name', 'em branco', { name: '   ' }],
     ['name', 'que nao e texto', { name: 42 }],
+    ['name', 'com mais de 255 caracteres', { name: 'x'.repeat(256) }],
+    ['password', 'que nao e texto', { password: 12345678901 }],
+    // 513 caracteres, 1026 bytes: o teto e de bytes, e protege o scrypt.
+    ['password', 'com mais de 1024 bytes', { password: 'ç'.repeat(513) }],
   ])('recusa %s %s com 422 no campo', async (campo, caso, override) => {
     const response = await request('POST', '/api/users', {
       ...NOVO,
@@ -174,6 +184,17 @@ describe('PATCH /api/users/:id', () => {
 
     expect(response.status).toBe(422);
     expect(response.body.details[0].field).toBe('email');
+  });
+
+  it('recusa apagar o nome com um em branco', async () => {
+    const response = await request('PATCH', `/api/users/${currentUser().id}`, {
+      name: '   ',
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      { field: 'name', message: 'name e obrigatorio' },
+    ]);
   });
 });
 

@@ -768,6 +768,26 @@ async function request(
 }
 
 /**
+ * Faz cada requisicao de `cases` (`{ caso: () => request(...) }`), em serie,
+ * e devolve `{ caso: campos do 422 }` — ou o status, quando nao vem 422.
+ * Comparar o mapa inteiro mostra de uma vez todo caso fora do esperado, como
+ * as matrizes de rota, e cada caso custa uma requisicao, nao um teste.
+ */
+async function refusedFields(cases) {
+  const result = {};
+
+  for (const [name, send] of Object.entries(cases)) {
+    const response = await send();
+    result[name] =
+      response.status === 422
+        ? response.body.details.map((detail) => detail.field)
+        : response.status;
+  }
+
+  return result;
+}
+
+/**
  * Envio multipart, para as rotas de upload. O `fetch` monta o boundary sozinho
  * a partir do FormData — definir Content-Type na mao quebraria isso.
  */
@@ -933,6 +953,7 @@ module.exports = {
   waitForProcessing,
   waitForQueue,
   request,
+  refusedFields,
   requestUpload,
   requestBinary,
 };
