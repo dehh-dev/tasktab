@@ -140,6 +140,31 @@ function planWorker({ days, ledger, period, dailyOnly, adjustments = [] }) {
   };
 }
 
+/**
+ * O periodo impresso no RPA, a "data da prestacao de servico" (issue 58): do
+ * primeiro ao ultimo dia com diaria neste pagamento, e nao o periodo pedido.
+ * Quem entrou ou saiu no meio, ou trabalhou tres dias e recebe dias depois,
+ * nao aparece prestando servico onde nao estava. Dia de valor zero (falta,
+ * folga) nao conta. Sem diaria, os dias que ele paga (extra pendente,
+ * correcao); sem dia nenhum (so bonus ou acrescimo), o periodo pedido.
+ */
+function servicePeriod(lines, period) {
+  const dailies = lines.filter(
+    (line) => line.part === 'daily' && line.value_subcents > 0,
+  );
+  const covered =
+    dailies.length > 0
+      ? dailies
+      : lines.filter((line) => line.value_subcents !== 0);
+
+  if (covered.length === 0) {
+    return { period_start: period.from, period_end: period.to };
+  }
+
+  const dates = covered.map((line) => line.date).sort();
+  return { period_start: dates[0], period_end: dates.at(-1) };
+}
+
 /** O menor numero livre: cancelar libera o numero para reemitir. */
 function nextPaymentNumber(taken) {
   const used = new Set(taken);
@@ -158,6 +183,7 @@ module.exports = {
   ADJUSTMENT_SIGN,
   roundSubcents,
   planWorker,
+  servicePeriod,
   nextPaymentNumber,
   paymentCode,
 };

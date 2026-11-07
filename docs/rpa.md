@@ -66,6 +66,11 @@ pagamento.
 | Meio periodo      | metade da diaria (dobrada no domingo e no feriado), base de 4h    |
 | Falta             | zero                                                              |
 
+- O **periodo do RPA** (a "data da prestacao de servico") vai do primeiro ao
+  ultimo dia com diaria naquele pagamento, e nao do periodo escolhido: quem
+  entrou no meio, saiu antes ou faltou no fim sai so com os dias que
+  trabalhou. Sem diaria (so extra pendente ou correcao), valem os dias que o
+  pagamento leva; so com bonus ou acrescimo, o periodo escolhido.
 - O **1o pagamento de cada pessoa** pode sair so com as diarias (opcao do
   lancamento); os extras entram no seguinte.
 - Dia ja pago cujo ponto mudou entra no pagamento seguinte como **correcao**,
