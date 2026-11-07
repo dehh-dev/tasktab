@@ -78,7 +78,9 @@ pagamento.
 - Dia ja pago cujo ponto mudou entra no pagamento seguinte como **correcao**,
   a mais ou a menos. Nenhum dia e pago duas vezes.
 - O **bonus** e um valor pontual, com motivo; nao cobre dia nenhum. Pagar dias
-  adiantados e escolher um periodo que va ate eles.
+  adiantados e escolher um periodo que va ate eles. O pagamento seguinte a um
+  bonus avisa na previa, com o motivo e o valor dele, para os dias adiantados
+  nao sairem pagos de novo.
 - O **bruto** e o menor valor cujo liquido fecha no centavo, com o INSS a 11%
   ate o teto e o IRRF da tabela vigente na data do pagamento, com a reducao da
   Lei 15.270/2025 em 2026. O teto do INSS e o IRRF somam os RPAs do mes do

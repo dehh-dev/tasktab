@@ -115,6 +115,14 @@ test('do .xlsx do formulario ao .zip dos RPAs, pela tela', async ({
   await page.getByLabel('Periodo: inicio').fill('2026-10-13');
   await page.getByLabel('Periodo: fim').fill('2026-10-19');
   await page.getByLabel('Data do pagamento').fill('2026-10-20');
+
+  // O ajuste nasce como bonus, e o bonus explica como adiantar dias.
+  await page.getByRole('button', { name: 'Ajuste', exact: true }).click();
+  await expect(page.getByLabel('Tipo do ajuste 1')).toHaveAccessibleDescription(
+    'Bonus nao cobre dias. Para adiantar dias, leve o periodo do pagamento ate eles.',
+  );
+  await page.getByRole('button', { name: 'Remover ajuste 1' }).click();
+
   await page.getByRole('button', { name: 'Ver previa' }).click();
 
   const preview = page.getByRole('table', { name: 'Previa do pagamento' });

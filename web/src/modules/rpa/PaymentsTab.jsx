@@ -61,6 +61,18 @@ function PaymentTable({ payments, caption }) {
                     ))}
                   </ul>
                 )}
+                {payment.warnings?.length > 0 && (
+                  <ul
+                    className="rpa-issues"
+                    aria-label={`Avisos de ${payment.worker_name}`}
+                  >
+                    {payment.warnings.map((warning, at) => (
+                      <li key={`${warning.code}-${at}`} className="rpa-flag">
+                        Aviso: {warning.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </th>
               <td className="rpa-nowrap">
                 {payment.number}º · {payment.code}
@@ -298,6 +310,11 @@ export default function PaymentsTab({ launch, canWrite }) {
                 <select
                   className="field__input"
                   aria-label={`Tipo do ajuste ${index + 1}`}
+                  aria-describedby={
+                    adjustment.kind === 'bonus'
+                      ? `adjustment-hint-${index}`
+                      : undefined
+                  }
                   value={adjustment.kind}
                   onChange={(event) =>
                     setAdjustment(index, 'kind', event.target.value)
@@ -340,6 +357,15 @@ export default function PaymentsTab({ launch, canWrite }) {
                 >
                   <Trash2 size={14} aria-hidden="true" />
                 </button>
+                {adjustment.kind === 'bonus' && (
+                  <p
+                    className="field__hint rpa-adjustment__hint"
+                    id={`adjustment-hint-${index}`}
+                  >
+                    Bonus nao cobre dias. Para adiantar dias, leve o periodo do
+                    pagamento ate eles.
+                  </p>
+                )}
               </div>
             ))}
             <button

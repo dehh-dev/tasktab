@@ -129,6 +129,13 @@ pendencia barra a importacao.
   **bonus e pontual e nao cobre dia nenhum** (decisao de 2026-10-31): pagar
   dias adiantados e so escolher um periodo que va ate eles — a grade e o
   ponto previsto, e a mudanca depois vira correcao.
+- **O pagamento logo depois de um bonus avisa** (issue 61): o costume da
+  planilha era adiantar dias como bonus, e os mesmos dias sairiam pagos de
+  novo. Quando o ultimo RPA valido da pessoa (`lastBonuses`, pelo
+  `issued_at`) levou bonus, a previa traz `warnings` com o codigo, o valor e
+  o motivo dele. **Nao barra nem desconta**: quem confere decide. Cancelado
+  nao conta, e o pagamento seguinte ja nao avisa. A tela explica no proprio
+  ajuste de bonus como adiantar dias.
 - **"1o pagamento so com diarias" e por pessoa**: quem entrou depois tambem
   tem o primeiro dela sem extra. O extra fica em `deferred_extra_subcents` e
   entra no seguinte.
