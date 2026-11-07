@@ -433,6 +433,58 @@ describe('POST /api/rpa/launches/:id/payments: o que nao passa', () => {
     ]);
   });
 
+  it('ajuste de quem nao e do lancamento, ou nao foi escolhido, responde 422 no worker_id', async () => {
+    const { launch } = await arrangeLaunch();
+    const worker = await arrangeWorker(launch);
+    const colleague = await arrangeWorker(launch, {
+      number: 8,
+      cpf: '11144477735',
+    });
+    const stranger = await arrangeWorker((await arrangeLaunch()).launch);
+    const adjustment = (workerId) => ({
+      worker_id: workerId,
+      kind: 'addition',
+      amount_cents: 2500,
+      reason: 'alimentacao extra',
+    });
+
+    const response = await pay(launch.id, {
+      ...FIRST_WEEK,
+      worker_ids: [worker.id],
+      adjustments: [adjustment(stranger.id), adjustment(colleague.id)],
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      {
+        field: 'adjustments[0].worker_id',
+        message: 'a pessoa nao e deste lancamento',
+      },
+      {
+        field: 'adjustments[1].worker_id',
+        message: 'a pessoa nao esta entre as escolhidas para o pagamento',
+      },
+    ]);
+  });
+
+  // A primeira tabela de INSS semeada vale de 2025-01-01, e a de IRRF de
+  // 2024-02-01: em 2024 ha IRRF e falta o INSS, e faltar uma ja basta.
+  it('sem tabela de INSS e IRRF vigente na data do pagamento, previa e emissao respondem 422', async () => {
+    const { launch } = await arrangeLaunch();
+    await arrangeWorker(launch);
+    const body = { ...FIRST_WEEK, payment_date: '2024-06-28' };
+
+    const preview = await pay(launch.id, body, { preview: true });
+    const issued = await pay(launch.id, body);
+
+    for (const response of [preview, issued]) {
+      expect(response.status).toBe(422);
+      expect(response.body.details).toEqual([
+        { field: 'payment_date', message: 'sem tabela de imposto' },
+      ]);
+    }
+  });
+
   it('lancamento encerrado recusa com 409', async () => {
     const { launch } = await arrangeLaunch({ launch: { status: 'closed' } });
     await arrangeWorker(launch);

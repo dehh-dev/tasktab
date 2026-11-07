@@ -255,6 +255,24 @@ describe('POST /api/rpa/launches/:id/documents: defesa de zip', () => {
     expect(documents).toEqual([]);
   });
 
+  it('arquivos abaixo de 50 MB que somam mais de 400 MB sao recusados antes de descompactar', async () => {
+    // Nove entradas que declaram 49 MB cada e trazem um byte so: a recusa
+    // vem do diretorio central, sem descompactar nenhuma.
+    const entries = Array.from({ length: 9 }, (_, index) => ({
+      name: `${ctps}/${index} - Maria Silva.jpg`,
+      data: Buffer.from([index]),
+      declaredSize: 49 * 1024 * 1024,
+    }));
+
+    const { response, documents } = await refused(rawZip(entries));
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      { field: 'file', message: 'o .zip passa de 400 MB descompactado' },
+    ]);
+    expect(documents).toEqual([]);
+  });
+
   it('bomba que mente o tamanho para no primeiro byte a mais', async () => {
     const { response, documents } = await refused(
       rawZip([
@@ -392,6 +410,21 @@ describe('GET /api/rpa/launches/:id/documents.zip', () => {
     ]);
     expect(Buffer.compare(zip['MARIA SILVA/RG-CNH.jpg'], files.rg)).toBe(0);
     expect(Buffer.compare(zip['JOÃO ARAÚJO/CE.pdf'], files.address)).toBe(0);
+  });
+
+  it('documento que sumiu do disco responde 422 apontando qual, em vez de um .zip sem ele', async () => {
+    const { launch } = await arrange();
+    const { buffer, files } = await teamZip();
+    const { documents } = (await upload(launch.id, buffer)).body.data;
+    const rg = documents.find((document) => document.kind === 'id_document');
+    fs.rmSync(uploadedFilePath(`${sha256(files.rg)}.jpg`));
+
+    const response = await downloadZip(launch.id);
+
+    expect(response.status).toBe(422);
+    expect(JSON.parse(response.buffer.toString()).details).toEqual([
+      { field: `documents[${rg.id}]`, message: 'arquivo ausente do disco' },
+    ]);
   });
 
   it('a versao para e-mail de fotos 4032 x 3024 fica abaixo de 25 MB e legivel', async () => {
