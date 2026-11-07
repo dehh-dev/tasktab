@@ -8,10 +8,11 @@ const path = require('path');
 const SCRIPT = path.resolve(__dirname, 'render-pdf-page.script.js');
 
 /**
- * Pixels de uma pagina do PDF em tons de cinza, um byte por pixel, renderizada
- * em subprocesso — ver `render-pdf-page.script.js`.
+ * Pixels de paginas do PDF em tons de cinza, um byte por pixel, renderizadas
+ * em subprocesso — ver `render-pdf-page.script.js`. Todas num processo so:
+ * cada um custa ~200 ms para subir, mais que a pagina.
  */
-function renderPdfPage(buffer, pageNumber, { scale = 1 } = {}) {
+function renderPdfPages(buffer, pageNumbers, { scale = 1 } = {}) {
   const tmpFile = path.join(
     os.tmpdir(),
     `pdf-render-${Date.now()}-${Math.random().toString(36).slice(2)}.pdf`,
@@ -21,19 +22,24 @@ function renderPdfPage(buffer, pageNumber, { scale = 1 } = {}) {
   try {
     const output = execFileSync(
       'node',
-      [SCRIPT, tmpFile, String(pageNumber), String(scale)],
-      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+      [SCRIPT, tmpFile, pageNumbers.join(','), String(scale)],
+      { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
     );
-    const { width, height, channels, pixels } = JSON.parse(output);
 
-    if (channels !== 1) {
-      throw new Error(`esperado 1 canal de cinza, veio ${channels}`);
-    }
+    return JSON.parse(output).map(({ width, height, channels, pixels }) => {
+      if (channels !== 1) {
+        throw new Error(`esperado 1 canal de cinza, veio ${channels}`);
+      }
 
-    return { width, height, pixels: Buffer.from(pixels, 'base64') };
+      return { width, height, pixels: Buffer.from(pixels, 'base64') };
+    });
   } finally {
     fs.rmSync(tmpFile, { force: true });
   }
+}
+
+function renderPdfPage(buffer, pageNumber, options) {
+  return renderPdfPages(buffer, [pageNumber], options)[0];
 }
 
 /**
@@ -54,4 +60,4 @@ function maxPixelDifference(a, b, rows) {
   return max;
 }
 
-module.exports = { renderPdfPage, maxPixelDifference };
+module.exports = { renderPdfPage, renderPdfPages, maxPixelDifference };

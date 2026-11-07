@@ -132,6 +132,9 @@ de teste cai na integracao, o lado seguro.
 
 - `tests/helpers/pdf-text.js` e `pdf-render.js` rodam a leitura de PDF num
   subprocesso `node`: o `unpdf` usa import dinamico, que a VM do Jest recusa.
+  O processo custa ~200 ms, mais que a pagina: para comparar varias, um PDF
+  com todas e `renderPdfPages(buffer, [paginas])`, num processo so. Assim os
+  giros de 0 a 270 graus cabem num teste por exportacao.
 - `tests/helpers/xlsx-formula.js` resolve formula contra as celulas: SUM,
   COUNTIF, SUMIF, ROUND, IF, AND e referencia a outra aba. Funcao nova na
   planilha entra no avaliador junto.

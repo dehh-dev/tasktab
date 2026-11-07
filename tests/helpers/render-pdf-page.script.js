@@ -13,13 +13,10 @@ const fs = require('fs');
 const sharp = require('sharp');
 const { renderPageAsImage } = require('unpdf');
 
-async function main() {
-  const [, , filePath, pageArg, scaleArg] = process.argv;
-  const buffer = fs.readFileSync(filePath);
-
-  const png = await renderPageAsImage(new Uint8Array(buffer), Number(pageArg), {
+async function renderPage(buffer, pageNumber, scale) {
+  const png = await renderPageAsImage(new Uint8Array(buffer), pageNumber, {
     canvasImport: () => import('@napi-rs/canvas'),
-    scale: Number(scaleArg),
+    scale,
   });
 
   // Fundo branco antes do cinza: sem isso o canal alfa vira um segundo canal
@@ -30,14 +27,26 @@ async function main() {
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  process.stdout.write(
-    JSON.stringify({
-      width: info.width,
-      height: info.height,
-      channels: info.channels,
-      pixels: data.toString('base64'),
-    }),
-  );
+  return {
+    width: info.width,
+    height: info.height,
+    channels: info.channels,
+    pixels: data.toString('base64'),
+  };
+}
+
+// As paginas vem separadas por virgula ("2,3,4"): subir o processo custa mais
+// que renderizar uma pagina, entao quem compara varias pede todas de uma vez.
+async function main() {
+  const [, , filePath, pagesArg, scaleArg] = process.argv;
+  const buffer = fs.readFileSync(filePath);
+  const pages = [];
+
+  for (const page of pagesArg.split(',')) {
+    pages.push(await renderPage(buffer, Number(page), Number(scaleArg)));
+  }
+
+  process.stdout.write(JSON.stringify(pages));
 }
 
 main().catch((error) => {
