@@ -12,13 +12,18 @@ const {
   waitForQueue,
 } = require('../../orchestrator');
 const { syntheticCpf } = require('../../fixtures/forms');
-const { makeScannedRpaReceipts } = require('../../fixtures/rpa-receipts');
+const {
+  makeScannedRpaReceipts,
+  makeTextRpaReceipts,
+} = require('../../fixtures/rpa-receipts');
 const { makePdf } = require('../../fixtures/pdf');
 
 /**
  * Os recibos assinados (issue 42): o PDF escaneado que o financeiro devolve
- * sai separado por pessoa, e o pagamento vira pago. A leitura e por OCR, na
- * fila da API: cada teste espera a fila antes de conferir.
+ * sai separado por pessoa, e o pagamento vira pago. A leitura e na fila da
+ * API: cada teste espera a fila antes de conferir. So o primeiro passa pelo
+ * OCR, que e o caso real; os outros usam camada de texto, porque o assunto
+ * deles vem depois da leitura e o OCR custava segundos a cada um.
  */
 const PEOPLE = [
   {
@@ -189,7 +194,7 @@ describe('POST /api/rpa/launches/:id/receipts', () => {
 
   it('o recibo que faltou e apontado, e o pagamento dele continua emitido', async () => {
     const { launch, people } = await arrange();
-    const pdf = await makeScannedRpaReceipts(
+    const pdf = await makeTextRpaReceipts(
       people.slice(0, 4).map((person) => receiptOf(person)),
     );
 
@@ -203,19 +208,92 @@ describe('POST /api/rpa/launches/:id/receipts', () => {
       `/api/rpa/payments/${people[4].payment.id}`,
     );
     expect(missing.body.data.status).toBe('issued');
-  }, 120000);
+  });
 
-  it('reenviar o mesmo PDF nao duplica os recibos', async () => {
+  it('reenviar o mesmo lote nao duplica: a pagina separada sai sem data, sempre o mesmo arquivo', async () => {
     const { launch, people } = await arrange();
-    const pdf = await makeScannedRpaReceipts([receiptOf(people[0])]);
+    // Duas paginas, para a separacao copiar a pagina. O PDF de uma pagina so
+    // vai como veio, e ai o arquivo nao teria como mudar.
+    const pdf = await makeTextRpaReceipts([
+      receiptOf(people[0]),
+      receiptOf(people[1]),
+    ]);
 
     await send(launch.id, pdf);
     await send(launch.id, pdf);
 
-    expect(Object.keys(await receiptsZip(launch.id))).toEqual([
+    const zip = await receiptsZip(launch.id);
+    expect(Object.keys(zip)).toEqual([
+      'RECIBO JOÃO ARAÚJO.pdf',
       'RECIBO MARIA DA CONCEIÇÃO SILVA.pdf',
     ]);
-  }, 120000);
+    // A data do PDF tem resolucao de segundo, e os dois envios podem cair no
+    // mesmo: a ausencia dela e conferida direto, e nao so pelo efeito.
+    const maria = await PDFDocument.load(
+      zip['RECIBO MARIA DA CONCEIÇÃO SILVA.pdf'],
+      { updateMetadata: false },
+    );
+    expect(maria.getCreationDate()).toBeUndefined();
+    expect(maria.getModificationDate()).toBeUndefined();
+  });
+
+  it('a segunda pagina da mesma pessoa fica sem pessoa, como repetida', async () => {
+    const { launch, people } = await arrange();
+    const pdf = await makeTextRpaReceipts([
+      receiptOf(people[0]),
+      receiptOf(people[1]),
+      receiptOf(people[0]),
+    ]);
+
+    const batch = await batchOf(await send(launch.id, pdf));
+
+    expect(
+      batch.result.matched.map((entry) => [entry.page, entry.worker_number]),
+    ).toEqual([
+      [1, 1],
+      [2, 2],
+    ]);
+    expect(batch.result.unmatched_pages).toEqual([
+      { page: 3, reason: 'repetida: a pessoa ja esta na pagina 1' },
+    ]);
+  });
+
+  it('a data diferente da do pagamento e apontada, e o pagamento vira pago assim mesmo', async () => {
+    const { launch, people } = await arrange();
+    const pdf = await makeTextRpaReceipts([
+      receiptOf(people[0], { date: '21/10/2026' }),
+    ]);
+
+    const batch = await batchOf(await send(launch.id, pdf));
+
+    expect(batch.result.date_differences).toEqual([
+      expect.objectContaining({
+        page: 1,
+        worker_number: 1,
+        date_read: '2026-10-21',
+        payment_date: '2026-10-20',
+      }),
+    ]);
+    const payment = await request(
+      'GET',
+      `/api/rpa/payments/${people[0].payment.id}`,
+    );
+    expect(payment.body.data.status).toBe('paid');
+  });
+
+  it('sem recibo lido, o .zip dos recibos responde 422 apontando o pagamento', async () => {
+    const { launch } = await arrange();
+
+    const response = await request(
+      'GET',
+      `/api/rpa/launches/${launch.id}/receipts.zip?payment=1`,
+    );
+
+    expect(response.status).toBe(422);
+    expect(response.body.details).toEqual([
+      { field: 'payment', message: 'nenhum recibo com este numero' },
+    ]);
+  });
 
   it('o que nao e PDF, pagamento que nao existe e lancamento encerrado nao passam', async () => {
     const { launch } = await arrange();

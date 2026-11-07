@@ -1,6 +1,6 @@
 'use strict';
 
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, StandardFonts } = require('pdf-lib');
 
 /**
  * O PDF escaneado dos recibos assinados (RPCI) que o financeiro devolve
@@ -88,4 +88,23 @@ async function makeScannedRpaReceipts(receipts) {
   return Buffer.from(await document.save());
 }
 
-module.exports = { makeScannedRpaReceipts };
+/**
+ * Os mesmos recibos, com camada de texto: a leitura e a mesma regra depois do
+ * OCR, sem os segundos dele. Serve ao teste cujo assunto nao e ler a imagem —
+ * quem faltou, a pagina repetida, o reenvio do lote.
+ */
+async function makeTextRpaReceipts(receipts) {
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+
+  for (const receipt of receipts) {
+    const page = document.addPage([612, 792]);
+    receiptText(receipt).forEach((line, row) => {
+      page.drawText(line, { x: 60, y: 720 - row * 24, size: 12, font });
+    });
+  }
+
+  return Buffer.from(await document.save());
+}
+
+module.exports = { makeScannedRpaReceipts, makeTextRpaReceipts };

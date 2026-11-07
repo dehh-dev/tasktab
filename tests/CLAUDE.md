@@ -116,7 +116,9 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   byte que declara o tamanho que se quiser — e assim que se monta a bomba.
 - `tests/fixtures/rpa-receipts.js` gera o PDF escaneado dos recibos
   assinados: uma pagina-imagem por pessoa, sem camada de texto, com a linha
-  de assinatura que faz o OCR normalizado se perder.
+  de assinatura que faz o OCR normalizado se perder. `makeTextRpaReceipts`
+  da os mesmos recibos com camada de texto: o OCR custa segundos por
+  pagina, entao so o teste cujo assunto e ler a imagem passa por ele.
 
 ## Puros
 
