@@ -28,7 +28,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   fixa no nome do teste; `RPA_SEED=<n>` sorteia outra). Os outros arquivos do
   RPA provam cada parte com dado escolhido; este prova que elas se encaixam, e
   confere o bruto por uma conta propria, nao pelo `taxes.js`. E um `it` so
-  porque o `setup.js` trunca o banco entre os testes. Etapa nova do modulo
+  porque o `setup.js` esvazia o banco entre os testes. Etapa nova do modulo
   entra nele tambem.
 
 ## Ciclo

@@ -144,8 +144,8 @@ nao por deixar de olhar.
 
 - O processamento e **assincrono**, numa fila em processo (`queue.js`); o
   upload responde `202`. Teste que afirme conteudo extraido passa por
-  `waitForProcessing`, e o `tests/setup.js` drena a fila antes de truncar —
-  senao o trabalho de um teste escreve no banco ja limpo do seguinte.
+  `waitForProcessing`, e o `tests/setup.js` drena a fila antes de esvaziar o
+  banco — senao o trabalho de um teste escreve no banco ja limpo do seguinte.
 - A duplicata exata e decidida antes de a pagina sair de `processing` (ver
   `src/services/validation/CLAUDE.md`).
 - Os casos de parsing sao testes puros em `tests/services/`
