@@ -2,6 +2,7 @@
 
 const {
   request,
+  refusedFields,
   requestUpload,
   insertReport,
   insertRow,
@@ -177,6 +178,65 @@ describe('POST /api/rpa/launches', () => {
     ]);
   });
 
+  // Cada caso muda um campo do corpo valido. A diaria e o adicional sao
+  // dinheiro: inteiro em centavos, e o validador e o que barra o 130.5 antes
+  // de ele virar 500 na coluna integer.
+  it('cada campo fora do formato responde 422 apontando o campo', async () => {
+    const valid = await validLaunch();
+    const [rate] = RATES;
+    const [monday] = SCHEDULE;
+    const post = (change) => () =>
+      request('POST', '/api/rpa/launches', { ...valid, ...change });
+
+    const refused = await refusedFields({
+      'development longo': post({ development: 'x'.repeat(256) }),
+      'holidays sem lista': post({ holidays: '2026-11-15' }),
+      'feriado fora do formato': post({ holidays: ['15/11/2026'] }),
+      'e-mails demais': post({
+        email_to: Array.from({ length: 21 }, (_, i) => `p${i}@exemplo.test`),
+      }),
+      'e-mail invalido': post({ email_cc: ['sem-arroba'] }),
+      'schedule sem lista': post({ schedule: 'segunda' }),
+      'dia que nao e objeto': post({ schedule: [1] }),
+      'dia repetido': post({ schedule: [monday, monday] }),
+      'quantidade fora de 1 ou 0.5': post({
+        schedule: [{ ...monday, quantity: 2 }],
+      }),
+      'rates sem lista': post({ rates: {} }),
+      'diaria que nao e objeto': post({ rates: ['130'] }),
+      'vigencia ao contrario': post({
+        rates: [{ ...rate, starts_on: '2026-10-31', ends_on: '2026-10-01' }],
+      }),
+      'diaria em reais': post({ rates: [{ ...rate, daily_cents: 130.5 }] }),
+      'diaria zero': post({ rates: [{ ...rate, daily_cents: 0 }] }),
+      'adicional fracionado': post({
+        rates: [{ ...rate, promoted_bonus_cents: 10.5 }],
+      }),
+      'primeiro pagamento sem booleano': post({
+        first_payment_daily_only: 'sim',
+      }),
+    });
+
+    expect(refused).toEqual({
+      'development longo': ['development'],
+      'holidays sem lista': ['holidays'],
+      'feriado fora do formato': ['holidays'],
+      'e-mails demais': ['email_to'],
+      'e-mail invalido': ['email_cc'],
+      'schedule sem lista': ['schedule'],
+      'dia que nao e objeto': ['schedule[0]'],
+      'dia repetido': ['schedule[1].weekday'],
+      'quantidade fora de 1 ou 0.5': ['schedule[0].quantity'],
+      'rates sem lista': ['rates'],
+      'diaria que nao e objeto': ['rates[0]'],
+      'vigencia ao contrario': ['rates[0].ends_on'],
+      'diaria em reais': ['rates[0].daily_cents'],
+      'diaria zero': ['rates[0].daily_cents'],
+      'adicional fracionado': ['rates[0].promoted_bonus_cents'],
+      'primeiro pagamento sem booleano': ['first_payment_daily_only'],
+    });
+  });
+
   it('o horario padrao segue a mesma regra de ordem da grade do ponto', async () => {
     const response = await request(
       'POST',
@@ -267,6 +327,27 @@ describe('PATCH /api/rpa/launches/:id', () => {
     expect(response.body.details).toEqual([
       { field: 'ends_on', message: 'ends_on antes de starts_on' },
     ]);
+  });
+
+  it('estado, status e o filtro da listagem fora do formato respondem 422 no campo', async () => {
+    const launch = await insertRpaLaunch();
+    const patch = (body) => () =>
+      request('PATCH', `/api/rpa/launches/${launch.id}`, body);
+
+    const refused = await refusedFields({
+      'estado em branco': patch({ state: ' ' }),
+      'estado que nao existe': patch({ state: 'XX' }),
+      'status fora do enum': patch({ status: 'paused' }),
+      'filtro de status': () =>
+        request('GET', '/api/rpa/launches?status=paused'),
+    });
+
+    expect(refused).toEqual({
+      'estado em branco': ['state'],
+      'estado que nao existe': ['state'],
+      'status fora do enum': ['status'],
+      'filtro de status': ['status'],
+    });
   });
 
   it('encerrado so aceita reabrir', async () => {

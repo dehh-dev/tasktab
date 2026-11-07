@@ -263,5 +263,8 @@ describe('GET /api/reports/:id/export/anexo-i.xlsx', () => {
     );
 
     expect(response.status).toBe(422);
+    expect(JSON.parse(response.buffer.toString()).details).toEqual([
+      { field: 'receipts', message: 'excede o numero de linhas do template' },
+    ]);
   });
 });

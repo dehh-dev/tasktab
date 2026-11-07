@@ -55,7 +55,7 @@ cada recusa conferida pelo nome da constraint:
   cancelado). `created_by` fica livre para o `SET NULL` de apagar usuario.
 - `rpa_banks` e `rpa_tax_tables` sao **sementes publicas** da migration
   `seed-rpa-banks-and-taxes` (lista do Banco Central; INSS e IRRF conferidos na
-  Receita). O `clearDatabase` dos testes nao as trunca. Tabela de imposto nova
+  Receita). O `clearDatabase` dos testes nao as apaga. Tabela de imposto nova
   e linha nova numa migration nova: o IRRF vale pela maior `starts_on` ate a
   data, e o RPA emitido guarda o id da que usou.
 - `rpa_files` e `rpa_receipt_batches` (o PDF dos recibos, issue 42, e cada

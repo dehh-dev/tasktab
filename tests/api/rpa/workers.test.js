@@ -2,6 +2,7 @@
 
 const {
   request,
+  refusedFields,
   requestUpload,
   insertRpaLaunch,
   insertRpaWorker,
@@ -170,6 +171,53 @@ describe('PATCH /api/rpa/workers/:id', () => {
         message: 'ja ha outra pessoa com este CPF no lancamento',
       },
     ]);
+  });
+
+  it('corrige nome, PIS com mascara, CEP e banco, e grava so os digitos', async () => {
+    const worker = await insertRpaWorker();
+
+    const response = await request('PATCH', `/api/rpa/workers/${worker.id}`, {
+      name: 'Maria Corrigida Sintetica',
+      pis: '120.56412.54-5',
+      cep: '18700-000',
+      bank_code: '260',
+      account_type: null,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      name: 'Maria Corrigida Sintetica',
+      pis: '12056412545',
+      cep: '18700000',
+      bank_code: '260',
+      account_type: null,
+    });
+  });
+
+  it('cada campo fora do formato responde 422 apontando o campo', async () => {
+    const worker = await insertRpaWorker();
+    const patch = (body) => () =>
+      request('PATCH', `/api/rpa/workers/${worker.id}`, body);
+
+    const refused = await refusedFields({
+      'nome nulo': patch({ name: null }),
+      'nome em branco': patch({ name: '   ' }),
+      'PIS que nao fecha': patch({ pis: '12056412546' }),
+      'data fora do formato': patch({ birth_date: '01/02/1990' }),
+      'tipo de conta fora do enum': patch({ account_type: 'salario' }),
+      'banco com dois digitos': patch({ bank_code: '26' }),
+      'resolve_issues sem lista': patch({ resolve_issues: 'tudo' }),
+    });
+
+    expect(refused).toEqual({
+      'nome nulo': ['name'],
+      'nome em branco': ['name'],
+      'PIS que nao fecha': ['pis'],
+      'data fora do formato': ['birth_date'],
+      'tipo de conta fora do enum': ['account_type'],
+      'banco com dois digitos': ['bank_code'],
+      'resolve_issues sem lista': ['resolve_issues'],
+    });
   });
 
   it('o numero fixo nao muda por PATCH', async () => {

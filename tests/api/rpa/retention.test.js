@@ -157,6 +157,8 @@ describe('PATCH /api/rpa/launches/:id: o prazo da retencao', () => {
   });
 });
 
+const PURGED = 'retencao do RPA: dados pessoais do lancamento apagados';
+
 describe('a varredura da retencao, na subida da API', () => {
   let instance = null;
 
@@ -175,11 +177,11 @@ describe('a varredura da retencao, na subida da API', () => {
     expect(expiredFiles).toHaveLength(2);
 
     instance = await startApiInstance({ LOG_LEVEL: 'info' });
+    // Espera a linha do log, que sai depois da limpeza do disco. O
+    // `purged_at` aparece antes, no commit: esperar por ele deixava o teste
+    // olhar o disco no meio da limpeza, e assim ele falhou no CI.
     const deadline = Date.now() + 10000;
-    while (
-      !(await launchRow(expired.launch.id)).purged_at &&
-      Date.now() < deadline
-    ) {
+    while (!instance.output().includes(PURGED) && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
@@ -227,11 +229,7 @@ describe('a varredura da retencao, na subida da API', () => {
       .trim()
       .split('\n')
       .map((entry) => JSON.parse(entry))
-      .find(
-        (entry) =>
-          entry.msg ===
-          'retencao do RPA: dados pessoais do lancamento apagados',
-      );
+      .find((entry) => entry.msg === PURGED);
     expect(line).toMatchObject({
       launch_id: expired.launch.id,
       files: 2,

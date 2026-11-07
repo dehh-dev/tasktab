@@ -93,14 +93,6 @@ async function removeExpired() {
   return rowCount;
 }
 
-async function countByUser(userId) {
-  const { rows } = await db.query(
-    'SELECT COUNT(*)::int AS total FROM sessions WHERE user_id = $1',
-    [userId],
-  );
-  return rows[0].total;
-}
-
 module.exports = {
   findActiveByTokenHash,
   create,
@@ -108,5 +100,4 @@ module.exports = {
   removeByTokenHash,
   removeByUser,
   removeExpired,
-  countByUser,
 };

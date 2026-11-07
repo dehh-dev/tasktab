@@ -5,6 +5,7 @@ const { PDFDocument, StandardFonts } = require('pdf-lib');
 const { extractPdfText } = require('../../helpers/pdf-text');
 const {
   renderPdfPage,
+  renderPdfPages,
   maxPixelDifference,
 } = require('../../helpers/pdf-render');
 const { makeCorruptPdf, makeRotatedPdf } = require('../../fixtures/pdf');
@@ -157,33 +158,54 @@ describe('GET /api/reports/:id/export/pdfs-por-categoria.zip', () => {
     expect([...todas].sort()).toEqual([...marcas].sort());
   });
 
-  it.each([0, 90, 180, 270])(
-    'a pagina com /Rotate %i e copiada como esta na origem, sem faixa',
-    async (angle) => {
-      const report = await insertReport();
-      const source = await makeRotatedPdf(angle);
-      await insertReceipt(report.id, pagina(saveUpload(source), 1));
+  it('as paginas com /Rotate 0, 90, 180 e 270 sao copiadas como estao na origem, sem faixa', async () => {
+    const angles = [0, 90, 180, 270];
+    const report = await insertReport();
+    // Um arquivo com uma pagina por angulo, e um comprovante por pagina: um
+    // export e dois renders, no lugar de um de cada por angulo.
+    const source = await makeRotatedPdf(...angles);
+    const upload = saveUpload(source);
+    for (const [index] of angles.entries()) {
+      await insertReceipt(
+        report.id,
+        pagina(upload, index + 1, { issued_at: `2026-06-1${index + 1}` }),
+      );
+    }
 
-      const { files } = await loadZip(report.id);
-      const gerado = files['01_alimentacao.pdf'];
-      const page = (await PDFDocument.load(gerado)).getPage(0);
-      const origem = (await PDFDocument.load(source)).getPage(0);
+    const { files } = await loadZip(report.id);
+    const gerado = files['01_alimentacao.pdf'];
+    const copied = await PDFDocument.load(gerado);
+    const sources = await PDFDocument.load(source);
+    const originals = renderPdfPages(source, [1, 2, 3, 4]);
+    const exportedPages = renderPdfPages(gerado, [1, 2, 3, 4]);
 
-      // Copiada, e nao embutida: o /Rotate segue atributo da pagina, e o
-      // tamanho e o da origem — nenhuma faixa de carimbo foi acrescentada.
-      expect(page.getRotation().angle).toBe(angle);
-      expect(page.getSize()).toEqual(origem.getSize());
+    // Copiada, e nao embutida: o /Rotate segue atributo da pagina, e o
+    // tamanho e o da origem — nenhuma faixa de carimbo foi acrescentada.
+    const asCopied = (index) => {
+      const [original, exported] = [originals[index], exportedPages[index]];
+      const sameSize =
+        exported.width === original.width &&
+        exported.height === original.height;
+      return {
+        rotation: copied.getPage(index).getRotation().angle,
+        size: copied.getPage(index).getSize(),
+        pixels: sameSize
+          ? maxPixelDifference(original, exported, original.height)
+          : 'render de outro tamanho',
+      };
+    };
 
-      const original = renderPdfPage(source, 1);
-      const exportado = renderPdfPage(gerado, 1);
-
-      expect([exportado.width, exportado.height]).toEqual([
-        original.width,
-        original.height,
-      ]);
-      expect(maxPixelDifference(original, exportado, original.height)).toBe(0);
-    },
-  );
+    expect(
+      Object.fromEntries(angles.map((angle, i) => [angle, asCopied(i)])),
+    ).toEqual(
+      Object.fromEntries(
+        angles.map((angle, i) => [
+          angle,
+          { rotation: angle, size: sources.getPage(i).getSize(), pixels: 0 },
+        ]),
+      ),
+    );
+  });
 
   it('o giro escolhido na revisao soma ao /Rotate da origem', async () => {
     const report = await insertReport();

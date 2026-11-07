@@ -28,15 +28,15 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   fixa no nome do teste; `RPA_SEED=<n>` sorteia outra). Os outros arquivos do
   RPA provam cada parte com dado escolhido; este prova que elas se encaixam, e
   confere o bruto por uma conta propria, nao pelo `taxes.js`. E um `it` so
-  porque o `setup.js` trunca o banco entre os testes. Etapa nova do modulo
+  porque o `setup.js` esvazia o banco entre os testes. Etapa nova do modulo
   entra nele tambem.
 
 ## Ciclo
 
-| Onde              | Quando                  | O que faz                                                                           |
-| ----------------- | ----------------------- | ----------------------------------------------------------------------------------- |
-| `global-setup.js` | uma vez por execucao    | espera a API, aplica migrations                                                     |
-| `setup.js`        | antes de **cada** teste | espera a fila, trunca as tabelas, esvazia `uploads-test/` e recria o usuario padrao |
+| Onde              | Quando                  | O que faz                                                                    |
+| ----------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `global-setup.js` | uma vez por execucao    | espera a API, aplica migrations                                              |
+| `setup.js`        | antes de **cada** teste | espera a fila, esvazia as tabelas e `uploads-test/`, recria o usuario padrao |
 
 - Arquivo novo nao precisa de preambulo: `require` do orchestrator e os
   `describe`.
@@ -44,6 +44,12 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   `npx`). Marca em `process.env` nao deduplica: cada arquivo do Jest tem a
   propria copia.
 - Rodam em serie (`--runInBand`), porque compartilham as tabelas.
+- **A limpeza e `DELETE`, nao `TRUNCATE`** (`clearDatabase`): o TRUNCATE tem
+  custo fixo por tabela, ~36 ms antes de cada teste, contra menos de 1 ms. O
+  `session_replication_role = replica` desliga FKs e os triggers que travam o
+  RPA emitido, e exige superusuario (o do `docker compose` e, aqui e no CI);
+  as sequencias voltam ao 1. Junto com o commit sem fsync (`PGOPTIONS` no
+  `env.test`), a integracao caiu de 140 s para 87 s.
 - O disco e da suite: `env.test` aponta `UPLOAD_DIR` para `uploads-test/`, e
   `clearUploads` o esvazia junto com o banco. No `uploads/` do dev a suite
   deixou milhares de PDFs, e a contagem de referencias de um banco podia
@@ -56,6 +62,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 | Funcao                                                             | Para que                                                   |
 | ------------------------------------------------------------------ | ---------------------------------------------------------- |
 | `request(m, path, body, { token, baseUrl })`                       | HTTP; `body` string vai cru, `token: null` = sem sessao    |
+| `refusedFields({ caso: () => request(...) })`                      | `{ caso: campos do 422 }`, para comparar o mapa inteiro    |
 | `requestUpload` / `requestBinary`                                  | multipart (`baseUrl`, `field`); resposta binaria           |
 | `insertTask` / `insertReport` / `insertReceipt` / `insertMerchant` | arranjo direto no banco, sem passar pela API               |
 | `insertRow(tabela, valores)` / `insertRpa*`                        | qualquer linha crua; empresa, lancamento, pessoa e RPA     |
@@ -73,7 +80,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 - `request()` ja chega autenticada como o **admin padrao**. `{ token: null }`
   testa 401; `createUserWithSession({ role })`, outro papel. O hash da senha e
   calculado uma vez por processo (o `scrypt` custa ~30 ms de proposito) e o
-  token, sorteado uma vez; o TRUNCATE apaga so a linha da sessao, recriada com
+  token, sorteado uma vez; a limpeza apaga so a linha da sessao, recriada com
   o mesmo token.
 - O padrao e admin para o arranjo antigo valer: `insertReport()` cria
   relatorio sem dono, que so `reports:read:any` enxerga.
@@ -94,7 +101,12 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 - Prepare estado com `insert*()`, fora da rota: um teste de leitura nao quebra
   por bug na escrita.
 - Asserte o contrato: status e shape do JSON. Em erro, `name` e `status_code`;
-  em 422, tambem o `field` de `details`.
+  em 422, tambem o `field` de `details` — so o status passa com a recusa
+  vindo de outro campo.
+- **Recusa de entrada e uma tabela por rota** (`refusedFields`), nao um teste
+  por campo: cada caso muda um campo do corpo valido, e o mapa inteiro e
+  comparado. Assim os ramos dos validators custam uma requisicao cada, e a
+  falha diz o caso pelo nome (`"diaria em reais": 500`).
 - Compare instantes **no Postgres**: o `Date` so vai ate milissegundo, e
   `not.toEqual` entre a string ISO e o `Date` do `pg` passa sempre.
 - Conteudo extraido, so depois de `waitForProcessing`.
@@ -110,7 +122,9 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   byte que declara o tamanho que se quiser — e assim que se monta a bomba.
 - `tests/fixtures/rpa-receipts.js` gera o PDF escaneado dos recibos
   assinados: uma pagina-imagem por pessoa, sem camada de texto, com a linha
-  de assinatura que faz o OCR normalizado se perder.
+  de assinatura que faz o OCR normalizado se perder. `makeTextRpaReceipts`
+  da os mesmos recibos com camada de texto: o OCR custa segundos por
+  pagina, entao so o teste cujo assunto e ler a imagem passa por ele.
 
 ## Puros
 
@@ -124,6 +138,9 @@ de teste cai na integracao, o lado seguro.
 
 - `tests/helpers/pdf-text.js` e `pdf-render.js` rodam a leitura de PDF num
   subprocesso `node`: o `unpdf` usa import dinamico, que a VM do Jest recusa.
+  O processo custa ~200 ms, mais que a pagina: para comparar varias, um PDF
+  com todas e `renderPdfPages(buffer, [paginas])`, num processo so. Assim os
+  giros de 0 a 270 graus cabem num teste por exportacao.
 - `tests/helpers/xlsx-formula.js` resolve formula contra as celulas: SUM,
   COUNTIF, SUMIF, ROUND, IF, AND e referencia a outra aba. Funcao nova na
   planilha entra no avaliador junto.

@@ -4,6 +4,7 @@ const { PDFDocument, PDFName, PDFDict } = require('pdf-lib');
 const { extractPdfText } = require('../../helpers/pdf-text');
 const {
   renderPdfPage,
+  renderPdfPages,
   maxPixelDifference,
 } = require('../../helpers/pdf-render');
 const {
@@ -279,27 +280,50 @@ describe('GET /api/reports/:id/export.pdf', () => {
 // Embutida sem a rotacao, ela voltava invertida no consolidado, enquanto a
 // revisao a mostrava certa.
 describe('GET /api/reports/:id/export.pdf com pagina girada', () => {
-  it.each([90, 180, 270])(
-    '/Rotate %i sai como a origem e exibida',
-    async (angle) => {
-      const report = await insertReport();
-      const source = await makeRotatedPdf(angle);
-      await insertConfirmedWithFile(report.id, source);
+  it('/Rotate 90, 180 e 270 saem como a origem e exibida', async () => {
+    const angles = [90, 180, 270];
+    const report = await insertReport();
+    // Um arquivo com uma pagina por angulo, e um comprovante por pagina: um
+    // export e dois renders, no lugar de um de cada por angulo.
+    const source = await makeRotatedPdf(...angles);
+    for (const [index] of angles.entries()) {
+      await insertConfirmedWithFile(report.id, source, {
+        page_number: index + 1,
+        issued_at: `2026-06-1${index + 1}`,
+      });
+    }
 
-      const response = await requestBinary(
-        'GET',
-        `/api/reports/${report.id}/export.pdf`,
-      );
+    const response = await requestBinary(
+      'GET',
+      `/api/reports/${report.id}/export.pdf`,
+    );
 
-      const original = renderPdfPage(source, 1);
-      // A pagina 1 e o indice; a 2, o comprovante.
-      const exported = renderPdfPage(response.buffer, 2);
+    const originals = renderPdfPages(source, [1, 2, 3]);
+    // A pagina 1 e o indice; as seguintes, os comprovantes pela data.
+    const exported = renderPdfPages(response.buffer, [2, 3, 4]);
+    const asExported = (index) => {
+      const [original, page] = [originals[index], exported[index]];
+      return {
+        width: page.width - original.width,
+        stamp: page.height - original.height,
+        pixels:
+          page.width === original.width
+            ? maxPixelDifference(original, page, original.height)
+            : null,
+      };
+    };
 
-      expect(exported.width).toBe(original.width);
-      expect(exported.height).toBe(original.height + STAMP_HEIGHT);
-      expect(maxPixelDifference(original, exported, original.height)).toBe(0);
-    },
-  );
+    expect(
+      Object.fromEntries(angles.map((angle, i) => [angle, asExported(i)])),
+    ).toEqual(
+      Object.fromEntries(
+        angles.map((angle) => [
+          angle,
+          { width: 0, stamp: STAMP_HEIGHT, pixels: 0 },
+        ]),
+      ),
+    );
+  });
 
   it('o giro escolhido na revisao soma ao /Rotate da origem', async () => {
     const report = await insertReport();

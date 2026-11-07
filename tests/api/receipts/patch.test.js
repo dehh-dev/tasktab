@@ -174,6 +174,9 @@ describe('PATCH /api/receipts/:id', () => {
     });
 
     expect(response.status).toBe(422);
+    expect(response.body.details.map((detail) => detail.field)).toEqual([
+      'issued_at',
+    ]);
   });
 });
 

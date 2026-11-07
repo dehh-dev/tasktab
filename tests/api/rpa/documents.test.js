@@ -259,6 +259,40 @@ describe('GET /api/rpa/launches/:id/rpas.zip', () => {
     expect(extractPdfText(joaoPdf)[0]).toContain('JOÃO SINTÉTICO DE ARAÚJO');
   });
 
+  it('duas pessoas com o mesmo primeiro e ultimo nome saem as duas, a segunda com o numero dela', async () => {
+    const { launch } = await arrange();
+    const homonym = await insertRpaWorker({
+      launch_id: launch.id,
+      number: 9,
+      cpf: '11144477735',
+      name: 'Maria Aparecida Sintética',
+    });
+    await insertRpaPayment({
+      worker_id: homonym.id,
+      code: '1-815-9-102026',
+      issued_at: ISSUED_AT,
+    });
+
+    const response = await requestBinary(
+      'GET',
+      `/api/rpa/launches/${launch.id}/rpas.zip?payment=1`,
+    );
+
+    // O JSZip troca em silencio o arquivo de mesmo nome: sem o numero, um
+    // dos dois RPAs sumiria do .zip sem erro nenhum.
+    const zip = await JSZip.loadAsync(response.buffer);
+    const textOf = async (name) =>
+      extractPdfText(await zip.file(name).async('nodebuffer'))[0];
+    const first =
+      'Solicitação - RPA - 1ª Pagto -Maria Sintética_20-10-2026_143005.pdf';
+    const second =
+      'Solicitação - RPA - 1ª Pagto -Maria Sintética_20-10-2026_143005 (9).pdf';
+
+    expect(Object.keys(zip.files).sort()).toEqual([second, first]);
+    expect(await textOf(first)).toContain('MARIA DA CONCEIÇÃO SINTÉTICA');
+    expect(await textOf(second)).toContain('MARIA APARECIDA SINTÉTICA');
+  });
+
   it('sem ?payment, ou sem RPA com o numero, responde 422 no campo', async () => {
     const { launch } = await arrange();
 

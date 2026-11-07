@@ -188,29 +188,32 @@ function makeNonPdf() {
 }
 
 /**
- * Uma pagina em pe com `/Rotate`. As duas marcas ficam em cantos opostos e em
- * tons diferentes: qualquer giro errado troca uma pela outra ou as tira do
- * lugar, e a comparacao de pixels acusa.
+ * Paginas em pe com `/Rotate`, uma por angulo. As duas marcas ficam em cantos
+ * opostos e em tons diferentes: qualquer giro errado troca uma pela outra ou
+ * as tira do lugar, e a comparacao de pixels acusa.
  */
-async function makeRotatedPdf(angle) {
+async function makeRotatedPdf(...angles) {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([200, 600]);
 
-  page.drawRectangle({
-    x: 0,
-    y: 540,
-    width: 60,
-    height: 60,
-    color: rgb(0, 0, 0),
-  });
-  page.drawRectangle({
-    x: 140,
-    y: 0,
-    width: 60,
-    height: 60,
-    color: rgb(0.5, 0.5, 0.5),
-  });
-  page.setRotation(degrees(angle));
+  for (const angle of angles) {
+    const page = doc.addPage([200, 600]);
+
+    page.drawRectangle({
+      x: 0,
+      y: 540,
+      width: 60,
+      height: 60,
+      color: rgb(0, 0, 0),
+    });
+    page.drawRectangle({
+      x: 140,
+      y: 0,
+      width: 60,
+      height: 60,
+      color: rgb(0.5, 0.5, 0.5),
+    });
+    page.setRotation(degrees(angle));
+  }
 
   return Buffer.from(await doc.save());
 }
