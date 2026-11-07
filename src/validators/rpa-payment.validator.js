@@ -163,6 +163,18 @@ function validateCreate(body) {
     data.adjustments = validateAdjustments(body.adjustments, errors);
   }
 
+  // Emitir com pendencia que impede o pagamento (banco, conta, CPF, PIS).
+  if (body.accept_issues !== undefined) {
+    if (typeof body.accept_issues === 'boolean') {
+      data.accept_issues = body.accept_issues;
+    } else {
+      errors.push({
+        field: 'accept_issues',
+        message: 'accept_issues deve ser true ou false',
+      });
+    }
+  }
+
   assertValid(errors);
   return data;
 }

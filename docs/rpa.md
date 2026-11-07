@@ -29,7 +29,9 @@ terceiros — ver [seguranca.md](seguranca.md).
 5. **Pagamentos.** Periodo e data do pagamento, e os acrescimos, bonus e
    descontos, cada um com motivo. A **previa** nao grava nada; **emitir** faz
    a mesma conta e grava. O RPA emitido nao muda: errou, cancele com motivo e
-   emita de novo.
+   emita de novo. As pendencias do cadastro aparecem ao lado de cada pessoa;
+   as de banco, agencia, conta, CPF e PIS impedem o pagamento, e emitir com
+   elas pede confirmacao.
 6. **Emissao.** O RPA de cada pessoa em PDF, no layout do formulario de
    emissao, ou todos num `.zip`, e o texto do e-mail de solicitacao com botoes
    de copiar. O envio continua pelo Gmail de quem pede.

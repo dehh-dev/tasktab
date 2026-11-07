@@ -43,4 +43,46 @@ function reconcileIssues({
   });
 }
 
-module.exports = { reconcileIssues };
+/**
+ * As pendencias que impedem o pagamento (issue 62, decisao de 2026-11-07):
+ * banco, agencia, conta, CPF e PIS errados ou vazios. O financeiro paga pelo
+ * que o RPA imprime, e o erro so apareceria na volta. As outras (endereco,
+ * datas, cidade) so avisam. A nota de CPF ou PIS completado com zero nao
+ * barra: o verificador fechou.
+ */
+const BLOCKING_CODES = new Set([
+  'bank_ambiguous',
+  'bank_unknown',
+  'account_without_digit',
+  'account_format',
+  'cpf_invalid',
+  'pis_invalid',
+]);
+const BLOCKING_MISSING = new Set([
+  'bank_name',
+  'agency',
+  'account',
+  'cpf',
+  'pis',
+]);
+
+function blocksPayment(entry) {
+  return (
+    BLOCKING_CODES.has(entry.code) ||
+    (entry.code === 'missing_field' && BLOCKING_MISSING.has(entry.field))
+  );
+}
+
+/** As pendencias abertas da pessoa, como a previa e a emissao as mostram. */
+function paymentIssues(issues = []) {
+  return issues
+    .filter((entry) => !entry.resolved)
+    .map(({ code, field, message }) => ({
+      code,
+      field,
+      message,
+      blocks_payment: blocksPayment({ code, field }),
+    }));
+}
+
+module.exports = { reconcileIssues, paymentIssues };

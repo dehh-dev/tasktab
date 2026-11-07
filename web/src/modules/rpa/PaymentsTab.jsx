@@ -45,6 +45,22 @@ function PaymentTable({ payments, caption }) {
             <tr key={payment.worker_id}>
               <th scope="row">
                 {payment.worker_number}. {payment.worker_name}
+                {payment.issues?.length > 0 && (
+                  <ul
+                    className="rpa-issues"
+                    aria-label={`Pendencias de ${payment.worker_name}`}
+                  >
+                    {payment.issues.map((issue) => (
+                      <li
+                        key={`${issue.code}-${issue.field}`}
+                        className="rpa-flag"
+                      >
+                        Pendencia: {issue.message}
+                        {issue.blocks_payment && ' (impede o pagamento)'}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </th>
               <td className="rpa-nowrap">
                 {payment.number}º · {payment.code}
@@ -119,6 +135,7 @@ export default function PaymentsTab({ launch, canWrite }) {
   const [busy, setBusy] = useState(false);
   const [canceling, setCanceling] = useState(null);
   const [reason, setReason] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   const loadIssued = useCallback(async () => {
     try {
@@ -156,13 +173,26 @@ export default function PaymentsTab({ launch, canWrite }) {
     };
   }
 
-  async function run(issue) {
+  // O que impede o pagamento (banco, conta, CPF, PIS): emitir assim pede
+  // confirmacao, e a API so aceita com `accept_issues`.
+  const blocking = (preview?.payments ?? []).flatMap((payment) =>
+    (payment.issues ?? [])
+      .filter((issue) => issue.blocks_payment)
+      .map((issue) => ({
+        key: `${payment.worker_id}-${issue.code}-${issue.field}`,
+        text: `${payment.worker_number}. ${payment.worker_name}: ${issue.message}`,
+      })),
+  );
+
+  async function run(issue, extra = {}) {
     setBusy(true);
     setError(null);
     try {
-      const response = await api.postPayments(launch.id, body(), {
-        preview: !issue,
-      });
+      const response = await api.postPayments(
+        launch.id,
+        { ...body(), ...extra },
+        { preview: !issue },
+      );
       if (issue) {
         setPreview(null);
         setAdjustments([]);
@@ -336,7 +366,9 @@ export default function PaymentsTab({ launch, canWrite }) {
                 type="button"
                 className="btn btn--primary"
                 disabled={busy}
-                onClick={() => run(true)}
+                onClick={() =>
+                  blocking.length > 0 ? setConfirming(true) : run(true)
+                }
               >
                 {busy
                   ? 'Emitindo...'
@@ -478,6 +510,30 @@ export default function PaymentsTab({ launch, canWrite }) {
               onChange={(event) => setReason(event.target.value)}
             />
           </div>
+        </ConfirmDialog>
+      )}
+
+      {confirming && (
+        <ConfirmDialog
+          title="Emitir com pendencias"
+          message="O cadastro tem pendencia que impede o pagamento: o financeiro paga pelo que o RPA imprime. Confira antes de emitir:"
+          confirmLabel="Emitir mesmo assim"
+          busyLabel="Emitindo..."
+          busy={busy}
+          onCancel={() => setConfirming(false)}
+          onConfirm={async () => {
+            await run(true, { accept_issues: true });
+            setConfirming(false);
+          }}
+        >
+          <ul
+            className="rpa-details"
+            aria-label="Pendencias que impedem o pagamento"
+          >
+            {blocking.map((entry) => (
+              <li key={entry.key}>{entry.text}</li>
+            ))}
+          </ul>
         </ConfirmDialog>
       )}
     </section>
