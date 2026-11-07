@@ -99,6 +99,9 @@ describe('POST /api/merchants', () => {
     });
 
     expect(response.status).toBe(422);
+    expect(response.body.details.map((detail) => detail.field)).toEqual([
+      'cnpj',
+    ]);
   });
 
   it('aceita CNPJ alfanumerico e grava em maiuscula, sem mascara', async () => {
@@ -130,6 +133,9 @@ describe('POST /api/merchants', () => {
     });
 
     expect(response.status).toBe(422);
+    expect(response.body.details.map((detail) => detail.field)).toEqual([
+      'cnpj',
+    ]);
   });
 
   it('recusa duplicata com 422, e nao com 500 de unique', async () => {

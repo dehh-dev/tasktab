@@ -154,5 +154,8 @@ describe('POST /api/reports', () => {
     });
 
     expect(response.status).toBe(422);
+    expect(response.body.details.map((detail) => detail.field)).toEqual([
+      'advance_cents',
+    ]);
   });
 });

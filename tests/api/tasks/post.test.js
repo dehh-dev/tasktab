@@ -51,6 +51,9 @@ describe('POST /api/tasks', () => {
     const response = await request('POST', '/api/tasks', { title: '   ' });
 
     expect(response.status).toBe(422);
+    expect(response.body.details.map((detail) => detail.field)).toEqual([
+      'title',
+    ]);
   });
 
   it('rejeita title com mais de 255 caracteres', async () => {
@@ -89,6 +92,9 @@ describe('POST /api/tasks', () => {
     });
 
     expect(response.status).toBe(422);
+    expect(response.body.details.map((detail) => detail.field)).toEqual([
+      'due_date',
+    ]);
   });
 
   it('rejeita due_date inexistente no calendario', async () => {
@@ -98,6 +104,9 @@ describe('POST /api/tasks', () => {
     });
 
     expect(response.status).toBe(422);
+    expect(response.body.details.map((detail) => detail.field)).toEqual([
+      'due_date',
+    ]);
   });
 
   it('converte erro inesperado em 500 sem vazar detalhe interno', async () => {
