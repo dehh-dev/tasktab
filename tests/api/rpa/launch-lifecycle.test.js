@@ -128,8 +128,9 @@ function draw(random) {
     const first = pick(FIRST_NAMES);
     const last = pick(LAST_NAMES);
     const cpf = syntheticCpf(1 + Math.floor(random() * 99999998));
-    // Primeiro e ultimo nome repetidos deixariam o documento sem pessoa, de
-    // proposito (ha teste disso); aqui cada um casa com alguem.
+    // Primeiro e ultimo nome repetidos dariam a mesma pasta no .zip dos
+    // documentos, com o numero da pessoa no fim (ha teste disso); aqui cada
+    // um tem a sua.
     if (keys.has(`${first} ${last}`) || cpfs.has(cpf)) continue;
     keys.add(`${first} ${last}`);
     cpfs.add(cpf);
@@ -137,7 +138,9 @@ function draw(random) {
     const middle = random() < 0.5 ? ` ${pick(MIDDLE_NAMES)}` : '';
     people.push({
       name: `${first}${middle} ${last}`,
-      account: `${first} ${last}`,
+      // A conta Google com o nome completo: so ele liga o documento.
+      account: `${first}${middle} ${last}`,
+      folder: `${first} ${last}`.toUpperCase(),
       cpf,
       // As tres funcoes aparecem em toda semente; dali em diante, sorteio.
       rate: people.length < roles.length ? roles[people.length] : pick(roles),
@@ -555,7 +558,7 @@ describe(`RPA de ponta a ponta, com a equipe sorteada (RPA_SEED=${SEED})`, () =>
       people
         .flatMap((person) =>
           ['CE', 'CTPS FRENTE', 'CTPS VERSO', 'RG-CNH FRENTE'].map(
-            (file) => `${person.account.toUpperCase()}/${file}.jpg`,
+            (file) => `${person.folder}/${file}.jpg`,
           ),
         )
         .sort(),

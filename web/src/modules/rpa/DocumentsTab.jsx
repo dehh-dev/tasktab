@@ -10,9 +10,30 @@ function size(bytes) {
 }
 
 /**
+ * Os sem pessoa, por conta Google: a escolha vale para todos os arquivos da
+ * conta (issue 59). Sem o nome da conta, so arquivo por arquivo, na tabela.
+ */
+function accountsWithoutWorker(documents) {
+  const byAccount = new Map();
+
+  for (const document of documents) {
+    if (document.worker_id || !document.source_name) continue;
+    if (!byAccount.has(document.source_name)) {
+      byAccount.set(document.source_name, []);
+    }
+    byAccount.get(document.source_name).push(document);
+  }
+
+  return [...byAccount]
+    .map(([account, files]) => ({ account, files }))
+    .sort((a, b) => a.account.localeCompare(b.account));
+}
+
+/**
  * Documentos do formulario: o .zip da pasta de respostas do Drive entra, e
- * cada arquivo vai para a pessoa e o tipo. O que nao casou com ninguem fica
- * no fim, com o nome da conta Google, para escolher a pessoa.
+ * cada arquivo vai para a pessoa e o tipo. So o nome completo da conta Google
+ * liga sozinho; o resto fica agrupado pela conta, para escolher a pessoa uma
+ * vez, e no fim da tabela, para corrigir um arquivo so.
  */
 export default function DocumentsTab({ launch, canWrite }) {
   const [documents, setDocuments] = useState(null);
@@ -20,6 +41,7 @@ export default function DocumentsTab({ launch, canWrite }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [sending, setSending] = useState(false);
+  const [assigning, setAssigning] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -65,9 +87,33 @@ export default function DocumentsTab({ launch, canWrite }) {
     }
   }
 
+  async function assignAccount(account, workerId) {
+    if (!workerId) return;
+    setAssigning(account);
+    setError(null);
+    try {
+      const updated = new Map();
+      for (const document of documents) {
+        if (document.worker_id || document.source_name !== account) continue;
+        const response = await api.updateDocument(document.id, {
+          worker_id: Number(workerId),
+        });
+        updated.set(document.id, response.data);
+      }
+      setDocuments((current) => current.map((d) => updated.get(d.id) ?? d));
+    } catch (caught) {
+      setError(toError(caught));
+      // Parte pode ter ido: a lista volta do servidor como ficou.
+      await load();
+    } finally {
+      setAssigning(null);
+    }
+  }
+
   const unassigned = (documents ?? []).filter(
     (document) => !document.worker_id,
   ).length;
+  const accounts = accountsWithoutWorker(documents ?? []);
 
   return (
     <section aria-labelledby="documents-title" className="rpa-section">
@@ -114,6 +160,47 @@ export default function DocumentsTab({ launch, canWrite }) {
           <p className="filter__count" aria-live="polite">
             {documents.length} documento(s), {unassigned} sem pessoa
           </p>
+          {canWrite && accounts.length > 0 && (
+            <section
+              aria-labelledby="accounts-title"
+              className="rpa-subsection"
+            >
+              <h4 id="accounts-title">Sem pessoa, por conta</h4>
+              <p className="filter__count">
+                So o nome completo da conta liga sozinho. Escolha a pessoa uma
+                vez: vale para todos os arquivos da conta.
+              </p>
+              <ul className="rpa-issues" aria-label="Contas sem pessoa">
+                {accounts.map(({ account, files }) => (
+                  <li key={account}>
+                    <span>
+                      Conta "{account}": {files.length} arquivo(s)
+                    </span>
+                    <select
+                      className="field__input"
+                      aria-label={`Pessoa da conta ${account}`}
+                      value=""
+                      disabled={assigning !== null}
+                      onChange={(event) =>
+                        assignAccount(account, event.target.value)
+                      }
+                    >
+                      <option value="">
+                        {assigning === account
+                          ? 'Atribuindo...'
+                          : 'Escolher a pessoa'}
+                      </option>
+                      {workers.map((worker) => (
+                        <option key={worker.id} value={worker.id}>
+                          {worker.number}. {worker.name}
+                        </option>
+                      ))}
+                    </select>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <div className="rpa-grid-scroll">
             <table className="rpa-table">
               <caption className="sr-only">Documentos da equipe</caption>

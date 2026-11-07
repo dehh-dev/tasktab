@@ -37,4 +37,4 @@ function smartCase(value) {
     .join(' ');
 }
 
-module.exports = { squish, fold, smartCase };
+module.exports = { CONNECTORS, squish, fold, smartCase };

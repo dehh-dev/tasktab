@@ -241,9 +241,11 @@ conversa, com o mesmo assunto.
 pasta de respostas do formulario baixado do Drive (uma subpasta por pergunta,
 arquivos `<nome original> - <nome da conta Google>`). O tipo sai da subpasta
 (CTPS, RG ou CNH, comprovante de endereco, dados bancarios; frente ou verso);
-a pessoa, do nome da conta, pelo primeiro e ultimo nome sem acento e sem
-caixa. O que nao casar fica sem `worker_id`, com `source_name`, para escolher
-no `PATCH /api/rpa/files/:id`. Frente e verso com o mesmo conteudo viram um
+a pessoa, do nome da conta, so quando ele e o **nome completo** do cadastro
+(sem acento, sem caixa e sem de/da/do/das/dos/e). Parte do nome nunca liga, e
+duas pessoas com o mesmo nome deixam o arquivo sem pessoa. O que nao casar
+fica sem `worker_id`, com `source_name`, para escolher no
+`PATCH /api/rpa/files/:id`. Frente e verso com o mesmo conteudo viram um
 arquivo so, sem lado; reenviar o mesmo .zip nao duplica. Arquivo de pergunta
 desconhecida, ou que nao e foto nem PDF, volta em `rejected`. O .zip e
 recusado inteiro com `422` se tiver mais de 2.000 arquivos, um arquivo acima

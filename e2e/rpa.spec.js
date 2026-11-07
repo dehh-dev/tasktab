@@ -283,7 +283,8 @@ test('documentos do Drive e recibos assinados, pela tela', async ({
     .getByRole('button', { name: `${DEVELOPMENT} documentos — Avaré/SP` })
     .click();
 
-  // Documentos: um casa pelo nome da conta, o outro fica sem pessoa.
+  // Documentos: um casa pelo nome completo da conta, a outra conta fica sem
+  // pessoa.
   await page.getByRole('button', { name: 'Documentos', exact: true }).click();
   await page.getByLabel(/Arraste o \.zip da pasta de respostas/).setInputFiles({
     name: 'Cadastro (File responses).zip',
@@ -299,18 +300,29 @@ test('documentos do Drive e recibos assinados, pela tela', async ({
         name: 'conta - Apelido Desconhecido.jpg',
         data: await photo(12),
       },
+      {
+        question: QUESTIONS.bank,
+        name: 'print - Apelido Desconhecido.jpg',
+        data: await photo(13),
+      },
     ]),
   });
-  await expect(page.getByText('2 documento(s), 1 sem pessoa')).toBeVisible();
+  await expect(page.getByText('3 documento(s), 2 sem pessoa')).toBeVisible();
   await expect(
     page.getByText('sem pessoa: conta "Apelido Desconhecido"'),
-  ).toBeVisible();
+  ).toHaveCount(2);
 
-  const orphan = page
-    .getByRole('combobox', { name: /Pessoa do documento/ })
-    .nth(1);
-  await orphan.selectOption({ label: `${second.number}. ${second.name}` });
-  await expect(page.getByText('2 documento(s), 0 sem pessoa')).toBeVisible();
+  // A conta que nao e o nome completo: uma escolha vale para os dois arquivos.
+  await expect(
+    page.getByRole('list', { name: 'Contas sem pessoa' }).getByRole('listitem'),
+  ).toHaveText([/^Conta "Apelido Desconhecido": 2 arquivo\(s\)/]);
+  await page
+    .getByLabel('Pessoa da conta Apelido Desconhecido')
+    .selectOption({ label: `${second.number}. ${second.name}` });
+  await expect(page.getByText('3 documento(s), 0 sem pessoa')).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Contas sem pessoa' }),
+  ).toHaveCount(0);
 
   // Recibos: um PDF escaneado por pessoa, como o RH manda e cada um devolve,
   // enviados juntos e lidos no servidor.
