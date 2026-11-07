@@ -69,6 +69,10 @@ async function queryWithTimeout(text, params, timeoutMs) {
  * estoura. Quem escreve em mais de uma tabela de uma vez (o lancamento do RPA
  * com horario e diarias, a importacao da equipe) passa por aqui, para nao
  * sobrar metade gravada.
+ *
+ * O `client` e uma conexao so: dentro de `work`, uma consulta por vez. Um
+ * `Promise.all` nele o pg 8 enfileira com DeprecationWarning, e o 9 deixa de
+ * aceitar.
  */
 async function transaction(work) {
   const client = await pool.connect();

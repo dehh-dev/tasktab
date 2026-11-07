@@ -6,6 +6,7 @@ const {
   insertRpaCompany,
   insertRpaLaunch,
   insertRpaWorker,
+  startApiInstance,
   updateColumnDirectly,
 } = require('../../orchestrator');
 
@@ -67,11 +68,12 @@ function arrangeWorker(launch, overrides = {}) {
   });
 }
 
-function pay(launchId, body, { preview = false } = {}) {
+function pay(launchId, body, { preview = false, baseUrl } = {}) {
   return request(
     'POST',
     `/api/rpa/launches/${launchId}/payments${preview ? '?preview=true' : ''}`,
     { payment_date: '2026-10-20', ...body },
+    { baseUrl },
   );
 }
 
@@ -568,5 +570,41 @@ describe('cancelamento e consulta', () => {
       ],
     });
     expect(response.body.data.lines).toHaveLength(7);
+  });
+});
+
+/**
+ * A emissao roda numa transacao, que e uma conexao so. Consulta disparada
+ * nela com outra em curso o pg 8 enfileira, so com um DeprecationWarning que
+ * a instancia principal esconde, e o 9 deixa de aceitar. Esta API sobe com
+ * `--throw-deprecation`: o aviso a derruba, e a emissao fica sem resposta.
+ */
+describe('POST /api/rpa/launches/:id/payments: a transacao, uma consulta por vez', () => {
+  let instance = null;
+
+  // Subir um processo novo pode passar do teto padrao de 15 s do Jest quando
+  // o disco esta disputado — ver `startApiInstance`.
+  beforeAll(async () => {
+    instance = await startApiInstance({ NODE_OPTIONS: '--throw-deprecation' });
+  }, 70000);
+
+  afterAll(async () => {
+    await instance?.stop();
+  });
+
+  it('emitir nao dispara consultas em paralelo na conexao da transacao', async () => {
+    const { launch } = await arrangeLaunch();
+    await arrangeWorker(launch);
+
+    const response = await pay(launch.id, FIRST_WEEK, {
+      baseUrl: instance.baseUrl,
+    }).catch((error) => {
+      throw new Error(`a API caiu na emissao:\n${instance.errors()}`, {
+        cause: error,
+      });
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.payments).toHaveLength(1);
   });
 });

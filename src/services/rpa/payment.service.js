@@ -119,12 +119,18 @@ function skipReason(plan) {
 async function buildPayments(launch, request, client = db) {
   assertPeriodInLaunch(launch, request);
 
-  const [workers, exceptions, ledgerRows, tables] = await Promise.all([
-    Worker.findByLaunch(launch.id, client),
-    Day.findByLaunch(launch.id, launch.starts_on, launch.ends_on, client),
-    Payment.ledgerByLaunch(launch.id, client),
-    Payment.taxTables(request.payment_date, client),
-  ]);
+  // Uma consulta por vez, sem `Promise.all`: na emissao o `client` e a
+  // conexao da transacao, e consulta disparada com outra em curso o pg 8
+  // enfileira com DeprecationWarning e o 9 deixa de aceitar.
+  const workers = await Worker.findByLaunch(launch.id, client);
+  const exceptions = await Day.findByLaunch(
+    launch.id,
+    launch.starts_on,
+    launch.ends_on,
+    client,
+  );
+  const ledgerRows = await Payment.ledgerByLaunch(launch.id, client);
+  const tables = await Payment.taxTables(request.payment_date, client);
 
   if (!tables.inss || !tables.irrf) {
     throw new ValidationError({
@@ -136,20 +142,18 @@ async function buildPayments(launch, request, client = db) {
 
   const selected = assertKnownWorkers(workers, request);
   const chosen = workers.filter((worker) => selected.has(worker.id));
-  const [numberRows, monthRows] = await Promise.all([
-    Payment.numbersByWorkers(
-      chosen.map((worker) => worker.id),
-      client,
-    ),
-    Payment.monthTotals(
-      {
-        cnpj: launch.company_cnpj,
-        cpfs: chosen.map((worker) => worker.cpf),
-        paymentDate: request.payment_date,
-      },
-      client,
-    ),
-  ]);
+  const numberRows = await Payment.numbersByWorkers(
+    chosen.map((worker) => worker.id),
+    client,
+  );
+  const monthRows = await Payment.monthTotals(
+    {
+      cnpj: launch.company_cnpj,
+      cpfs: chosen.map((worker) => worker.cpf),
+      paymentDate: request.payment_date,
+    },
+    client,
+  );
 
   const grid = buildGrid({
     launch,

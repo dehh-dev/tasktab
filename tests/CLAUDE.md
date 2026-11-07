@@ -68,6 +68,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 | `runMigration(direcao, n)` / `migrationsFrom(nome)`                | anda migrations; quantas o `down` desfaz ate antes de uma  |
 | `enumLabels(tipo)`                                                 | valores de um enum do banco, na ordem declarada            |
 | `startApiInstance(env)`                                            | outra API, em porta propria; `output()` e o stdout dela    |
+| `errors()` da instancia                                            | o fim do stderr dela: o que disse ao cair                  |
 
 - `request()` ja chega autenticada como o **admin padrao**. `{ token: null }`
   testa 401; `createUserWithSession({ role })`, outro papel. O hash da senha e
