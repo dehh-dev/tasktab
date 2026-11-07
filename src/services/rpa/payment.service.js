@@ -16,6 +16,7 @@ const {
 } = require('./payment-plan');
 const { NO_PREVIOUS, grossForNet } = require('./taxes');
 const { paymentIssues } = require('./worker-issues');
+const { formatMoney } = require('./rpa-format');
 
 /**
  * A previa e a emissao dos RPAs de um lancamento (issue 39). As duas passam
@@ -104,6 +105,21 @@ function isActive(launch, worker, request) {
   );
 }
 
+/**
+ * O aviso do pagamento que vem logo depois de um bonus da pessoa (issue 61).
+ * O costume da planilha era adiantar dias como bonus; aqui o bonus nao cobre
+ * dia, e os mesmos dias sairiam pagos de novo. Quem confere decide.
+ */
+function bonusWarnings(bonuses = []) {
+  return bonuses.map((bonus) => ({
+    code: 'after_bonus',
+    message:
+      `o RPA ${bonus.code} levou bonus de ${formatMoney(bonus.amount_cents)} ` +
+      `("${bonus.reason}"). Bonus nao cobre dia: confira se este pagamento ` +
+      'nao paga de novo os dias que ele adiantou.',
+  }));
+}
+
 function skipReason(plan) {
   if (plan.unpriced.length > 0) {
     return `sem diaria vigente em ${plan.unpriced.join(', ')}`;
@@ -148,6 +164,10 @@ async function buildPayments(launch, request, client = db) {
     chosen.map((worker) => worker.id),
     client,
   );
+  const bonusRows = await Payment.lastBonuses(
+    chosen.map((worker) => worker.id),
+    client,
+  );
   const monthRows = await Payment.monthTotals(
     {
       cnpj: launch.company_cnpj,
@@ -169,6 +189,7 @@ async function buildPayments(launch, request, client = db) {
     numberRows.map((row) => [row.worker_id, row.numbers]),
   );
   const month = new Map(monthRows.map((row) => [row.cpf, row]));
+  const bonuses = Map.groupBy(bonusRows, (row) => row.worker_id);
   const period = { from: request.period_start, to: request.period_end };
   const payments = [];
   const skipped = [];
@@ -233,6 +254,7 @@ async function buildPayments(launch, request, client = db) {
       // A pendencia so aparecia na aba Equipe, e o RPA saia com banco
       // ambiguo ou conta sem digito sem ninguem ver.
       issues: paymentIssues(worker.issues),
+      warnings: bonusWarnings(bonuses.get(worker.id)),
       dependents: worker.dependents,
       inss_table_id: tables.inss.id,
       irrf_table_id: tables.irrf.id,

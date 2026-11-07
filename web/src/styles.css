@@ -1890,6 +1890,11 @@ textarea.field__input {
   margin-bottom: 8px;
 }
 
+.rpa-adjustment__hint {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+}
+
 .rpa-copy {
   align-items: flex-start;
   display: flex;

@@ -114,6 +114,29 @@ async function numbersByWorkers(workerIds, client = db) {
 }
 
 /**
+ * Os bonus do ultimo RPA valido de cada pessoa (issue 61): o pagamento que vem
+ * logo depois avisa, porque o bonus nao cobre dia e os dias que ele adiantou
+ * sairiam pagos de novo.
+ */
+async function lastBonuses(workerIds, client = db) {
+  const { rows } = await client.query(
+    `WITH last AS (
+       SELECT DISTINCT ON (worker_id) id, worker_id, number, code
+       FROM rpa_payments
+       WHERE worker_id = ANY($1::int[]) AND status <> 'canceled'
+       ORDER BY worker_id, issued_at DESC, id DESC
+     )
+     SELECT last.worker_id, last.number, last.code, a.amount_cents, a.reason
+     FROM last
+     JOIN rpa_payment_adjustments a ON a.payment_id = last.id
+     WHERE a.kind = 'bonus'
+     ORDER BY last.worker_id, a.id`,
+    [workerIds],
+  );
+  return rows;
+}
+
+/**
  * O acumulado do mes por CPF na mesma fonte pagadora (o CNPJ da empresa), em
  * qualquer lancamento: o teto do INSS e o IRRF sao do mes, e nao de cada RPA.
  */
@@ -351,6 +374,7 @@ module.exports = {
   findById,
   ledgerByLaunch,
   numbersByWorkers,
+  lastBonuses,
   takenCodes,
   monthTotals,
   taxTables,

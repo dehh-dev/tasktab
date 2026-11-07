@@ -608,6 +608,101 @@ describe('POST /api/rpa/launches/:id/payments: as pendencias da pessoa (issue 62
   });
 });
 
+describe('POST /api/rpa/launches/:id/payments: o pagamento depois de um bonus (issue 61)', () => {
+  const ADVANCED = {
+    worker_id: null,
+    kind: 'bonus',
+    amount_cents: 73938,
+    reason: 'dias 20/10, 21/10 e 22/10 adiantados',
+  };
+  const NEXT_WEEK = {
+    period_start: '2026-10-20',
+    period_end: '2026-10-26',
+    payment_date: '2026-10-27',
+  };
+
+  async function arrangeBonus() {
+    const { company, launch } = await arrangeLaunch({
+      launch: { first_payment_daily_only: false },
+    });
+    const worker = await arrangeWorker(launch);
+    const other = await arrangeWorker(launch, {
+      number: 8,
+      cpf: '11144477735',
+    });
+    const first = await pay(launch.id, {
+      ...FIRST_WEEK,
+      adjustments: [{ ...ADVANCED, worker_id: worker.id }],
+    });
+    expect(first.status).toBe(201);
+
+    return { company, launch, worker, other, first };
+  }
+
+  const warningsOf = (body) =>
+    Object.fromEntries(
+      body.data.payments.map((payment) => [
+        payment.worker_number,
+        payment.warnings,
+      ]),
+    );
+
+  it('a previa seguinte avisa com o RPA, o valor e o motivo do bonus, e deixa a conta como esta', async () => {
+    const { company, launch } = await arrangeBonus();
+
+    const preview = await pay(launch.id, NEXT_WEEK, { preview: true });
+
+    expect(preview.status).toBe(200);
+    expect(warningsOf(preview.body)).toEqual({
+      7: [
+        {
+          code: 'after_bonus',
+          message:
+            `o RPA 1-${company.code}-7-102026 levou bonus de R$ 739,38 ` +
+            '("dias 20/10, 21/10 e 22/10 adiantados"). Bonus nao cobre dia: ' +
+            'confira se este pagamento nao paga de novo os dias que ele adiantou.',
+        },
+      ],
+      8: [],
+    });
+    // Quem confere decide: os dias continuam na conta.
+    const [payment] = preview.body.data.payments;
+    expect(payment.days.daily_subcents).toBe(subcents(5 * 130));
+  });
+
+  it('so o pagamento logo depois avisa; com o RPA do bonus cancelado, nenhum', async () => {
+    const { launch } = await arrangeBonus();
+    await pay(launch.id, NEXT_WEEK);
+
+    const after = await pay(
+      launch.id,
+      {
+        period_start: '2026-10-27',
+        period_end: '2026-11-02',
+        payment_date: '2026-11-03',
+      },
+      { preview: true },
+    );
+
+    expect(warningsOf(after.body)).toEqual({ 7: [], 8: [] });
+
+    const { launch: again, first: bonus } = await arrangeBonus();
+    const [bonusPayment] = bonus.body.data.payments.filter(
+      (payment) => payment.adjustments.length > 0,
+    );
+    const canceled = await request(
+      'POST',
+      `/api/rpa/payments/${bonusPayment.id}/cancel`,
+      { reason: 'bonus lancado no lugar dos dias' },
+    );
+    expect(canceled.status).toBe(200);
+
+    const preview = await pay(again.id, NEXT_WEEK, { preview: true });
+
+    expect(warningsOf(preview.body)).toEqual({ 7: [], 8: [] });
+  });
+});
+
 describe('POST /api/rpa/launches/:id/payments: ponto de dia ja pago', () => {
   it('a diferenca entra na previa seguinte como correcao, com o dia', async () => {
     const { launch } = await arrangeLaunch({

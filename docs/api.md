@@ -189,8 +189,10 @@ totais), `deferred_extra_subcents` (extra que o 1o pagamento so com diarias
 deixou para o seguinte), `adjustments`, `value_cents` (os dias, arredondados
 uma vez), `net_cents`, `inss_cents`, `irrf_cents`, `gross_cents`,
 `irrf_base_cents`, `month_before` (o que a pessoa ja recebeu no mes, na
-mesma empresa) e `issues`, as pendencias abertas do cadastro (`code`,
-`field`, `message`, `blocks_payment`). `skipped` diz quem ficou de fora e por
+mesma empresa), `issues`, as pendencias abertas do cadastro (`code`,
+`field`, `message`, `blocks_payment`), e `warnings`, os avisos que nao
+barram (`code`, `message`): `after_bonus` quando o ultimo RPA valido da
+pessoa levou bonus, que nao cobre dia. `skipped` diz quem ficou de fora e por
 que: nada a pagar, desconto maior que o valor, dia sem diaria vigente.
 
 Pendencia de banco, agencia, conta, CPF ou PIS impede o pagamento: com uma
