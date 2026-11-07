@@ -66,13 +66,6 @@ const LABEL_WORDS = new Set([
   'totais',
 ]);
 
-function isLabel(value) {
-  const words = fold(value)
-    .split(/[^a-z]+/)
-    .filter(Boolean);
-  return words.length > 0 && words.every((word) => LABEL_WORDS.has(word));
-}
-
 /** Linha que e so um nome: letras, duas palavras ou mais, nenhum rotulo. */
 function looksLikeName(line) {
   const folded = fold(line);
@@ -87,6 +80,10 @@ function looksLikeName(line) {
  * COMPLETO" do RPCI do RH) tem o nome na linha vizinha: a de baixo na ordem da
  * pagina (OCR), a de cima na camada de texto do Senior. "Nome ou razao
  * social" e a empresa, nunca a pessoa.
+ *
+ * O resto da linha do rotulo passa pelo mesmo `looksLikeName` das vizinhas
+ * (issue 69): no escaneado, o rotulo vem seguido da linha da assinatura, e
+ * um risco que o OCR leu como letra fazia "COMPLETO ____ i" passar por nome.
  */
 function readName(text) {
   const all = lines(text);
@@ -98,12 +95,13 @@ function readName(text) {
       continue;
     }
 
+    // Pontuacao nas pontas e do OCR; no meio, tira a linha de ser nome.
     const inline = squish(
       line.includes(':')
         ? line.slice(line.indexOf(':') + 1)
         : line.replace(/^\S+/, ''),
-    );
-    if (inline !== '' && !isLabel(inline)) return inline;
+    ).replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
+    if (looksLikeName(inline)) return inline;
 
     const neighbour = [all[index + 1], all[index - 1]].find(
       (candidate) => candidate && looksLikeName(candidate),
@@ -185,9 +183,33 @@ function matchPage(text, candidates) {
   return { candidate: null, by: null, cpfs };
 }
 
-/** O nome lido difere do cadastro? Sem acento, sem caixa e sem espaco a mais. */
+// A sobra do OCR depois do nome: uma palavra deste tamanho, no fim.
+const NOISE_MAX_LETTERS = 3;
+
+function nameLetters(text) {
+  return fold(text)
+    .split(/[^a-z]+/)
+    .filter(Boolean);
+}
+
+/**
+ * O nome lido e o do cadastro, a menos do ruido do OCR (issue 69)? As palavras
+ * do cadastro, na mesma ordem, comparadas sem os espacos: "SILVADE OLIVEIRA"
+ * e "Silva de Oliveira". Uma palavra curta a mais no fim e lixo da leitura.
+ * Uma letra trocada, a mais ou a menos (MATOS x MATTOS) continua diferente:
+ * e o erro de digitacao que o aviso existe para pegar. Com dois de tres
+ * avisos falsos, quem confere aprendia a ignorar o aviso.
+ */
 function sameName(read, registered) {
-  return squish(fold(read)) === squish(fold(registered));
+  const target = nameLetters(registered).join('');
+  const words = nameLetters(read);
+  if (words.join('') === target) return true;
+
+  return (
+    words.length > 1 &&
+    words.at(-1).length <= NOISE_MAX_LETTERS &&
+    words.slice(0, -1).join('') === target
+  );
 }
 
 module.exports = {

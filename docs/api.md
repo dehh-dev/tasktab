@@ -272,7 +272,9 @@ do cadastro. Em `GET /api/rpa/receipt-batches/:id`, quando `status` e `done`,
 `result` traz `matched` (pagina, pessoa, pagamento, como casou e o que foi
 lido), `missing` (quem nao teve recibo), `unmatched_pages`,
 `name_differences`, `value_differences` e `date_differences` — apontadas,
-nunca corrigidas. O PDF de uma pagina so vai para a pessoa como veio (uma
+nunca corrigidas. No nome, o ruido do OCR nao conta: palavra grudada ou
+partida, e uma palavra de ate 3 letras a mais no fim; uma letra trocada, a
+mais ou a menos, sim. O PDF de uma pagina so vai para a pessoa como veio (uma
 assinatura digital continua valendo); do PDF com varias, cada pagina casada
 vira um PDF so dela, sem recomprimir. O pagamento passa a `paid`. `GET /api/rpa/launches/:id/receipts.zip?payment=n`
 junta os recibos como `RECIBO NOME COMPLETO.pdf`, com o nome do cadastro.

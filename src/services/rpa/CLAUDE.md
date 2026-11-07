@@ -286,6 +286,14 @@ pendencia barra a importacao.
   recibo real nao entra no repositorio. Diferenca e **apontada, nunca
   corrigida** — o recibo de R$ 650,01
   continua contra o RPA de R$ 650,00, e o pagamento vira pago assim mesmo.
+- **Ruido do OCR nao e nome diferente** (issue 69): com recibos reais
+  escaneados, dois de tres avisos de nome eram falsos, e quem confere
+  aprende a ignorar o aviso. `sameName` compara as palavras do cadastro na
+  ordem, sem os espacos (palavra grudada ou partida passa), e ignora uma
+  palavra de ate 3 letras a mais no fim. Uma letra trocada, a mais ou a menos
+  (MATOS x MATTOS) continua avisando. O resto da linha do rotulo "NOME" so
+  vale como nome pelo `looksLikeName`, como as vizinhas: o rotulo seguido da
+  linha da assinatura ("COMPLETO ____ i") era lido como nome.
 - A pagina separada e **copiada** (`copyPages`), sem recomprimir: a imagem e a
   mesma, byte a byte (ha teste do stream). O PDF dela sai sem data
   (`updateMetadata: false`), entao reenviar o mesmo lote da o mesmo arquivo e

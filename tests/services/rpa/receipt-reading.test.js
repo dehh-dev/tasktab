@@ -142,6 +142,23 @@ describe('o RPCI do RH (Senior)', () => {
     expect(readName('NOME COMPLETO\nASSINATURA\n22/10/2026')).toBeNull();
   });
 
+  // No escaneado, o rotulo vem seguido da linha da assinatura (issue 69).
+  it.each([
+    ['tracos com um risco lido como letra', 'NOME COMPLETO ________ i'],
+    ['tracos e pontos', 'NOME COMPLETO ....____....'],
+    ['so tracos', 'NOME COMPLETO ________________'],
+    ['rotulo e digito', 'NOME COMPLETO 1 ____ 7'],
+  ])('rotulo com %s nao e nome: vale a linha vizinha', (_, label) => {
+    expect(readName(`${label}\nPEDRO MATOS\nASSINATURA`)).toBe('PEDRO MATOS');
+    expect(readName(`${label}\nASSINATURA`)).toBeNull();
+  });
+
+  it('pontuacao do OCR nas pontas do nome na linha do rotulo nao o descarta', () => {
+    expect(readName('Nome: | MARIA DA CONCEICAO SILVA .')).toBe(
+      'MARIA DA CONCEICAO SILVA',
+    );
+  });
+
   it('sem valor na linha do liquido, vale "a importancia de R$" do corpo', () => {
     expect(
       readNetCents('LIQUIDO:\n17,30\na importancia de R$ 1.140,00 -- ( mil )'),
@@ -195,13 +212,29 @@ describe('matchPage', () => {
   });
 });
 
-describe('sameName', () => {
-  it('ignora acento, caixa e espaco a mais', () => {
-    expect(
-      sameName('MARIA DA CONCEICAO  SILVA', 'Maria da Conceição Silva'),
-    ).toBe(true);
-    expect(
-      sameName('MARIA DA CONCEICAO SILV', 'Maria da Conceição Silva'),
-    ).toBe(false);
+describe('sameName: ruido do OCR nao e diferenca, erro de digitacao e (issue 69)', () => {
+  it.each([
+    ['MARIA DA CONCEICAO  SILVA', 'Maria da Conceição Silva', true],
+    // Palavras grudadas, ou partidas, pelo OCR.
+    ['MARIA SILVADE OLIVEIRA', 'Maria Silva de Oliveira', true],
+    ['MARIADA CONCEICAO SILVA', 'Maria da Conceição Silva', true],
+    ['MARIA SIL VA DE OLIVEIRA', 'Maria Silva de Oliveira', true],
+    // Uma palavra curta a mais no fim: lixo da leitura.
+    ['MARIA SILVA DE OLIVEIRA EE', 'Maria Silva de Oliveira', true],
+    ['MARIA SILVA DE OLIVEIRA I', 'Maria Silva de Oliveira', true],
+    ['PEDRO MATTOS 1 ;', 'Pedro Mattos', true],
+    // Uma letra trocada, a mais ou a menos, avisa.
+    ['PEDRO MATOS', 'Pedro Mattos', false],
+    ['PEDRO MATTOSS', 'Pedro Mattos', false],
+    ['PEDRO MATOZ', 'Pedro Matos', false],
+    ['MARIA DA CONCEICAO SILV', 'Maria da Conceição Silva', false],
+    // Palavra a mais que nao e curta, ou faltando, tambem.
+    ['MARIA SILVA DE OLIVEIRA SANTOS', 'Maria Silva de Oliveira', false],
+    ['MARIA SILVA', 'Maria Silva de Oliveira', false],
+    // So uma sobra no fim: duas palavras curtas ja nao sao ruido.
+    ['MARIA SILVA EE II', 'Maria Silva', false],
+    ['OLIVEIRA MARIA SILVA DE', 'Maria Silva de Oliveira', false],
+  ])('%j e %j: mesmo nome = %j', (read, registered, expected) => {
+    expect(sameName(read, registered)).toBe(expected);
   });
 });
