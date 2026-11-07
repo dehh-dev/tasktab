@@ -15,16 +15,19 @@ const { makeReceiptPdf } = require('../tests/fixtures/pdf');
 // acompanhamento, nao a extracao.
 const PAGES = 60;
 
+// A queda de rede so precisa do lote em andamento quando a tela abre: dali
+// em diante ela consulta ate ver o fim, mesmo que o servidor ja tenha
+// terminado. Metade do lote, e uns cinco segundos a menos.
+const PAGES_FOR_OUTAGE = 30;
+
 test.beforeEach(async ({ request }) => {
   await clearReports(request);
 });
 
 /** Abre o relatorio com o lote ainda na fila de extracao. */
-async function openWhileProcessing(page, request, title) {
+async function openWhileProcessing(page, request, title, pages = PAGES) {
   const report = await createReport(request, { title });
-  await sendReceipts(request, report.id, [
-    await makeReceiptPdf({ pages: PAGES }),
-  ]);
+  await sendReceipts(request, report.id, [await makeReceiptPdf({ pages })]);
 
   await page.goto('/');
   await openSection(page, 'Prestacao de Contas');
@@ -86,7 +89,12 @@ test('a rede cai no meio do acompanhamento: avisa e retoma sozinha', async ({
   context,
   request,
 }) => {
-  await openWhileProcessing(page, request, 'Lote com queda de rede');
+  await openWhileProcessing(
+    page,
+    request,
+    'Lote com queda de rede',
+    PAGES_FOR_OUTAGE,
+  );
 
   // A rede do navegador cai de verdade: nenhuma resposta e inventada, a
   // requisicao so nao sai. Antes, o erro era engolido, nenhum ciclo novo era
@@ -101,5 +109,7 @@ test('a rede cai no meio do acompanhamento: avisa e retoma sozinha', async ({
   await context.setOffline(false);
 
   await expect(notice).toHaveCount(0, { timeout: 20000 });
-  await expect(reviewed(page)).toHaveCount(PAGES, { timeout: 30000 });
+  await expect(reviewed(page)).toHaveCount(PAGES_FOR_OUTAGE, {
+    timeout: 30000,
+  });
 });
