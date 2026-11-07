@@ -1,6 +1,6 @@
 'use strict';
 
-const { fold, squish } = require('./text');
+const { CONNECTORS, fold, squish } = require('./text');
 
 /**
  * Os documentos do formulario (issue 41), puros: de que pergunta veio cada
@@ -100,22 +100,30 @@ function detectType(buffer) {
   return null;
 }
 
-/** Primeiro e ultimo nome, sem acento e sem caixa. */
-function nameKey(name) {
-  const words = normalized(name).split(' ').filter(Boolean);
-  if (words.length === 0) return null;
-  return words.length === 1 ? words[0] : `${words[0]} ${words.at(-1)}`;
+/**
+ * O nome inteiro, para comparar: sem acento, sem caixa e sem de/da/do/das/
+ * dos/e, que a conta Google costuma deixar de fora. Todas as outras palavras,
+ * na ordem.
+ */
+function fullNameKey(name) {
+  const words = normalized(name)
+    .split(' ')
+    .filter((word) => word !== '' && !CONNECTORS.has(word));
+  return words.length === 0 ? null : words.join(' ');
 }
 
 /**
- * A pessoa do lancamento com o mesmo primeiro e ultimo nome da conta. Duas
- * pessoas com a mesma chave, ou nenhuma, e `null`: alguem escolhe na mao.
+ * A pessoa do lancamento cujo nome completo e o da conta (issue 59, decisao
+ * de 2026-11-07). Parte do nome nunca liga: "Maria Oliveira" nao e "Maria
+ * Paula Silva Oliveira", e o primeiro e ultimo nome, a regra anterior, ja
+ * trocava uma pessoa pela outra. Duas pessoas com o mesmo nome, ou nenhuma, e
+ * `null`: alguem escolhe na tela, uma vez por conta.
  */
 function matchWorker(account, workers) {
-  const key = account ? nameKey(account) : null;
+  const key = account ? fullNameKey(account) : null;
   if (!key) return null;
 
-  const matches = workers.filter((worker) => nameKey(worker.name) === key);
+  const matches = workers.filter((worker) => fullNameKey(worker.name) === key);
   return matches.length === 1 ? matches[0] : null;
 }
 

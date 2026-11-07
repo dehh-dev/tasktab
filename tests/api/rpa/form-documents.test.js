@@ -22,6 +22,7 @@ const {
   rawZip,
 } = require('../../fixtures/drive');
 const { makePdf } = require('../../fixtures/pdf');
+const { syntheticCpf } = require('../../fixtures/forms');
 
 /**
  * Os documentos do formulario (issue 41): o .zip do Drive entra, cada
@@ -85,23 +86,23 @@ async function teamZip() {
     [
       {
         question: QUESTIONS.ctpsFront,
-        name: 'IMG_0001 - Maria Silva.jpg',
+        name: 'IMG_0001 - Maria da Conceicao Silva.jpg',
         data: files.ctpsFront,
       },
       {
         question: QUESTIONS.ctpsBack,
-        name: 'IMG_0002 - Maria Silva.jpg',
+        name: 'IMG_0002 - Maria da Conceicao Silva.jpg',
         data: files.ctpsBack,
       },
       // A mesma foto mandada como frente e como verso do RG.
       {
         question: QUESTIONS.idFront,
-        name: 'rg - Maria Silva.jpg',
+        name: 'rg - Maria da Conceicao Silva.jpg',
         data: files.rg,
       },
       {
         question: QUESTIONS.idBack,
-        name: 'rg - Maria Silva.jpg',
+        name: 'rg - Maria da Conceicao Silva.jpg',
         data: files.rg,
       },
       {
@@ -121,19 +122,19 @@ async function teamZip() {
       },
       {
         question: 'Outra pergunta (File responses)',
-        name: 'x - Maria Silva.jpg',
+        name: 'x - Maria da Conceicao Silva.jpg',
         data: await photo(6),
       },
       {
         question: QUESTIONS.ctpsFront,
-        name: 'leia-me - Maria Silva.jpg',
+        name: 'leia-me - Maria da Conceicao Silva.jpg',
         data: Buffer.from('nao e foto'),
       },
     ],
     {
       extra: [
         {
-          path: '__MACOSX/._IMG_0001 - Maria Silva.jpg',
+          path: '__MACOSX/._IMG_0001 - Maria da Conceicao Silva.jpg',
           data: Buffer.from('lixo'),
         },
       ],
@@ -238,7 +239,7 @@ describe('POST /api/rpa/launches/:id/documents: defesa de zip', () => {
     const { response, documents } = await refused(
       rawZip([
         {
-          name: `${ctps}/a - Maria Silva.jpg`,
+          name: `${ctps}/a - Maria da Conceicao Silva.jpg`,
           data: Buffer.alloc(60 * 1024 * 1024),
         },
       ]),
@@ -259,7 +260,7 @@ describe('POST /api/rpa/launches/:id/documents: defesa de zip', () => {
     // Nove entradas que declaram 49 MB cada e trazem um byte so: a recusa
     // vem do diretorio central, sem descompactar nenhuma.
     const entries = Array.from({ length: 9 }, (_, index) => ({
-      name: `${ctps}/${index} - Maria Silva.jpg`,
+      name: `${ctps}/${index} - Maria da Conceicao Silva.jpg`,
       data: Buffer.from([index]),
       declaredSize: 49 * 1024 * 1024,
     }));
@@ -277,7 +278,7 @@ describe('POST /api/rpa/launches/:id/documents: defesa de zip', () => {
     const { response, documents } = await refused(
       rawZip([
         {
-          name: `${ctps}/a - Maria Silva.jpg`,
+          name: `${ctps}/a - Maria da Conceicao Silva.jpg`,
           data: Buffer.alloc(20 * 1024 * 1024),
           declaredSize: 1024,
         },
@@ -293,7 +294,7 @@ describe('POST /api/rpa/launches/:id/documents: defesa de zip', () => {
 
   it('mais de 2.000 entradas e recusado pelo diretorio central', async () => {
     const entries = Array.from({ length: 2001 }, (_, index) => ({
-      name: `${ctps}/${index} - Maria Silva.jpg`,
+      name: `${ctps}/${index} - Maria da Conceicao Silva.jpg`,
       data: Buffer.from([index % 256]),
     }));
 
@@ -319,13 +320,18 @@ describe('POST /api/rpa/launches/:id/documents: defesa de zip', () => {
     const response = await upload(
       launch.id,
       rawZip([
-        { name: `${ctps}/../../../../tmp/fora - Maria Silva.jpg`, data },
+        {
+          name: `${ctps}/../../../../tmp/fora - Maria da Conceicao Silva.jpg`,
+          data,
+        },
       ]),
     );
 
     expect(response.status).toBe(200);
     expect(fs.existsSync(uploadedFilePath(`${sha256(data)}.jpg`))).toBe(true);
-    expect(fs.existsSync('/tmp/fora - Maria Silva.jpg')).toBe(false);
+    expect(fs.existsSync('/tmp/fora - Maria da Conceicao Silva.jpg')).toBe(
+      false,
+    );
   });
 });
 
@@ -440,7 +446,7 @@ describe('GET /api/rpa/launches/:id/documents.zip', () => {
     for (const [index, [question]] of sides.entries()) {
       files.push({
         question,
-        name: `IMG_${index} - Maria Silva.jpg`,
+        name: `IMG_${index} - Maria da Conceicao Silva.jpg`,
         data: rememberLarge(await phonePhoto(index), 'jpg'),
       });
     }
@@ -474,10 +480,14 @@ describe('GET /api/rpa/launches/:id/documents.zip', () => {
       await makeDriveZip([
         {
           question: QUESTIONS.address,
-          name: 'a - Maria Silva.pdf',
+          name: 'a - Maria da Conceicao Silva.pdf',
           data: big(1),
         },
-        { question: QUESTIONS.bank, name: 'b - Maria Silva.pdf', data: big(2) },
+        {
+          question: QUESTIONS.bank,
+          name: 'b - Maria da Conceicao Silva.pdf',
+          data: big(2),
+        },
       ]),
     );
 
@@ -501,5 +511,56 @@ describe('GET /api/rpa/launches/:id/documents.zip', () => {
     expect(response.body.details.map((detail) => detail.field)).toEqual([
       'documents',
     ]);
+  });
+});
+
+describe('POST /api/rpa/launches/:id/documents: a pessoa pelo nome completo da conta (issue 59)', () => {
+  it('so o nome completo liga; parte do nome fica sem pessoa, com a conta', async () => {
+    const launch = await insertRpaLaunch();
+    const people = [
+      ['Maria Clara Souza Prates', 'Maria Clara'],
+      ['Lucas Martins Prado', 'Lucas Prado'],
+      ['Luiza Fernanda Rocha', 'Luiza Fernanda Rocha'],
+      ['Joao Pedro Alves Costa', 'JOAO PEDRO ALVES COSTA'],
+      ['Felipe Nunes de Barros', 'Felipe Nunes Barros'],
+    ];
+    const ids = {};
+    for (const [index, [name, account]] of people.entries()) {
+      const worker = await insertRpaWorker({
+        launch_id: launch.id,
+        number: index + 1,
+        cpf: syntheticCpf(index + 1),
+        name,
+      });
+      ids[account] = worker.id;
+    }
+
+    const files = [];
+    for (const [index, [, account]] of people.entries()) {
+      files.push({
+        question: QUESTIONS.address,
+        name: `comprovante - ${account}.jpg`,
+        data: await photo(20 + index),
+      });
+    }
+    const response = await upload(launch.id, await makeDriveZip(files));
+
+    expect(response.status).toBe(200);
+    expect(
+      Object.fromEntries(
+        response.body.data.documents.map((document) => [
+          document.source_name,
+          document.worker_id,
+        ]),
+      ),
+    ).toEqual({
+      // Parte do nome, mesmo de uma pessoa so: fica para escolher.
+      'Maria Clara': null,
+      'Lucas Prado': null,
+      'Luiza Fernanda Rocha': ids['Luiza Fernanda Rocha'],
+      // Sem acento, sem caixa e sem o "de" ainda e o nome inteiro.
+      'JOAO PEDRO ALVES COSTA': ids['JOAO PEDRO ALVES COSTA'],
+      'Felipe Nunes Barros': ids['Felipe Nunes Barros'],
+    });
   });
 });

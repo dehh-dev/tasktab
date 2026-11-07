@@ -229,10 +229,17 @@ pendencia barra a importacao.
 - **Tipo pela pasta da pergunta**, nunca pelo nome do arquivo, com regras em
   ordem (`KIND_RULES`): a CTPS ("Carteira de Trabalho") antes do RG, porque o
   RG diz "Lado dos Dados". O formato e pelo conteudo (`detectType`).
-- **Pessoa pelo primeiro e ultimo nome da conta**, sem acento e sem caixa;
-  duas pessoas com a mesma chave, ou nenhuma, deixam o documento sem pessoa,
-  com `source_name` para escolher na mao (`PATCH /api/rpa/files/:id`).
-  Reenviar so preenche a pessoa que faltava: a escolha feita na mao fica.
+- **Pessoa so pelo nome completo da conta** (`fullNameKey`, issue 59,
+  decisao de 2026-11-07): sem acento, sem caixa e sem os conectivos
+  (`CONNECTORS`), todas as outras palavras na ordem. **Parte do nome nunca
+  liga**, nem com uma pessoa so que a tenha: o primeiro e ultimo nome, regra
+  anterior, ligava "Maria Oliveira" a quem fosse Maria ... Oliveira, e a conta
+  Google quase nunca e o nome inteiro (no caso real, nome e segundo nome ou
+  apelido). Duas pessoas com o mesmo nome, ou nenhuma, deixam o documento sem
+  pessoa, com `source_name`. A tela agrupa os sem pessoa pela conta, e uma
+  escolha atribui todos os arquivos dela (um `PATCH /api/rpa/files/:id` por
+  arquivo). Reenviar so preenche a pessoa que faltava: a escolha feita na mao
+  fica.
 - Frente e verso com o mesmo hash viram **um arquivo sem lado** (`CTPS.jpg`);
   o mesmo arquivo nao se repete no lancamento (`rpa_files_unique_hash_per_launch`).
 - **Versao para e-mail**: foto acima de 1 MB sai a 2.400 px no lado maior,

@@ -136,7 +136,7 @@ describe('o log do RPA', () => {
           buffer: await makeDriveZip([
             {
               question: QUESTIONS.ctpsFront,
-              name: 'FOTO_UNICA_7781 - Pessoa Documentada.jpg',
+              name: 'FOTO_UNICA_7781 - Pessoa Sintetica Documentada.jpg',
               data: await photo(1),
             },
             {
@@ -164,7 +164,7 @@ describe('o log do RPA', () => {
         'FOTO_UNICA_7781',
         'CONTA_UNICA_7782',
         'ZIP_UNICO_7783',
-        'Pessoa Documentada',
+        'Pessoa Sintetica Documentada',
         'Conta Sem Cadastro',
         'Documentada',
         'File responses',

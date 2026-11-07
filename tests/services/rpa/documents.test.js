@@ -88,23 +88,38 @@ describe('detectType: o formato pelo conteudo', () => {
   });
 });
 
-describe('matchWorker: primeiro e ultimo nome, sem acento e sem caixa', () => {
+describe('matchWorker: o nome completo, sem acento, sem caixa e sem de/da/do', () => {
   const WORKERS = [
     { id: 1, name: 'Maria da Conceição Silva' },
     { id: 2, name: 'João Araújo' },
     { id: 3, name: 'Ana Souza' },
     { id: 4, name: 'Ana Maria Souza' },
+    { id: 5, name: 'Maria Paula Silva Oliveira' },
+    { id: 6, name: 'Pedro Lima' },
+    { id: 7, name: 'Pedro  LIMA' },
   ];
 
   it.each([
-    ['Maria Silva', 1],
-    ['MARIA SILVA', 1],
+    ['Maria da Conceicao Silva', 1],
+    ['MARIA DA CONCEIÇÃO  SILVA', 1],
+    // A conta Google costuma vir sem o "da".
     ['maria conceicao silva', 1],
     ['Joao Araujo', 2],
-    // Duas pessoas com a mesma chave: ninguem escolhe sozinho.
-    ['Ana Souza', null],
+    ['Ana Souza', 3],
+    ['Ana Maria Souza', 4],
+    ['Maria Paula Silva Oliveira', 5],
+    // Parte do nome nao liga, nem com uma pessoa so que o tenha.
+    ['Maria Silva', null],
+    ['Maria Oliveira', null],
+    ['Maria Paula', null],
+    ['Paula Silva Oliveira', null],
     ['Maria', null],
+    // As palavras na ordem do cadastro.
+    ['Silva Oliveira Maria Paula', null],
+    // Duas pessoas com o mesmo nome completo: ninguem escolhe sozinho.
+    ['Pedro Lima', null],
     ['Zé Ninguém', null],
+    ['da de', null],
     [null, null],
   ])('%j -> %j', (account, id) => {
     expect(matchWorker(account, WORKERS)?.id ?? null).toBe(id);

@@ -37,7 +37,10 @@ terceiros — ver [seguranca.md](seguranca.md).
    de copiar. O envio continua pelo Gmail de quem pede.
 7. **Documentos.** Suba o `.zip` da pasta de respostas baixado do Drive. Cada
    arquivo vai para a pessoa e o tipo (CTPS, RG ou CNH, comprovante de
-   endereco, dados bancarios); o que nao casar fica para escolher a pessoa. O
+   endereco, dados bancarios). A pessoa so e ligada sozinha quando o nome da
+   conta Google e o **nome completo** dela; parte do nome nunca liga, para nao
+   trocar uma pessoa por outra. O que nao casar aparece agrupado pela conta, e
+   uma escolha vale para todos os arquivos dela. O
    `.zip` de saida tem uma pasta por pessoa, e a versao para e-mail reduz as
    fotos para caber nos 25 MB do Gmail.
 8. **Recibos.** O financeiro manda um recibo (RPCI) por pessoa para colher a
