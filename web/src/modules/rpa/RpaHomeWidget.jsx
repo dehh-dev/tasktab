@@ -5,8 +5,9 @@ import Widget, { WidgetStat } from '../../shell/Widget';
 
 /**
  * RPA no Inicio: o proximo pagamento (data, pessoas, liquido) e o que esta
- * pendente — quem ainda nao teve RPA e o RPA cuja data passou sem o recibo
- * assinado. Tudo escrito, nao so contado.
+ * pendente — quem ainda nao teve RPA, o RPA cuja data passou sem o recibo
+ * assinado e o saldo de dia ja pago (extra adiado, correcao). Tudo escrito,
+ * nao so contado.
  */
 export default function RpaHomeWidget({ module, onOpen }) {
   const [summary, setSummary] = useState(null);
@@ -24,6 +25,7 @@ export default function RpaHomeWidget({ module, onOpen }) {
   }, []);
 
   const next = summary?.next_payment;
+  const balance = summary?.pending_balance;
 
   return (
     <Widget module={module} onOpen={onOpen}>
@@ -61,6 +63,15 @@ export default function RpaHomeWidget({ module, onOpen }) {
             <p className="widget__item-meta">
               Pendente: {summary.without_payment} pessoa(s) na equipe sem nenhum
               RPA emitido.
+            </p>
+          )}
+          {balance?.launches > 0 && (
+            <p className="widget__item-meta">
+              Saldo pendente em {balance.launches} lancamento(s):
+              {balance.to_pay.people > 0 &&
+                ` ${formatMoney(balance.to_pay.cents)} a pagar para ${balance.to_pay.people} pessoa(s).`}
+              {balance.to_deduct.people > 0 &&
+                ` ${formatMoney(balance.to_deduct.cents)} a descontar de ${balance.to_deduct.people} pessoa(s).`}
             </p>
           )}
         </>

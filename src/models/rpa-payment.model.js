@@ -346,6 +346,19 @@ async function summary() {
   return rows[0];
 }
 
+/** Os lancamentos abertos com algum RPA valido: os que podem ter saldo. */
+async function openLaunchIdsWithPayments() {
+  const { rows } = await db.query(
+    `SELECT DISTINCT w.launch_id
+     FROM rpa_payments p
+     JOIN rpa_workers w ON w.id = p.worker_id
+     JOIN rpa_launches l ON l.id = w.launch_id
+     WHERE l.status = 'open' AND p.status <> 'canceled'
+     ORDER BY w.launch_id`,
+  );
+  return rows.map((row) => row.launch_id);
+}
+
 /** O recibo assinado voltou: o emitido vira pago. O ja pago fica como esta. */
 async function markPaid(ids) {
   if (ids.length === 0) return;
@@ -385,5 +398,6 @@ module.exports = {
   findDocumentsByNumber,
   markPaid,
   summary,
+  openLaunchIdsWithPayments,
   cancel,
 };

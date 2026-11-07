@@ -105,6 +105,11 @@ router.post(
   asyncHandler(payments.create),
 );
 router.get(
+  '/launches/:id/balances',
+  requireScope('rpa:read'),
+  asyncHandler(payments.balances),
+);
+router.get(
   '/launches/:id/rpas.zip',
   requireScope('rpa:read'),
   asyncHandler(documents.rpasZip),

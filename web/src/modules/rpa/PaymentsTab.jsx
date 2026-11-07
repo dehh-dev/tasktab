@@ -11,7 +11,7 @@ import {
   labelOf,
   parseMoneyToCents,
 } from '../../constants';
-import { ErrorAlert, Field, toError } from './common';
+import { BalanceList, ErrorAlert, Field, toError } from './common';
 
 function addDays(date, days) {
   const [year, month, day] = date.split('-').map(Number);
@@ -143,6 +143,7 @@ export default function PaymentsTab({ launch, canWrite }) {
   const [workers, setWorkers] = useState([]);
   const [preview, setPreview] = useState(null);
   const [issued, setIssued] = useState([]);
+  const [balances, setBalances] = useState([]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [canceling, setCanceling] = useState(null);
@@ -151,12 +152,14 @@ export default function PaymentsTab({ launch, canWrite }) {
 
   const loadIssued = useCallback(async () => {
     try {
-      const [payments, team] = await Promise.all([
+      const [payments, team, pending] = await Promise.all([
         api.listPayments(launch.id),
         api.listWorkers(launch.id),
+        api.getLaunchBalances(launch.id),
       ]);
       setIssued(payments.data);
       setWorkers(team.data);
+      setBalances(pending.data);
     } catch (caught) {
       setError(toError(caught));
     }
@@ -434,6 +437,17 @@ export default function PaymentsTab({ launch, canWrite }) {
               ))}
             </ul>
           )}
+        </section>
+      )}
+
+      {balances.length > 0 && (
+        <section aria-labelledby="balance-title" className="rpa-subsection">
+          <h4 id="balance-title">Saldo pendente</h4>
+          <p className="filter__count">
+            Extra adiado e correcao de dia ja pago entram no proximo pagamento
+            da pessoa. Sem ele, o valor nao chega a ela.
+          </p>
+          <BalanceList balances={balances} label="Saldo pendente por pessoa" />
         </section>
       )}
 

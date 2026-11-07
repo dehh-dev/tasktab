@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Upload } from 'lucide-react';
+import { formatMoney, formatSubcents } from '../../constants';
 
 /** O erro da API como o resto da interface o mostra: mensagem e o que fazer. */
 export function ErrorAlert({ error }) {
@@ -92,5 +93,33 @@ export function Field({ id, label, error, full, hint, children }) {
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * O saldo pendente de cada pessoa (issue 60): o que falta pagar ou descontar
+ * dos dias ja pagos. Escrito por extenso, nao so o sinal do valor.
+ */
+export function BalanceList({ balances, label }) {
+  return (
+    <ul className="rpa-details" aria-label={label}>
+      {balances.map((balance) => {
+        const parts = [
+          balance.extra_subcents !== 0 &&
+            `extra adiado ${formatSubcents(balance.extra_subcents)}`,
+          balance.correction_subcents !== 0 &&
+            `correcao ${formatSubcents(balance.correction_subcents)}`,
+        ].filter(Boolean);
+
+        return (
+          <li key={balance.worker_id}>
+            {balance.worker_number}. {balance.worker_name}:{' '}
+            {formatMoney(Math.abs(balance.value_cents))}{' '}
+            {balance.value_cents > 0 ? 'a pagar' : 'a descontar'} (
+            {parts.join('; ')})
+          </li>
+        );
+      })}
+    </ul>
   );
 }

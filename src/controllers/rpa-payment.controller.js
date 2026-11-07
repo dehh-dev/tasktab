@@ -5,6 +5,8 @@ const { loadLaunch, loadPayment } = require('../services/auth/access.service');
 const {
   previewPayments,
   issuePayments,
+  launchBalances,
+  openBalances,
 } = require('../services/rpa/payment.service');
 const { ConflictError } = require('../../infra/errors');
 const launchValidator = require('../validators/rpa-launch.validator');
@@ -101,9 +103,19 @@ async function cancel(req, res) {
   res.json({ data: canceled });
 }
 
-/** GET /api/rpa/summary — o widget do Inicio. */
-async function summary(req, res) {
-  res.json({ data: await Payment.summary() });
+/** GET /api/rpa/launches/:id/balances — o saldo pendente de cada pessoa. */
+async function balances(req, res) {
+  const launchId = launchValidator.validateId(req.params.id);
+  const launch = await loadLaunch(launchId);
+
+  res.json({ data: await launchBalances(launch) });
 }
 
-module.exports = { index, create, show, cancel, summary };
+/** GET /api/rpa/summary — o widget do Inicio. */
+async function summary(req, res) {
+  const counts = await Payment.summary();
+
+  res.json({ data: { ...counts, pending_balance: await openBalances() } });
+}
+
+module.exports = { index, create, show, cancel, balances, summary };

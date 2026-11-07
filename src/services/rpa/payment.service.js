@@ -306,6 +306,88 @@ function previewPayments(launch, request) {
   return buildPayments(launch, request);
 }
 
+// Um periodo depois de qualquer lancamento: o `planWorker` so olha o livro,
+// e o que sai dele e o que ficou para depois dos dias ja pagos.
+const AFTER_EVERYTHING = { from: '9999-12-31', to: '9999-12-31' };
+
+/**
+ * O saldo pendente de cada pessoa (issue 60): o extra que o 1o pagamento so
+ * com diarias deixou para depois e a correcao de dia ja pago, a favor ou
+ * contra. So existia dentro da previa do pagamento seguinte; sem ele, quem
+ * entrou na ultima semana ou faltou num dia pago adiantado ficava sem o
+ * acerto, e ninguem via. A conta e a mesma do pagamento, sem periodo novo:
+ * dia ainda nao pago nao entra. So quem tem saldo, no centavo.
+ */
+async function launchBalances(launch, client = db) {
+  const ledger = ledgerOf(await Payment.ledgerByLaunch(launch.id, client));
+  const workers = (await Worker.findByLaunch(launch.id, client)).filter(
+    (worker) => ledger.has(worker.id),
+  );
+  if (workers.length === 0) return [];
+
+  const exceptions = await Day.findByLaunch(
+    launch.id,
+    launch.starts_on,
+    launch.ends_on,
+    client,
+  );
+  const grid = buildGrid({
+    launch,
+    workers,
+    exceptions,
+    from: launch.starts_on,
+    to: launch.ends_on,
+  });
+
+  return grid.workers.flatMap((row, index) => {
+    const worker = workers[index];
+    const plan = planWorker({
+      days: new Map(row.days.map((day) => [day.date, day])),
+      ledger: ledger.get(worker.id),
+      period: AFTER_EVERYTHING,
+      dailyOnly: false,
+    });
+    if (plan.value_cents === 0) return [];
+
+    return [
+      {
+        worker_id: worker.id,
+        worker_number: worker.number,
+        worker_name: worker.name,
+        extra_subcents: plan.totals.extra_subcents,
+        correction_subcents: plan.totals.correction_subcents,
+        value_cents: plan.value_cents,
+        lines: plan.lines,
+      },
+    ];
+  });
+}
+
+/**
+ * O saldo pendente dos lancamentos abertos, para o Inicio: quantos tem, e
+ * quanto falta pagar ou descontar, de quantas pessoas.
+ */
+async function openBalances() {
+  const total = {
+    launches: 0,
+    to_pay: { people: 0, cents: 0 },
+    to_deduct: { people: 0, cents: 0 },
+  };
+
+  for (const id of await Payment.openLaunchIdsWithPayments()) {
+    const balances = await launchBalances(await Launch.findById(id));
+    if (balances.length > 0) total.launches += 1;
+
+    for (const balance of balances) {
+      const side = balance.value_cents > 0 ? total.to_pay : total.to_deduct;
+      side.people += 1;
+      side.cents += Math.abs(balance.value_cents);
+    }
+  }
+
+  return total;
+}
+
 /**
  * Emite numa transacao, com o lancamento travado: duas emissoes ao mesmo
  * tempo nao pagam o mesmo dia (o indice unico do banco tambem barraria, mas
@@ -390,4 +472,9 @@ function issuePayments(launchId, request, createdBy) {
   });
 }
 
-module.exports = { previewPayments, issuePayments };
+module.exports = {
+  previewPayments,
+  issuePayments,
+  launchBalances,
+  openBalances,
+};

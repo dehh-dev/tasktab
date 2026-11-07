@@ -101,6 +101,7 @@ plano e as etapas estao na issue 35.
 | `PUT`    | `/api/rpa/launches/:id/days`          | Grava em lote so os dias que mudam              |
 | `GET`    | `/api/rpa/launches/:id/payments`      | Os RPAs do lancamento (`status`, `number`)      |
 | `POST`   | `/api/rpa/launches/:id/payments`      | Previa (`?preview=true`) ou emissao dos RPAs    |
+| `GET`    | `/api/rpa/launches/:id/balances`      | Saldo pendente: extra adiado e correcao         |
 | `GET`    | `/api/rpa/launches/:id/rpas.zip`      | Um PDF por pessoa do pagamento `?payment=n`     |
 | `GET`    | `/api/rpa/launches/:id/email`         | Texto do e-mail de solicitacao (`?payment=n`)   |
 | `POST`   | `/api/rpa/launches/:id/documents`     | Importa o .zip dos documentos do formulario     |
@@ -209,6 +210,17 @@ entra de novo; dia pago cujo ponto mudou entra no pagamento seguinte como
 `correction`, a mais ou a menos. O RPA emitido nao muda: `cancel` (com
 `reason`) libera os dias e o numero para emitir de novo, e responde `409` se
 ja esta cancelado ou pago.
+
+`GET /api/rpa/launches/:id/balances` e o saldo pendente de cada pessoa: o
+extra que o 1o pagamento so com diarias deixou para depois e a correcao de
+dia ja pago, a favor ou contra, que so entrariam no pagamento seguinte. A
+conta e a do pagamento, sem periodo novo; dia ainda nao pago nao entra. Cada
+linha traz `worker_id`, `worker_number`, `worker_name`, `extra_subcents`,
+`correction_subcents`, `value_cents` (positivo a pagar, negativo a descontar)
+e `lines`; so vem quem tem saldo. Encerrar o lancamento com saldo nao e
+recusado. O `GET /api/rpa/summary` soma o dos lancamentos abertos em
+`pending_balance`: `launches`, `to_pay` e `to_deduct`, cada um com `people` e
+`cents`.
 
 `GET /api/rpa/payments/:id/rpa.pdf` devolve o RPA numa pagina Carta, no
 layout do formulario de emissao, com as tabelas de INSS e IRRF que o RPA

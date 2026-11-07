@@ -146,6 +146,13 @@ pendencia barra a importacao.
   tres dias e recebe dias depois, sai so com os dias dele. Sem diaria, valem
   os dias que o pagamento leva (extra pendente, correcao); so com ajuste, o
   periodo pedido. Gravado na emissao, o RPA ja emitido continua igual.
+- **Saldo pendente** (`launchBalances`, issue 60): extra adiado e correcao de
+  dia ja pago so existiam na previa do pagamento seguinte, e sem ele ninguem
+  via. E o `planWorker` com um periodo depois do lancamento
+  (`AFTER_EVERYTHING`): sai so o que o livro deixou, nunca dia ainda nao
+  pago. Rota propria, na aba Pagamentos, no Inicio (`pending_balance`, so os
+  lancamentos abertos) e no aviso de encerrar. **Encerrar com saldo so avisa
+  na tela** (decisao de 2026-11-07); o bloqueio na API fica para depois.
 - `rpa_payment_days` leva **todo dia do periodo, inclusive o de valor zero**
   (falta, folga): e o que faz uma falta que vira dia trabalhado aparecer como
   correcao, e nao sumir.
