@@ -3,6 +3,7 @@
 const {
   request,
   requestBinary,
+  requestUpload,
   refusedFields,
   insertRow,
   insertRpaCompany,
@@ -12,6 +13,11 @@ const {
   updateColumnDirectly,
 } = require('../../orchestrator');
 const { extractPdfText } = require('../../helpers/pdf-text');
+const {
+  formResponse,
+  makeFormXlsx,
+  syntheticCpf,
+} = require('../../fixtures/forms');
 
 /**
  * O lancamento dos criterios da issue 39: diaria de R$ 130,00, segunda a
@@ -452,6 +458,156 @@ describe('POST /api/rpa/launches/:id/payments: o periodo impresso no RPA (issue 
   });
 });
 
+describe('POST /api/rpa/launches/:id/payments: as pendencias da pessoa (issue 62)', () => {
+  // A equipe pela importacao, como no uso real: as pendencias sao as que a
+  // limpeza e a verificacao do cadastro marcam.
+  async function importTeam(responses) {
+    const { launch } = await arrangeLaunch();
+    await insertRow('rpa_rates', {
+      launch_id: launch.id,
+      role: 'Assistente Administrativo',
+      starts_on: '2026-10-13',
+      ends_on: '2026-11-15',
+      daily_cents: 13000,
+    });
+    const imported = await requestUpload(
+      `/api/rpa/launches/${launch.id}/import`,
+      [
+        {
+          buffer: await makeFormXlsx(responses),
+          filename: 'Cadastro AVARE (respostas).xlsx',
+        },
+      ],
+      { field: 'file' },
+    );
+    expect(imported.status).toBe(200);
+
+    const workers = new Map(
+      imported.body.data.workers.map((worker) => [worker.number, worker]),
+    );
+    return { launch, workers };
+  }
+
+  const issuesOf = (body) =>
+    Object.fromEntries(
+      body.data.payments.map((payment) => [
+        payment.worker_number,
+        payment.issues.map((issue) => [
+          issue.code,
+          issue.message,
+          issue.blocks_payment,
+        ]),
+      ]),
+    );
+
+  it('a previa lista as pendencias abertas com texto, e a emissao com banco ambiguo pede confirmacao', async () => {
+    const { launch } = await importTeam([
+      formResponse(1, {
+        bank_name: 'Banco ItauBank S.A',
+        address: 'Rua Sintetica Sem Numero',
+      }),
+      formResponse(2),
+    ]);
+
+    const preview = await pay(launch.id, FIRST_WEEK, { preview: true });
+
+    expect(preview.status).toBe(200);
+    expect(issuesOf(preview.body)).toEqual({
+      1: [
+        ['bank_ambiguous', expect.stringMatching(/ambiguo|ItauBank/i), true],
+        ['address_without_number', 'endereco sem numero', false],
+      ],
+      2: [],
+    });
+
+    // Sem a confirmacao, nada sai: nem o RPA de quem nao tem pendencia.
+    const refused = await pay(launch.id, FIRST_WEEK);
+
+    expect(refused.status).toBe(422);
+    expect(refused.body).toMatchObject({
+      name: 'ValidationError',
+      status_code: 422,
+    });
+    expect(refused.body.details).toEqual([
+      {
+        field: 'accept_issues',
+        message: `1: ${preview.body.data.payments[0].issues[0].message}`,
+      },
+    ]);
+    const listed = await request(
+      'GET',
+      `/api/rpa/launches/${launch.id}/payments`,
+    );
+    expect(listed.body.data).toEqual([]);
+
+    const issued = await pay(launch.id, { ...FIRST_WEEK, accept_issues: true });
+
+    expect(issued.status).toBe(201);
+    expect(issued.body.data.payments).toHaveLength(2);
+  });
+
+  it('pendencia dada por resolvida some da previa, e a que so avisa nao pede confirmacao', async () => {
+    const { launch, workers } = await importTeam([
+      formResponse(1, {
+        bank_name: 'Banco ItauBank S.A',
+        address: 'Rua Sintetica Sem Numero',
+      }),
+    ]);
+    const resolved = await request(
+      'PATCH',
+      `/api/rpa/workers/${workers.get(1).id}`,
+      { resolve_issues: [{ code: 'bank_ambiguous', field: 'bank_code' }] },
+    );
+    expect(resolved.status).toBe(200);
+
+    const preview = await pay(launch.id, FIRST_WEEK, { preview: true });
+
+    expect(issuesOf(preview.body)).toEqual({
+      1: [['address_without_number', 'endereco sem numero', false]],
+    });
+
+    const issued = await pay(launch.id, FIRST_WEEK);
+
+    expect(issued.status).toBe(201);
+  });
+
+  it('conta sem digito, CPF ou PIS invalido e campo de pagamento vazio impedem; CPF completado com zero, nao', async () => {
+    const { launch } = await importTeam([
+      formResponse(1, { account: '12345678901' }),
+      formResponse(2, { cpf: '11111111111' }),
+      formResponse(3, { pis: '11111111111' }),
+      formResponse(4, { agency: '' }),
+      formResponse(5, { birth_place: '' }),
+      formResponse(6, { cpf: syntheticCpf(6, { leadingZero: true }) }),
+    ]);
+
+    const preview = await pay(launch.id, FIRST_WEEK, { preview: true });
+
+    const blocking = Object.fromEntries(
+      preview.body.data.payments.map((payment) => [
+        payment.worker_number,
+        payment.issues
+          .filter((issue) => issue.blocks_payment)
+          .map((issue) => `${issue.code}:${issue.field}`),
+      ]),
+    );
+    expect(blocking).toEqual({
+      1: ['account_without_digit:account'],
+      2: ['cpf_invalid:cpf'],
+      3: ['pis_invalid:pis'],
+      4: ['missing_field:agency'],
+      5: [],
+      6: [],
+    });
+    // As duas que nao barram estao la, so avisando.
+    expect(
+      preview.body.data.payments
+        .filter((payment) => payment.worker_number >= 5)
+        .map((payment) => payment.issues.map((issue) => issue.code)),
+    ).toEqual([['missing_field'], ['cpf_padded']]);
+  });
+});
+
 describe('POST /api/rpa/launches/:id/payments: ponto de dia ja pago', () => {
   it('a diferenca entra na previa seguinte como correcao, com o dia', async () => {
     const { launch } = await arrangeLaunch({
@@ -588,6 +744,7 @@ describe('POST /api/rpa/launches/:id/payments: o que nao passa', () => {
       'motivo longo': send({
         adjustments: [{ ...adjustment, reason: 'x'.repeat(256) }],
       }),
+      'confirmacao como texto': send({ accept_issues: 'sim' }),
       'previa fora de true ou false': () =>
         request('POST', `${payments}?preview=talvez`, {
           ...FIRST_WEEK,
@@ -607,6 +764,7 @@ describe('POST /api/rpa/launches/:id/payments: o que nao passa', () => {
       'ajuste sem pessoa': ['adjustments[0].worker_id'],
       'ajuste em reais': ['adjustments[0].amount_cents'],
       'motivo longo': ['adjustments[0].reason'],
+      'confirmacao como texto': ['accept_issues'],
       'previa fora de true ou false': ['preview'],
       'filtro de status': ['status'],
       'filtro de numero': ['number'],

@@ -122,7 +122,21 @@ test('do .xlsx do formulario ao .zip dos RPAs, pela tela', async ({
   // 5 diarias de R$ 130,00, so diarias no 1o pagamento.
   await expect(preview.getByText('R$ 650,00').first()).toBeVisible();
 
+  // O CPF invalido aparece na previa, escrito, e impede o pagamento: emitir
+  // pede confirmacao com a lista.
+  await expect(
+    preview
+      .getByRole('list', { name: 'Pendencias de Pessoa Sintetica Numero 3' })
+      .getByText(/Pendencia: CPF .*\(impede o pagamento\)/),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Emitir 3 RPAs' }).click();
+  const confirm = page.getByRole('dialog', { name: 'Emitir com pendencias' });
+  await expect(
+    confirm
+      .getByRole('list', { name: 'Pendencias que impedem o pagamento' })
+      .getByRole('listitem'),
+  ).toHaveText([/^3\. Pessoa Sintetica Numero 3: CPF/]);
+  await confirm.getByRole('button', { name: 'Emitir mesmo assim' }).click();
   const issued = page.getByRole('table', { name: 'RPAs emitidos' });
   await expect(issued.getByText('Emitido', { exact: true })).toHaveCount(3);
   await expect(

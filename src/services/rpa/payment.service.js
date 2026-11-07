@@ -15,6 +15,7 @@ const {
   paymentCode,
 } = require('./payment-plan');
 const { NO_PREVIOUS, grossForNet } = require('./taxes');
+const { paymentIssues } = require('./worker-issues');
 
 /**
  * A previa e a emissao dos RPAs de um lancamento (issue 39). As duas passam
@@ -229,6 +230,9 @@ async function buildPayments(launch, request, client = db) {
       // na emissao, o RPA ja emitido continua saindo igual.
       ...servicePeriod(plan.lines, period),
       payment_date: request.payment_date,
+      // A pendencia so aparecia na aba Equipe, e o RPA saia com banco
+      // ambiguo ou conta sem digito sem ninguem ver.
+      issues: paymentIssues(worker.issues),
       dependents: worker.dependents,
       inss_table_id: tables.inss.id,
       irrf_table_id: tables.irrf.id,
@@ -308,6 +312,26 @@ function issuePayments(launchId, request, createdBy) {
           field: 'worker_ids',
           message: `${entry.worker_number}: ${entry.reason}`,
         })),
+      });
+    }
+
+    // Pendencia que impede o pagamento so passa com a confirmacao explicita
+    // de quem emite: a tela mostra a lista e manda `accept_issues`.
+    const blocking = result.payments.flatMap((payment) =>
+      payment.issues
+        .filter((entry) => entry.blocks_payment)
+        .map((entry) => ({
+          field: 'accept_issues',
+          message: `${payment.worker_number}: ${entry.message}`,
+        })),
+    );
+
+    if (blocking.length > 0 && !request.accept_issues) {
+      throw new ValidationError({
+        message: 'Ha pendencias no cadastro que impedem o pagamento.',
+        action:
+          'Corrija o cadastro na aba Equipe, ou confirme a emissao com as pendencias.',
+        details: blocking,
       });
     }
 

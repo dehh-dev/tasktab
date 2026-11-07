@@ -62,6 +62,14 @@ pendencia barra a importacao.
   proprio banco viram vazio — e o que o formulario de Avare recebeu.
 - No PATCH o CPF corrigido **tem** de fechar o DV e nao pode repetir outro do
   lancamento. O `number` nao muda: vai no codigo de todo RPA da pessoa.
+- **A pendencia vai ate o pagamento** (issue 62, decisao de 2026-11-07): a
+  previa e a emissao trazem as abertas de cada pessoa (`paymentIssues`), com
+  `blocks_payment`. Barram as de banco, agencia, conta, CPF e PIS
+  (`BLOCKING_CODES`, `BLOCKING_MISSING`): o financeiro paga pelo que o RPA
+  imprime, e o erro so apareceria na volta. Com uma delas, emitir e `422` em
+  `accept_issues` ate a tela mandar `accept_issues: true`, e a emissao inteira
+  espera, nao so a pessoa. CPF ou PIS completado com zero nao barra: o
+  verificador fechou. A dada por resolvida sai da previa.
 
 ## Grade do ponto e calculo (`timesheet.js`, `day-value.js`)
 
