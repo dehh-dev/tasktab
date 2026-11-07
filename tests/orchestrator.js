@@ -247,21 +247,45 @@ async function waitForQueue({ timeoutMs = 30000 } = {}) {
   throw new Error(`A fila de extracao nao esvaziou em ${timeoutMs}ms.`);
 }
 
-// CASCADE porque receipts referencia reports e merchants, e sessions
-// referencia users; sem ele o TRUNCATE recusa a tabela que tem dependente.
+// DELETE, e nao TRUNCATE: o teste deixa poucas linhas, e o TRUNCATE paga um
+// custo fixo por tabela (um arquivo novo no disco) — eram ~36 ms antes de
+// cada teste, contra menos de 1 ms. O `session_replication_role` desliga as
+// FKs e os triggers que travam o RPA emitido, que o TRUNCATE tambem nao
+// disparava, e as sequencias de cada tabela voltam ao 1, como no RESTART
+// IDENTITY (o `contract.test.js` usa o id 999 como inexistente).
 //
+// A lista sai do catalogo, a cada chamada: tabela nova entra sozinha, e os
+// testes que andam migrations para tras nao tropecam em tabela que sumiu.
 // `rpa_banks` e `rpa_tax_tables` ficam de fora de proposito: sao as sementes
-// publicas da migration, e nenhum teste as recria. O CASCADE so desce para
-// quem referencia a tabela truncada, nunca para quem ela referencia — entao
-// truncar os pagamentos nao as leva.
+// publicas da migration, e nenhum teste as recria.
+const CLEAR_DATABASE = `DO $$
+DECLARE
+  item record;
+BEGIN
+  PERFORM set_config('session_replication_role', 'replica', true);
+
+  FOR item IN
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+      AND tablename NOT IN ('pgmigrations', 'rpa_banks', 'rpa_tax_tables')
+  LOOP
+    EXECUTE format('DELETE FROM public.%I', item.tablename);
+  END LOOP;
+
+  FOR item IN
+    SELECT sequence.oid FROM pg_class sequence
+    JOIN pg_depend owner ON owner.objid = sequence.oid
+    JOIN pg_class owned ON owned.oid = owner.refobjid
+    WHERE sequence.relkind = 'S'
+      AND owned.relnamespace = 'public'::regnamespace
+      AND owned.relname NOT IN ('pgmigrations', 'rpa_banks', 'rpa_tax_tables')
+  LOOP
+    PERFORM setval(item.oid::regclass, 1, false);
+  END LOOP;
+END $$`;
+
 function clearDatabase() {
-  return db.query(
-    `TRUNCATE TABLE tasks, receipts, reports, merchants, sessions, users,
-       rpa_files, rpa_payment_adjustments, rpa_payment_days, rpa_payments,
-       rpa_days, rpa_workers, rpa_rates, rpa_launch_schedules, rpa_launches,
-       rpa_companies
-     RESTART IDENTITY CASCADE`,
-  );
+  return db.query(CLEAR_DATABASE);
 }
 
 // O caminho que o `env.test` declara, fixo aqui de proposito: uma UPLOAD_DIR

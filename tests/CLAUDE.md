@@ -33,10 +33,10 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 
 ## Ciclo
 
-| Onde              | Quando                  | O que faz                                                                           |
-| ----------------- | ----------------------- | ----------------------------------------------------------------------------------- |
-| `global-setup.js` | uma vez por execucao    | espera a API, aplica migrations                                                     |
-| `setup.js`        | antes de **cada** teste | espera a fila, trunca as tabelas, esvazia `uploads-test/` e recria o usuario padrao |
+| Onde              | Quando                  | O que faz                                                                    |
+| ----------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `global-setup.js` | uma vez por execucao    | espera a API, aplica migrations                                              |
+| `setup.js`        | antes de **cada** teste | espera a fila, esvazia as tabelas e `uploads-test/`, recria o usuario padrao |
 
 - Arquivo novo nao precisa de preambulo: `require` do orchestrator e os
   `describe`.
@@ -44,6 +44,12 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   `npx`). Marca em `process.env` nao deduplica: cada arquivo do Jest tem a
   propria copia.
 - Rodam em serie (`--runInBand`), porque compartilham as tabelas.
+- **A limpeza e `DELETE`, nao `TRUNCATE`** (`clearDatabase`): o TRUNCATE tem
+  custo fixo por tabela, ~36 ms antes de cada teste, contra menos de 1 ms. O
+  `session_replication_role = replica` desliga FKs e os triggers que travam o
+  RPA emitido, e exige superusuario (o do `docker compose` e, aqui e no CI);
+  as sequencias voltam ao 1. Junto com o commit sem fsync (`PGOPTIONS` no
+  `env.test`), a integracao caiu de 140 s para 87 s.
 - O disco e da suite: `env.test` aponta `UPLOAD_DIR` para `uploads-test/`, e
   `clearUploads` o esvazia junto com o banco. No `uploads/` do dev a suite
   deixou milhares de PDFs, e a contagem de referencias de um banco podia
@@ -73,7 +79,7 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 - `request()` ja chega autenticada como o **admin padrao**. `{ token: null }`
   testa 401; `createUserWithSession({ role })`, outro papel. O hash da senha e
   calculado uma vez por processo (o `scrypt` custa ~30 ms de proposito) e o
-  token, sorteado uma vez; o TRUNCATE apaga so a linha da sessao, recriada com
+  token, sorteado uma vez; a limpeza apaga so a linha da sessao, recriada com
   o mesmo token.
 - O padrao e admin para o arranjo antigo valer: `insertReport()` cria
   relatorio sem dono, que so `reports:read:any` enxerga.

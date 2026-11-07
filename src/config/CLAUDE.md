@@ -10,6 +10,9 @@
 - Dev usa `tasktab_development`; testes, `tasktab_test`, criado pelo
   `docker/initdb/` so na **primeira** subida do volume. Se o de teste sumir:
   `npm run services:down -- -v` e subir de novo.
+- O `env.test` traz `PGOPTIONS=-c synchronous_commit=off`, que o `pg` le
+  sozinho: o commit do teste nao espera o fsync (~7 ms cada no volume do
+  Docker). Nao leve para o `env.development` — la ha dado que importa.
 - **Dentro de `db.transaction`, uma consulta por vez**: o `client` e uma
   conexao so, e `Promise.all` nele o pg 8 enfileira com um DeprecationWarning
   (o 9 deixa de aceitar). Fora da transacao, pelo pool, o paralelo vale. A
