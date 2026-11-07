@@ -120,6 +120,10 @@ sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
   subpasta por pergunta real, `<arquivo> - <conta>`), fotos sinteticas pelo
   `sharp` (inclusive de celular, 4032 x 3024) e, com `rawZip`, um .zip byte a
   byte que declara o tamanho que se quiser — e assim que se monta a bomba.
+  **A conta so liga o documento quando e o nome completo do cadastro** (issue
+  59): para o arquivo ir para a pessoa, use o nome inteiro dela; para o caso
+  sem pessoa, um nome que nao seja o de ninguem. Primeiro e ultimo nome nao
+  ligam mais.
 - `tests/fixtures/rpa-receipts.js` gera o PDF escaneado dos recibos
   assinados: uma pagina-imagem por pessoa, sem camada de texto, com a linha
   de assinatura que faz o OCR normalizado se perder. `makeTextRpaReceipts`
