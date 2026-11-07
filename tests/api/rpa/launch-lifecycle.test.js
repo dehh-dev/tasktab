@@ -608,14 +608,24 @@ describe(`RPA de ponta a ponta, com a equipe sorteada (RPA_SEED=${SEED})`, () =>
       people.flatMap(() => ['paid', 'paid']),
     );
 
-    // 9. O Inicio sem pendencia: tudo pago, ninguem sem RPA.
+    // 9. O Inicio sem pendencia: tudo pago, ninguem sem RPA, nenhum saldo.
     const summary = await request('GET', '/api/rpa/summary');
     expect(summary.body.data).toEqual({
       open_launches: 1,
       next_payment: null,
       awaiting_receipt: 0,
       without_payment: 0,
+      pending_balance: {
+        launches: 0,
+        to_pay: { people: 0, cents: 0 },
+        to_deduct: { people: 0, cents: 0 },
+      },
     });
+    const balances = await request(
+      'GET',
+      `/api/rpa/launches/${launch.id}/balances`,
+    );
+    expect(balances.body.data).toEqual([]);
 
     // 10. Encerrado, o lancamento fica so leitura, com a data da retencao.
     const closed = await request('PATCH', `/api/rpa/launches/${launch.id}`, {

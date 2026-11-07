@@ -151,6 +151,16 @@ test('do .xlsx do formulario ao .zip dos RPAs, pela tela', async ({
     issued.getByText(`1-${COMPANY_CODE}-1-102026`, { exact: true }),
   ).toBeVisible();
 
+  // O 1o pagamento so com diarias deixa o extra de 14/10 para depois: o
+  // saldo aparece escrito, por pessoa.
+  await expect(
+    page
+      .getByRole('list', { name: 'Saldo pendente por pessoa' })
+      .getByRole('listitem'),
+  ).toHaveText([
+    '1. Pessoa Sintetica Numero 1: R$ 24,38 a pagar (extra adiado R$ 24,375)',
+  ]);
+
   // Emissao: o e-mail montado e o .zip com um PDF por pessoa.
   await page.getByRole('button', { name: 'Emissao', exact: true }).click();
   await expect(page.getByLabel('Assunto', { exact: true })).toHaveValue(
@@ -169,6 +179,21 @@ test('do .xlsx do formulario ao .zip dos RPAs, pela tela', async ({
   for (const name of names) {
     expect(name).toMatch(/^Solicitação - RPA - 1ª Pagto -.+\.pdf$/);
   }
+
+  // Encerrar com saldo pendente so avisa, com quem e quanto.
+  await page.getByRole('button', { name: 'Encerrar lancamento' }).click();
+  const closing = page.getByRole('dialog', {
+    name: 'Encerrar com saldo pendente',
+  });
+  await expect(
+    closing
+      .getByRole('list', { name: 'Saldo pendente ao encerrar' })
+      .getByRole('listitem'),
+  ).toHaveText([/^1\. Pessoa Sintetica Numero 1: R\$ 24,38 a pagar/]);
+  await closing.getByRole('button', { name: 'Encerrar mesmo assim' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Reabrir lancamento' }),
+  ).toBeVisible();
 });
 
 /**

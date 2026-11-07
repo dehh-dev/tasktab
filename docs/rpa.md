@@ -48,7 +48,9 @@ terceiros — ver [seguranca.md](seguranca.md).
    **como veio**, sem copiar a pagina: uma assinatura digital (gov.br)
    continua valendo.
 9. **Encerrar.** Terminados os pagamentos, encerre o lancamento: ele fica so
-   leitura. **Um mes depois**, os dados pessoais da equipe e os arquivos sao
+   leitura. Se alguem ainda tem **saldo pendente** (extra adiado ou correcao
+   de dia ja pago), a tela avisa com quem e quanto antes de encerrar. O mesmo
+   saldo aparece na aba Pagamentos e no Inicio. **Um mes depois**, os dados pessoais da equipe e os arquivos sao
    apagados (ver Retencao).
 
 O **Inicio** mostra o proximo pagamento (data, pessoas, liquido), quantas

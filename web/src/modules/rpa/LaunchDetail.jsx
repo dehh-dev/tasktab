@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import * as api from '../../api';
 import { ApiError } from '../../api';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { LAUNCH_STATUSES, formatDate, labelOf } from '../../constants';
 import LaunchForm from './LaunchForm';
 import TeamTab from './TeamTab';
@@ -10,7 +11,7 @@ import PaymentsTab from './PaymentsTab';
 import EmissionTab from './EmissionTab';
 import DocumentsTab from './DocumentsTab';
 import ReceiptsTab from './ReceiptsTab';
-import { ErrorAlert, toError } from './common';
+import { BalanceList, ErrorAlert, toError } from './common';
 
 // As etapas do processo, na ordem em que acontecem (issue 35).
 const TABS = [
@@ -33,6 +34,10 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
   const [editing, setEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
+  // O saldo pendente de quem ainda tem extra adiado ou correcao: encerrar
+  // com ele so avisa (issue 60), e quem decide e quem encerra.
+  const [closing, setClosing] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +76,26 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
     } catch (caught) {
       setError(toError(caught));
     }
+  }
+
+  async function requestClose() {
+    try {
+      const response = await api.getLaunchBalances(launchId);
+      if (response.data.length > 0) {
+        setClosing(response.data);
+      } else {
+        await setStatus('closed');
+      }
+    } catch (caught) {
+      setError(toError(caught));
+    }
+  }
+
+  async function confirmClose() {
+    setBusy(true);
+    await setStatus('closed');
+    setBusy(false);
+    setClosing(null);
   }
 
   if (!launch) {
@@ -115,7 +140,7 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
               <button
                 type="button"
                 className="btn btn--sm"
-                onClick={() => setStatus(open ? 'closed' : 'open')}
+                onClick={() => (open ? requestClose() : setStatus('open'))}
               >
                 {open ? 'Encerrar lancamento' : 'Reabrir lancamento'}
               </button>
@@ -211,6 +236,20 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
         launch={launch}
         canWrite={writable}
       />
+
+      {closing && (
+        <ConfirmDialog
+          title="Encerrar com saldo pendente"
+          message="Extra adiado e correcao de dia ja pago so entram num proximo pagamento, e o lancamento encerrado nao emite RPA:"
+          confirmLabel="Encerrar mesmo assim"
+          busyLabel="Encerrando..."
+          busy={busy}
+          onCancel={() => setClosing(null)}
+          onConfirm={confirmClose}
+        >
+          <BalanceList balances={closing} label="Saldo pendente ao encerrar" />
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

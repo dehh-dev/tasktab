@@ -125,6 +125,7 @@ const ROUTES = [
   { method: 'PUT', path: '/api/rpa/launches/:id/days', roles: ADMIN },
   { method: 'GET', path: '/api/rpa/launches/:id/payments', roles: RPA_READERS },
   { method: 'POST', path: '/api/rpa/launches/:id/payments', roles: ADMIN },
+  { method: 'GET', path: '/api/rpa/launches/:id/balances', roles: RPA_READERS },
   { method: 'GET', path: '/api/rpa/launches/:id/rpas.zip', roles: RPA_READERS },
   { method: 'GET', path: '/api/rpa/launches/:id/email', roles: RPA_READERS },
   { method: 'POST', path: '/api/rpa/launches/:id/documents', roles: ADMIN },

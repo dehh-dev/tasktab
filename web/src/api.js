@@ -387,6 +387,11 @@ export function saveDays(launchId, days) {
  * por vez, e 26 pessoas com 4 pagamentos ja passam disso. Parar na primeira
  * pagina escondia justamente os RPAs mais novos (a lista vem pelo numero).
  */
+/** O saldo pendente de cada pessoa: extra adiado e correcao ainda nao pagos. */
+export function getLaunchBalances(launchId) {
+  return request(`${RPA_URL}/launches/${launchId}/balances`);
+}
+
 export async function listPayments(launchId, { number } = {}) {
   const data = [];
 
