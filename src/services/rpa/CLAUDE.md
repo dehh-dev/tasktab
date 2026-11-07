@@ -124,6 +124,13 @@ pendencia barra a importacao.
 - **"1o pagamento so com diarias" e por pessoa**: quem entrou depois tambem
   tem o primeiro dela sem extra. O extra fica em `deferred_extra_subcents` e
   entra no seguinte.
+- **O periodo gravado e o da pessoa, nao o pedido** (issue 58, decisao de
+  2026-11-07): do primeiro ao ultimo dia com diaria neste pagamento
+  (`servicePeriod`), sem os dias de valor zero. E a "data da prestacao de
+  servico" do PDF e da lista: quem entrou no meio, saiu antes, ou trabalhou
+  tres dias e recebe dias depois, sai so com os dias dele. Sem diaria, valem
+  os dias que o pagamento leva (extra pendente, correcao); so com ajuste, o
+  periodo pedido. Gravado na emissao, o RPA ja emitido continua igual.
 - `rpa_payment_days` leva **todo dia do periodo, inclusive o de valor zero**
   (falta, folga): e o que faz uma falta que vira dia trabalhado aparecer como
   correcao, e nao sumir.

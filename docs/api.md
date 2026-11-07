@@ -181,7 +181,9 @@ com `short_day`. Meia diaria tem base de 4h.
 `bonus`, `addition` ou `deduction` e motivo obrigatorio. Com `?preview=true`
 nada e gravado; sem ele, os RPAs sao emitidos (`201`). As duas respostas
 fazem a mesma conta: `{ preview, payments, skipped }`. Cada pagamento traz
-`number`, `code` (`no-empresa-pessoa-mmaaaa`), `lines` (o que leva de cada
+`number`, `code` (`no-empresa-pessoa-mmaaaa`), `period_start` e `period_end`
+(o periodo impresso no RPA: do primeiro ao ultimo dia com diaria naquele
+pagamento, e nao o pedido), `lines` (o que leva de cada
 dia: `daily`, `extras` ou `correction`, em 1/1920 de centavo), `days` (os
 totais), `deferred_extra_subcents` (extra que o 1o pagamento so com diarias
 deixou para o seguinte), `adjustments`, `value_cents` (os dias, arredondados

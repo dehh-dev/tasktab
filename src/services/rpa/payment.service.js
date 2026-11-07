@@ -10,6 +10,7 @@ const { earliest, latest } = require('./calendar');
 const { buildGrid, workerPeriod } = require('./timesheet');
 const {
   planWorker,
+  servicePeriod,
   nextPaymentNumber,
   paymentCode,
 } = require('./payment-plan');
@@ -224,8 +225,9 @@ async function buildPayments(launch, request, client = db) {
         workerNumber: worker.number,
         paymentDate: request.payment_date,
       }),
-      period_start: request.period_start,
-      period_end: request.period_end,
+      // O periodo da pessoa, e nao o pedido: e o que o RPA imprime. Gravado
+      // na emissao, o RPA ja emitido continua saindo igual.
+      ...servicePeriod(plan.lines, period),
       payment_date: request.payment_date,
       dependents: worker.dependents,
       inss_table_id: tables.inss.id,

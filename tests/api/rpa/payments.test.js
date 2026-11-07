@@ -2,6 +2,7 @@
 
 const {
   request,
+  requestBinary,
   refusedFields,
   insertRow,
   insertRpaCompany,
@@ -10,6 +11,7 @@ const {
   startApiInstance,
   updateColumnDirectly,
 } = require('../../orchestrator');
+const { extractPdfText } = require('../../helpers/pdf-text');
 
 /**
  * O lancamento dos criterios da issue 39: diaria de R$ 130,00, segunda a
@@ -325,6 +327,127 @@ describe('POST /api/rpa/launches/:id/payments: codigo repetido', () => {
     expect(issue.status).toBe(422);
     expect(issue.body.details).toEqual([
       { field: 'worker_ids', message: `1: ${reason}` },
+    ]);
+  });
+});
+
+describe('POST /api/rpa/launches/:id/payments: o periodo impresso no RPA (issue 58)', () => {
+  const periodsOf = (payments) =>
+    Object.fromEntries(
+      payments.map((payment) => [
+        payment.worker_id,
+        [payment.period_start, payment.period_end],
+      ]),
+    );
+
+  it('quem entrou ou saiu no meio sai com os proprios dias, na lista e no PDF', async () => {
+    const { launch } = await arrangeLaunch({
+      launch: {
+        service_type: 'Prestação de Serviços Administrativos',
+        cost_center: '71401',
+      },
+    });
+    const entered = await arrangeWorker(launch, { starts_on: '2026-10-15' });
+    const left = await arrangeWorker(launch, {
+      number: 8,
+      cpf: '11144477735',
+      left_on: '2026-10-16',
+    });
+
+    const response = await pay(launch.id, FIRST_WEEK);
+
+    expect(response.status).toBe(201);
+    const { payments } = response.body.data;
+    expect(periodsOf(payments)).toEqual({
+      [entered.id]: ['2026-10-15', '2026-10-19'],
+      [left.id]: ['2026-10-13', '2026-10-16'],
+    });
+    // O valor nao muda: 3 e 4 diarias de R$ 130,00.
+    expect(payments.map((payment) => payment.value_cents).sort()).toEqual([
+      39000, 52000,
+    ]);
+
+    const listed = await request(
+      'GET',
+      `/api/rpa/launches/${launch.id}/payments`,
+    );
+    expect(periodsOf(listed.body.data)).toEqual(periodsOf(payments));
+
+    const pdf = await requestBinary(
+      'GET',
+      `/api/rpa/payments/${payments.find((p) => p.worker_id === entered.id).id}/rpa.pdf`,
+    );
+    const [text] = extractPdfText(pdf.buffer);
+    expect(text).toContain('15/10/2026 até 19/10/2026');
+  });
+
+  it('tres dias trabalhados, pagos dias depois num periodo maior: so os tres dias, sem as faltas', async () => {
+    const { launch } = await arrangeLaunch({
+      launch: { first_payment_daily_only: false },
+    });
+    const worker = await arrangeWorker(launch);
+    await saveDays(launch.id, [
+      { worker_id: worker.id, date: '2026-10-16', quantity: 0 },
+      { worker_id: worker.id, date: '2026-10-19', quantity: 0 },
+    ]);
+    const body = { ...FIRST_WEEK, payment_date: '2026-10-24' };
+
+    const preview = await pay(launch.id, body, { preview: true });
+    const issued = await pay(launch.id, body);
+
+    for (const response of [preview, issued]) {
+      expect(response.body.data.payments).toEqual([
+        expect.objectContaining({
+          period_start: '2026-10-13',
+          period_end: '2026-10-15',
+          // 3 dias de 9h: R$ 130,00 e 1h a 50% (R$ 24,375), arredondado no total.
+          value_cents: 46313,
+        }),
+      ]);
+    }
+  });
+
+  it('sem diaria no pagamento, os dias que ele paga; so com bonus, o periodo pedido', async () => {
+    const { launch } = await arrangeLaunch();
+    const worker = await arrangeWorker(launch, { left_on: '2026-10-19' });
+    await pay(launch.id, FIRST_WEEK);
+    const nextWeek = {
+      period_start: '2026-10-20',
+      period_end: '2026-10-26',
+      payment_date: '2026-10-27',
+    };
+
+    // So o extra que o 1o pagamento deixou pendente, de 13/10 a 19/10.
+    const extras = await pay(launch.id, nextWeek);
+
+    expect(extras.body.data.payments).toEqual([
+      expect.objectContaining({
+        period_start: '2026-10-13',
+        period_end: '2026-10-19',
+        value_cents: 12188,
+      }),
+    ]);
+
+    const bonus = await pay(launch.id, {
+      ...nextWeek,
+      payment_date: '2026-10-28',
+      adjustments: [
+        {
+          worker_id: worker.id,
+          kind: 'bonus',
+          amount_cents: 5000,
+          reason: 'Premio de assiduidade',
+        },
+      ],
+    });
+
+    expect(bonus.body.data.payments).toEqual([
+      expect.objectContaining({
+        period_start: '2026-10-20',
+        period_end: '2026-10-26',
+        value_cents: 0,
+        net_cents: 5000,
+      }),
     ]);
   });
 });
