@@ -78,7 +78,8 @@ async function waitForAllServices() {
  *
  * `output()` devolve tudo o que ele escreveu na saida padrao: com
  * `LOG_LEVEL: 'info'` e o log de verdade, que e como se prova o que nao sai
- * nele. Sem isso o logger de teste e mudo e nada se acumula.
+ * nele. Sem isso o logger de teste e mudo e nada se acumula. `errors()` e o
+ * fim do stderr: o que ele disse ao cair depois de ja estar de pe.
  */
 const INSTANCE_ATTEMPTS = 240;
 
@@ -123,7 +124,7 @@ async function startApiInstance(extraEnv = {}, { port = 3002 } = {}) {
     throw new Error(`${error.message}\n${stderr}`.trim());
   }
 
-  return { baseUrl, stop, output: () => stdout };
+  return { baseUrl, stop, output: () => stdout, errors: () => stderr };
 }
 
 /**

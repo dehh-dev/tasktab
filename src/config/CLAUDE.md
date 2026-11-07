@@ -10,6 +10,11 @@
 - Dev usa `tasktab_development`; testes, `tasktab_test`, criado pelo
   `docker/initdb/` so na **primeira** subida do volume. Se o de teste sumir:
   `npm run services:down -- -v` e subir de novo.
+- **Dentro de `db.transaction`, uma consulta por vez**: o `client` e uma
+  conexao so, e `Promise.all` nele o pg 8 enfileira com um DeprecationWarning
+  (o 9 deixa de aceitar). Fora da transacao, pelo pool, o paralelo vale. A
+  emissao de RPA fazia isso; o teste dela sobe uma API com
+  `--throw-deprecation`, que cai com o aviso.
 - Arquivo enviado: dev em `uploads/`, testes em `uploads-test/`
   (`UPLOAD_DIR` do `env.test`). A retencao conta referencias no banco do
   proprio ambiente; com um diretorio so, um podia apagar o arquivo do outro.
