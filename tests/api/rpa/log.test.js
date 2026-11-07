@@ -213,6 +213,14 @@ describe('o log do RPA', () => {
     expect(batch.body.data.status).toBe('done');
     expect(batch.body.data.result.matched).toHaveLength(1);
 
+    // A linha sai depois de o envio ficar `done`, e chega por um pipe: o
+    // status pronto nao garante que ela ja esta na saida.
+    while (
+      !instance.output().slice(before).includes('recibos lidos') &&
+      Date.now() < deadline
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
     const output = instance.output().slice(before);
     expect(output).toContain('recibos lidos');
     expect(
