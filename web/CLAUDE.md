@@ -83,8 +83,14 @@ JSX — o backend e que e CommonJS.
   senao o 422 seria salvo como arquivo.
 - O valor do dia e `formatSubcents` (1/1920 de centavo, com as casas que
   tiver), nunca arredondado na tela.
-- Pendencia, marca do ponto e diferenca do recibo sempre com texto, como os
-  badges.
+- Pendencia, aviso da previa, saldo pendente, marca do ponto e diferenca do
+  recibo sempre com texto, como os badges.
+- **Encerrar com saldo pendente so avisa** (issue 60): a `LaunchDetail` busca
+  o saldo (`getLaunchBalances`) antes do PATCH e, se houver, abre o
+  `ConfirmDialog` com a lista. A API aceita encerrar assim mesmo: o bloqueio
+  ficou para depois, entao nao conte com o servidor. Emitir com pendencia que
+  impede o pagamento e o contrario: a API recusa sem `accept_issues`, e a tela
+  so o manda depois da confirmacao.
 - A importacao devolve a equipe resumida: depois dela a lista recarrega da
   rota da equipe, senao CPF e funcao somem da tela.
 - Lancamento com `purged_at` (retencao, um mes depois de encerrar): sem
