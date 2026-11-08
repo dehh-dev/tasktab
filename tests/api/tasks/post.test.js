@@ -73,6 +73,16 @@ describe('POST /api/tasks', () => {
     expect(response.status).toBe(201);
   });
 
+  it('cria a tarefa ja aguardando outra pessoa', async () => {
+    const response = await request('POST', '/api/tasks', {
+      title: 'Resposta sobre o insumo',
+      status: 'waiting',
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.status).toBe('waiting');
+  });
+
   it('rejeita status fora do enum', async () => {
     const response = await request('POST', '/api/tasks', {
       title: 'Tarefa',

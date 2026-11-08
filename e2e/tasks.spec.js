@@ -47,6 +47,31 @@ test('cria uma tarefa e a exibe na lista', async ({ page }) => {
   await expect(page.getByText('1 tarefa', { exact: true })).toBeVisible();
 });
 
+test('o que espera outra pessoa fica em Aguardando, separado do pendente', async ({
+  page,
+  request,
+}) => {
+  await createTask(request, {
+    title: 'Faturas para lancar',
+    status: 'pending',
+  });
+  await createTask(request, { title: 'Voucher do veiculo', status: 'waiting' });
+
+  await page.goto('/');
+  await openSection(page, 'Tarefas');
+  await page
+    .getByRole('group', { name: 'Filtrar por status' })
+    .getByRole('button', { name: 'Aguardando' })
+    .click();
+
+  const tasks = page.locator('.task');
+  await expect(tasks).toHaveCount(1);
+  await expect(tasks.first()).toContainText('Voucher do veiculo');
+  // O status esta escrito no badge, nao so na cor.
+  await expect(tasks.first().getByText('Aguardando')).toBeVisible();
+  await expect(page.getByText('1 tarefa', { exact: true })).toBeVisible();
+});
+
 test('edita uma tarefa a partir dos valores atuais', async ({
   page,
   request,

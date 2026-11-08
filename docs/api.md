@@ -304,12 +304,12 @@ README).
 
 ## Campos de uma tarefa
 
-| Campo         | Tipo   | Regras                                                  |
-| ------------- | ------ | ------------------------------------------------------- |
-| `title`       | string | **obrigatorio**, nao-vazio, max. 255 caracteres         |
-| `description` | text   | opcional, aceita `null`                                 |
-| `status`      | enum   | `pending` \| `in_progress` \| `done` (padrao `pending`) |
-| `due_date`    | date   | opcional, `YYYY-MM-DD`, data valida no calendario       |
+| Campo         | Tipo   | Regras                                                               |
+| ------------- | ------ | -------------------------------------------------------------------- |
+| `title`       | string | **obrigatorio**, nao-vazio, max. 255 caracteres                      |
+| `description` | text   | opcional, aceita `null`                                              |
+| `status`      | enum   | `pending` \| `in_progress` \| `waiting` \| `done` (padrao `pending`) |
+| `due_date`    | date   | opcional, `YYYY-MM-DD`, data valida no calendario                    |
 
 `created_at` e `updated_at` sao do banco. O `updated_at` e mantido por um
 trigger, entao vale tambem para escrita que nao passa pela API.

@@ -61,7 +61,9 @@ Um widget por modulo, com o resumo do proprio modulo e o "Abrir":
 ## Tarefas
 
 - **Listagem** com filtro por status (Todas / Pendente / Em andamento /
-  Concluida) e contagem total vinda do `meta` da API.
+  Aguardando / Concluida) e contagem total vinda do `meta` da API.
+  **Aguardando** e o que depende de outra pessoa, separado da fila de quem
+  faz.
 - **Formulario unico** para criar e editar, com contador de caracteres do
   titulo. Erros `422` aparecem no campo correspondente, preservando o que foi
   digitado.
@@ -165,6 +167,7 @@ isso as acoes destrutivas sao laranja (`#ec8e2c`), nao vermelhas.
 | ------------ | ----------------- |
 | Pendente     | Amarelo `#d29922` |
 | Em andamento | Azul `#4184e4`    |
+| Aguardando   | Cinza `#a1a1aa`   |
 | Concluida    | Roxo `#a371f7`    |
 
 Cor nunca e o unico canal de informacao: cada badge tambem carrega o texto do

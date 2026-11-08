@@ -7,8 +7,9 @@ const SHOWN = 5;
 
 /**
  * Tarefas no Inicio: quantas ha em cada status e as que estao em aberto,
- * primeiro as em andamento. Os totais vem do `meta.total` de cada lista
- * filtrada — contar no cliente so veria a primeira pagina.
+ * primeiro as em andamento e por ultimo as que aguardam outra pessoa. Os
+ * totais vem do `meta.total` de cada lista filtrada — contar no cliente so
+ * veria a primeira pagina.
  */
 export default function TasksHomeWidget({ module, onOpen }) {
   const [summary, setSummary] = useState(null);
@@ -20,15 +21,20 @@ export default function TasksHomeWidget({ module, onOpen }) {
     Promise.all([
       api.listTasks({ status: 'in_progress', limit: SHOWN }),
       api.listTasks({ status: 'pending', limit: SHOWN }),
+      api.listTasks({ status: 'waiting', limit: SHOWN }),
       api.listTasks({ status: 'done', limit: 1 }),
     ])
-      .then(([doing, todo, done]) => {
+      .then(([doing, todo, waiting, done]) => {
         if (current) {
           setSummary({
             doing: doing.meta.total,
             todo: todo.meta.total,
+            waiting: waiting.meta.total,
             done: done.meta.total,
-            open: [...doing.data, ...todo.data].slice(0, SHOWN),
+            open: [...doing.data, ...todo.data, ...waiting.data].slice(
+              0,
+              SHOWN,
+            ),
           });
         }
       })
@@ -53,6 +59,7 @@ export default function TasksHomeWidget({ module, onOpen }) {
           <dl className="widget__stats">
             <WidgetStat label="Pendentes" value={summary.todo} />
             <WidgetStat label="Em andamento" value={summary.doing} />
+            <WidgetStat label="Aguardando" value={summary.waiting} />
             <WidgetStat label="Concluidas" value={summary.done} />
           </dl>
 

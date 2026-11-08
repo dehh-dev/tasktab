@@ -1348,6 +1348,7 @@ textarea.field__input {
   color: var(--danger-strong);
 }
 
+.badge--waiting,
 .badge--duplicate {
   background: var(--neutral-subtle);
   border-color: var(--neutral-muted);
