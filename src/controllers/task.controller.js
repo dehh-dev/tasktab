@@ -13,10 +13,10 @@ function taskNotFound(id) {
 
 /** GET /api/tasks */
 async function index(req, res) {
-  const { status, limit, offset } = validator.validateListQuery(req.query);
+  const { status, q, limit, offset } = validator.validateListQuery(req.query);
   const [data, total] = await Promise.all([
-    Task.findAll({ status, limit, offset }),
-    Task.count({ status }),
+    Task.findAll({ status, q, limit, offset }),
+    Task.count({ status, q }),
   ]);
 
   res.json({ data, meta: { total, limit, offset } });

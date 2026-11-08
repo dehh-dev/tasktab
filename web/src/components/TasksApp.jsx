@@ -7,6 +7,8 @@ import TaskForm from './TaskForm';
 import TaskList from './TaskList';
 import ConfirmDialog from './ConfirmDialog';
 
+const SEARCH_DELAY_MS = 300;
+
 /**
  * O modulo "Tarefas". Saiu do antigo App.jsx sem mudar comportamento nenhum
  * quando a tela ganhou abas (Issue 19), e assim entrou na casca.
@@ -15,6 +17,15 @@ export default function TasksApp({ canWrite = true }) {
   const [tasks, setTasks] = useState([]);
   const [total, setTotal] = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
+  // A busca no titulo e na referencia (issue 74): o que se digita vira
+  // consulta depois de uma pausa, e nao uma requisicao por tecla.
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(search.trim()), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,7 +41,7 @@ export default function TasksApp({ canWrite = true }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await api.listTasks({ status: statusFilter });
+      const response = await api.listTasks({ status: statusFilter, q: query });
       setTasks(response.data);
       setTotal(response.meta.total);
       setError(null);
@@ -39,7 +50,7 @@ export default function TasksApp({ canWrite = true }) {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, query]);
 
   useEffect(() => {
     load();
@@ -120,6 +131,15 @@ export default function TasksApp({ canWrite = true }) {
           value={statusFilter}
           onChange={setStatusFilter}
           total={total}
+        />
+        <input
+          type="search"
+          className="field__input task-search"
+          aria-label="Buscar no titulo e na referencia"
+          placeholder="Buscar (titulo ou referencia)"
+          maxLength={120}
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
         />
         {
           // Sem `tasks:write` o botao nao aparece: oferecer o que a API vai

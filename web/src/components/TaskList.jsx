@@ -16,6 +16,7 @@ function TaskItem({ task, onEdit, onDelete, busy }) {
             {statusLabel(task.status)}
           </span>
           <span>#{task.id}</span>
+          {task.reference && <span>{task.reference}</span>}
           {dueDate && <span>Prazo: {dueDate}</span>}
         </div>
       </div>

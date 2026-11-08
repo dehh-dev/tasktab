@@ -35,9 +35,13 @@ Base: `/api/tasks`
 | `PATCH`  | `/:id` | Atualiza (parcial)          | 200     |
 | `DELETE` | `/:id` | Remove                      | 204     |
 
-Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
-`offset` (padrao 0). A lista vem pelo prazo: o que vence primeiro no topo, sem
-prazo no fim e, no mesmo prazo, a mais nova primeiro.
+Query params do `GET /api/tasks`: `status` (enum), `q` (busca, ate 120
+caracteres), `limit` (1–100, padrao 50), `offset` (padrao 0). A lista vem pelo
+prazo: o que vence primeiro no topo, sem prazo no fim e, no mesmo prazo, a
+mais nova primeiro. `q` acha o texto no `title` ou na `reference`, sem caixa;
+`%` e `_` valem como texto, e `q` vazio e sem filtro. A `reference` e de onde
+a tarefa veio ou o que a identifica fora daqui: "Fatura 62502", "EMP 363",
+"Processo UAU 164".
 
 ### Prestacao de contas
 
@@ -311,6 +315,7 @@ README).
 | `description` | text   | opcional, aceita `null`                                              |
 | `status`      | enum   | `pending` \| `in_progress` \| `waiting` \| `done` (padrao `pending`) |
 | `due_date`    | date   | opcional, `YYYY-MM-DD`, data valida no calendario                    |
+| `reference`   | string | opcional, max. 120 caracteres; vazio vira `null`                     |
 
 `created_at` e `updated_at` sao do banco. O `updated_at` e mantido por um
 trigger, entao vale tambem para escrita que nao passa pela API.

@@ -55,6 +55,26 @@ describe('PATCH /api/tasks/:id', () => {
     expect(response.body.data.due_date).toBeNull();
   });
 
+  it('a referencia entra ao concluir, e sai com null (issue 74)', async () => {
+    const created = await insertTask({ title: 'Lancar fatura' });
+
+    const done = await request('PATCH', `/api/tasks/${created.id}`, {
+      status: 'done',
+      reference: 'Processo UAU 164',
+    });
+    const cleared = await request('PATCH', `/api/tasks/${created.id}`, {
+      reference: null,
+    });
+
+    expect(done.status).toBe(200);
+    expect(done.body.data).toMatchObject({
+      status: 'done',
+      reference: 'Processo UAU 164',
+    });
+    expect(cleared.body.data.reference).toBeNull();
+    expect(cleared.body.data.status).toBe('done');
+  });
+
   it('PUT nao existe: a atualizacao e parcial, e isso e PATCH', async () => {
     // O PUT chamava o mesmo controller e fazia atualizacao parcial, que nao e
     // o que um PUT significa. A interface sempre usou PATCH.

@@ -21,6 +21,8 @@ const INVALID_ID = {
 // `waiting` (issue 74): espera outra pessoa, e nao e a fila de quem faz.
 const TASK_STATUSES = ['pending', 'in_progress', 'waiting', 'done'];
 const TITLE_MAX_LENGTH = 255;
+// "Fatura 62502", "EMP 363", "Processo UAU 164" (issue 74).
+const REFERENCE_MAX_LENGTH = 120;
 
 function validateTitle(value, errors) {
   if (typeof value !== 'string') {
@@ -81,6 +83,26 @@ function validateDueDate(value, errors) {
   return value;
 }
 
+/** Texto opcional e curto: vazio ou so espaco e sem valor (null). */
+function validateShortText(field, value, errors) {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    errors.push({ field, message: `${field} deve ser uma string ou null` });
+    return undefined;
+  }
+  const text = value.trim();
+  if (text.length > REFERENCE_MAX_LENGTH) {
+    errors.push({
+      field,
+      message: `${field} deve ter no maximo ${REFERENCE_MAX_LENGTH} caracteres`,
+    });
+    return undefined;
+  }
+  return text === '' ? null : text;
+}
+
 function assertValid(errors) {
   if (errors.length > 0) {
     throw new ValidationError({ details: errors });
@@ -113,6 +135,10 @@ function validateCreate(body) {
     data.due_date = validateDueDate(body.due_date, errors);
   }
 
+  if (body.reference !== undefined) {
+    data.reference = validateShortText('reference', body.reference, errors);
+  }
+
   assertValid(errors);
   return data;
 }
@@ -141,6 +167,10 @@ function validateUpdate(body) {
     data.due_date = validateDueDate(body.due_date, errors);
   }
 
+  if (body.reference !== undefined) {
+    data.reference = validateShortText('reference', body.reference, errors);
+  }
+
   assertValid(errors);
 
   if (Object.keys(data).length === 0) {
@@ -149,7 +179,8 @@ function validateUpdate(body) {
       details: [
         {
           field: 'body',
-          message: 'campos aceitos: title, description, status, due_date',
+          message:
+            'campos aceitos: title, description, status, due_date, reference',
         },
       ],
     });
@@ -170,6 +201,12 @@ function validateListQuery(query = {}) {
 
   if (query.status !== undefined) {
     result.status = validateStatus(query.status, errors);
+  }
+
+  // A busca no titulo e na referencia; vazia e sem filtro.
+  if (query.q !== undefined) {
+    const q = validateShortText('q', query.q, errors);
+    if (q) result.q = q;
   }
 
   Object.assign(result, parsePagination(query, errors));
