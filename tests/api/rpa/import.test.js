@@ -4,6 +4,7 @@ const JSZip = require('jszip');
 const {
   request,
   requestUpload,
+  insertRpaCompany,
   insertRpaLaunch,
   insertRpaWorker,
   leftoverUploads,
@@ -263,6 +264,33 @@ describe('POST /api/rpa/launches/:id/import', () => {
     );
 
     expect(response.body.data.workers.map((w) => w.number)).toEqual([7, 8]);
+  });
+
+  it('o numero e contado por empresa: o segundo lancamento dela continua do maior, e outra empresa comeca do 1 (issue 70)', async () => {
+    const company = await insertRpaCompany({ code: 910 });
+    const first = await insertRpaLaunch({ ...LAUNCH, company_id: company.id });
+    const second = await insertRpaLaunch({
+      ...LAUNCH,
+      company_id: company.id,
+      development: 'Residencial Sintetico Fase 2',
+    });
+    const other = await insertRpaLaunch(LAUNCH);
+    const numbers = async (launch, seeds) =>
+      (
+        await upload(
+          launch.id,
+          await makeFormXlsx(seeds.map((seed) => formResponse(seed))),
+        )
+      ).body.data.workers.map((worker) => worker.number);
+
+    expect(await numbers(first, [1, 2])).toEqual([1, 2]);
+    expect(await numbers(second, [3, 4])).toEqual([3, 4]);
+    // Quem entra depois no primeiro tambem segue a empresa, e nao o lancamento.
+    expect(await numbers(first, [1, 2, 5])).toEqual([1, 2, 5]);
+    // A mesma pessoa no segundo lancamento ganha outro numero: com o mesmo,
+    // o codigo do RPA repetiria.
+    expect(await numbers(second, [3, 4, 1])).toEqual([3, 4, 6]);
+    expect(await numbers(other, [1])).toEqual([1]);
   });
 
   it('planilha sem a pergunta de CPF responde 422 dizendo qual falta', async () => {

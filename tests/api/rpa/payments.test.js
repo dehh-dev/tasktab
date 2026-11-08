@@ -703,6 +703,51 @@ describe('POST /api/rpa/launches/:id/payments: o pagamento depois de um bonus (i
   });
 });
 
+describe('POST /api/rpa/launches/:id/payments: dois lancamentos da mesma empresa no mesmo mes (issue 70)', () => {
+  it('os dois emitem, com codigos que nao repetem, porque a equipe e numerada pela empresa', async () => {
+    const { company, launch: first } = await arrangeLaunch();
+    const { launch: second } = await arrangeLaunch({ company });
+    for (const [launch, seeds] of [
+      [first, [1, 2]],
+      [second, [3, 4]],
+    ]) {
+      await insertRow('rpa_rates', {
+        launch_id: launch.id,
+        role: 'Assistente Administrativo',
+        starts_on: '2026-10-13',
+        ends_on: '2026-11-15',
+        daily_cents: 13000,
+      });
+      const imported = await requestUpload(
+        `/api/rpa/launches/${launch.id}/import`,
+        [
+          {
+            buffer: await makeFormXlsx(seeds.map((seed) => formResponse(seed))),
+            filename: 'respostas.xlsx',
+          },
+        ],
+        { field: 'file' },
+      );
+      expect(imported.status).toBe(200);
+    }
+
+    const issued = [];
+    for (const launch of [first, second]) {
+      const response = await pay(launch.id, FIRST_WEEK);
+      expect(response.status).toBe(201);
+      expect(response.body.data.skipped).toEqual([]);
+      issued.push(...response.body.data.payments.map((p) => p.code));
+    }
+
+    expect(issued).toEqual([
+      `1-${company.code}-1-102026`,
+      `1-${company.code}-2-102026`,
+      `1-${company.code}-3-102026`,
+      `1-${company.code}-4-102026`,
+    ]);
+  });
+});
+
 describe('POST /api/rpa/launches/:id/payments: ponto de dia ja pago', () => {
   it('a diferenca entra na previa seguinte como correcao, com o dia', async () => {
     const { launch } = await arrangeLaunch({

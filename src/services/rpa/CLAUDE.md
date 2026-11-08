@@ -30,9 +30,14 @@ retencao dos dados pessoais.
 - Reimportar **casa pelo CPF** dentro do lancamento. So a resposta de carimbo
   mais novo (ou igual) atualiza, e so os campos que a planilha traz — uma
   planilha sem a pergunta de dependentes nao zera ninguem. Quem nao veio no
-  arquivo continua no lancamento. Pessoa nova ganha `MAX(number) + 1`, com o
-  lancamento travado (`FOR UPDATE`) para duas importacoes nao darem o mesmo
-  numero.
+  arquivo continua no lancamento. Pessoa nova ganha o `MAX(number) + 1`
+  **da empresa**, de todos os lancamentos dela (issue 70): o numero vai no
+  codigo do RPA (`no-empresa-pessoa-mmaaaa`), e recomecando em 1 a cada
+  lancamento, o segundo da mesma empresa pago no mesmo mes repetia os codigos
+  do primeiro e ninguem emitia. A mesma pessoa em outro lancamento da empresa
+  ganha outro numero, pelo mesmo motivo. Lancamento e empresa travados
+  (`FOR UPDATE`): duas importacoes, no mesmo lancamento ou em dois da empresa,
+  nao dao o mesmo numero. A empresa do lancamento nao muda depois de criado.
 - Linha sem nome ou sem CPF de 11 digitos fica de fora, listada pelo numero.
   CPF de 11 digitos com DV errado **entra**, com pendencia: e a mesma pessoa
   que vai corrigir.
