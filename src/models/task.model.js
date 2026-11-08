@@ -16,8 +16,12 @@ async function findAll({ status, limit = 50, offset = 0 } = {}) {
     sql += ` WHERE status = $${params.length}`;
   }
 
+  // O que vence primeiro no topo, sem prazo no fim (issue 74): sete tarefas
+  // criadas no mesmo minuto saiam em ordem aleatoria para quem quer saber o
+  // que vence antes. No mesmo prazo, a mais nova; o indice em due_date ja
+  // existe.
   params.push(limit);
-  sql += ` ORDER BY created_at DESC, id DESC LIMIT $${params.length}`;
+  sql += ` ORDER BY due_date ASC NULLS LAST, created_at DESC, id DESC LIMIT $${params.length}`;
 
   params.push(offset);
   sql += ` OFFSET $${params.length}`;

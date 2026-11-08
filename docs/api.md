@@ -36,7 +36,8 @@ Base: `/api/tasks`
 | `DELETE` | `/:id` | Remove                      | 204     |
 
 Query params do `GET /api/tasks`: `status` (enum), `limit` (1–100, padrao 50),
-`offset` (padrao 0).
+`offset` (padrao 0). A lista vem pelo prazo: o que vence primeiro no topo, sem
+prazo no fim e, no mesmo prazo, a mais nova primeiro.
 
 ### Prestacao de contas
 
