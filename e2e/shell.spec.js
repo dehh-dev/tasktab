@@ -64,6 +64,7 @@ test('o Inicio resume as tarefas, e o widget abre o modulo', async ({
     due_date: '2026-12-31',
   });
   await createTask(request, { title: 'Ja foi', status: 'done' });
+  await createTask(request, { title: 'Esperando voucher', status: 'waiting' });
 
   await page.goto('/');
 
@@ -71,15 +72,18 @@ test('o Inicio resume as tarefas, e o widget abre o modulo', async ({
 
   await expect(stat(widget, 'Pendentes')).toHaveText('1');
   await expect(stat(widget, 'Em andamento')).toHaveText('1');
+  await expect(stat(widget, 'Aguardando')).toHaveText('1');
   await expect(stat(widget, 'Concluidas')).toHaveText('1');
 
-  // So o que esta em aberto, e o que esta em andamento primeiro.
+  // So o que esta em aberto: o em andamento primeiro, o que aguarda outra
+  // pessoa por ultimo.
   const open = widget
     .getByRole('list', { name: 'Tarefas em aberto' })
     .getByRole('listitem');
-  await expect(open).toHaveCount(2);
+  await expect(open).toHaveCount(3);
   await expect(open.first()).toContainText('Fazendo agora');
   await expect(open.nth(1)).toContainText('Prazo 31/12/2026');
+  await expect(open.nth(2)).toContainText('Aguardando');
 
   await widget.getByRole('button', { name: 'Abrir Tarefas' }).click();
 
@@ -87,7 +91,7 @@ test('o Inicio resume as tarefas, e o widget abre o modulo', async ({
   // O botao clicado sumiu junto com o Inicio: o foco vai para o titulo da
   // pagina nova, e nao para o <body>.
   await expect(pageTitle(page, 'Tarefas')).toBeFocused();
-  await expect(page.locator('.task')).toHaveCount(3);
+  await expect(page.locator('.task')).toHaveCount(4);
 });
 
 test('o widget da prestacao abre o relatorio direto no detalhe', async ({

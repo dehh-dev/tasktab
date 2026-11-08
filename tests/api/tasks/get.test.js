@@ -37,6 +37,19 @@ describe('GET /api/tasks', () => {
     expect(response.body.meta.total).toBe(1);
   });
 
+  it('filtra o que aguarda outra pessoa, separado do pendente (issue 74)', async () => {
+    await insertTask({ title: 'Faturas para lancar', status: 'pending' });
+    await insertTask({ title: 'Voucher do veiculo', status: 'waiting' });
+
+    const response = await request('GET', '/api/tasks?status=waiting');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.map((task) => task.title)).toEqual([
+      'Voucher do veiculo',
+    ]);
+    expect(response.body.meta.total).toBe(1);
+  });
+
   it('rejeita status invalido no filtro', async () => {
     const response = await request('GET', '/api/tasks?status=archived');
 

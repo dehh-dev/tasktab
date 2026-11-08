@@ -2,6 +2,7 @@
 export const STATUSES = [
   { value: 'pending', label: 'Pendente' },
   { value: 'in_progress', label: 'Em andamento' },
+  { value: 'waiting', label: 'Aguardando' },
   { value: 'done', label: 'Concluida' },
 ];
 

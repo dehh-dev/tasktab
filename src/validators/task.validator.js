@@ -18,7 +18,8 @@ const INVALID_ID = {
   action: 'Use o id numerico devolvido pela listagem de tarefas.',
 };
 
-const TASK_STATUSES = ['pending', 'in_progress', 'done'];
+// `waiting` (issue 74): espera outra pessoa, e nao e a fila de quem faz.
+const TASK_STATUSES = ['pending', 'in_progress', 'waiting', 'done'];
 const TITLE_MAX_LENGTH = 255;
 
 function validateTitle(value, errors) {
