@@ -140,7 +140,9 @@ descartado. A resposta traz `created`, `updated`, `unchanged`, `rejected`
 (`[{ line, reason }]`, as linhas sem nome ou CPF), `warnings` (pergunta
 desconhecida ou pessoa repetida, pela linha), `changes` (`[{ worker_id,
 number, fields }]`, o que cada resposta mais nova mudou) e `workers` (a equipe,
-com as pendencias). Reimportar casa pelo CPF e nao duplica ninguem. Sem a
+com as pendencias). Reimportar casa pelo CPF e nao duplica ninguem. Pessoa
+nova ganha o numero seguinte ao maior da empresa, em qualquer lancamento dela:
+o numero vai no codigo do RPA, que nao pode repetir no mes. Sem a
 pergunta de nome ou de CPF, ou com um arquivo que nao e planilha, `422` no
 campo `file`.
 

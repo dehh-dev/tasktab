@@ -128,6 +128,16 @@ async function update(id, data) {
   return rows[0] || null;
 }
 
+/**
+ * Trava a empresa na transacao: a numeracao da equipe e dela, e duas
+ * importacoes em lancamentos dela ao mesmo tempo dariam o mesmo numero.
+ */
+async function lock(client, id) {
+  await client.query('SELECT id FROM rpa_companies WHERE id = $1 FOR UPDATE', [
+    id,
+  ]);
+}
+
 module.exports = {
   UPDATABLE_COLUMNS,
   findAll,
@@ -137,4 +147,5 @@ module.exports = {
   create,
   upsertByCode,
   update,
+  lock,
 };

@@ -95,10 +95,12 @@ pagamento.
   liquido fecha com o recibo do RH.
 - O **codigo do RPA** e `no-empresa-pessoa-mmaaaa`. O processo normal e um
   lancamento por empresa, pago em partes: a semana de treinamento no dia do
-  lancamento do empreendimento, depois a semana do lancamento. Dois
-  lancamentos da mesma empresa emitindo no mesmo mes repetiriam o codigo
-  (o numero da pessoa recomeca em cada um); nesse caso raro a pessoa fica de
-  fora da emissao, com o motivo escrito.
+  lancamento do empreendimento, depois a semana do lancamento. O **numero da
+  pessoa e contado por empresa**: o segundo lancamento da mesma empresa (outra
+  fase, outro estande) continua do maior numero dela, e os dois emitem no
+  mesmo mes sem repetir codigo. Se ainda assim um codigo ja existir (um RPA
+  antigo, de antes dessa regra), a pessoa fica de fora da emissao, com o
+  motivo escrito.
 
 ## Instalacao
 

@@ -111,11 +111,20 @@ async function findByCpf(launchId, cpf) {
   return rows[0] || null;
 }
 
-/** O proximo numero fixo do lancamento: quem entra depois ganha o seguinte. */
-async function nextNumber(client, launchId) {
+/**
+ * O proximo numero fixo da pessoa, contado **por empresa** (issue 70): o
+ * numero vai no codigo do RPA (`no-empresa-pessoa-mmaaaa`), e recomecando em
+ * 1 a cada lancamento, o segundo lancamento da mesma empresa pago no mesmo
+ * mes repetia os codigos do primeiro e nao emitia. Quem entra depois, em
+ * qualquer lancamento da empresa, ganha o seguinte.
+ */
+async function nextNumber(client, companyId) {
   const { rows } = await client.query(
-    'SELECT COALESCE(MAX(number), 0) + 1 AS next FROM rpa_workers WHERE launch_id = $1',
-    [launchId],
+    `SELECT COALESCE(MAX(w.number), 0) + 1 AS next
+     FROM rpa_workers w
+     JOIN rpa_launches l ON l.id = w.launch_id
+     WHERE l.company_id = $1`,
+    [companyId],
   );
   return rows[0].next;
 }

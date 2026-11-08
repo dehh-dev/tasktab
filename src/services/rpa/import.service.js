@@ -3,6 +3,7 @@
 const ExcelJS = require('exceljs');
 const JSZip = require('jszip');
 const db = require('../../config/database');
+const Company = require('../../models/rpa-company.model');
 const Launch = require('../../models/rpa-launch.model');
 const Worker = require('../../models/rpa-worker.model');
 const Bank = require('../../models/rpa-bank.model');
@@ -218,13 +219,15 @@ async function importResponses(launch, buffer) {
   const tracked = trackedFields(present);
 
   return db.transaction(async (client) => {
-    // Duas importacoes do mesmo lancamento ao mesmo tempo dariam o mesmo
-    // numero a duas pessoas.
+    // Duas importacoes do mesmo lancamento, ou de dois lancamentos da mesma
+    // empresa, ao mesmo tempo dariam o mesmo numero a duas pessoas: o numero
+    // e contado por empresa.
     await Launch.lock(client, launch.id);
+    await Company.lock(client, launch.company_id);
 
     const current = await Worker.findByLaunch(launch.id, client);
     const byCpf = new Map(current.map((worker) => [worker.cpf, worker]));
-    let number = await Worker.nextNumber(client, launch.id);
+    let number = await Worker.nextNumber(client, launch.company_id);
     const counts = { created: 0, updated: 0, unchanged: 0 };
     const changes = [];
 
