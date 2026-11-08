@@ -6,6 +6,7 @@ const Worker = require('../models/rpa-worker.model');
 const RpaFile = require('../models/rpa-file.model');
 const { loadLaunch, launchPurged } = require('../services/auth/access.service');
 const { importResponses } = require('../services/rpa/import.service');
+const { launchUpdateEffect } = require('../services/rpa/payment.service');
 const retention = require('../services/retention.service');
 const { ConflictError, ValidationError } = require('../../infra/errors');
 const validator = require('../validators/rpa-launch.validator');
@@ -64,13 +65,15 @@ async function create(req, res) {
 }
 
 /**
- * PATCH /api/rpa/launches/:id
+ * PATCH /api/rpa/launches/:id — `?preview=true` so calcula o efeito nos dias
+ * ja pagos, sem gravar (issue 71).
  *
  * Encerrado, o unico PATCH aceito e o que reabre — como no relatorio.
  */
 async function update(req, res) {
   const id = validator.validateId(req.params.id);
   const current = await loadLaunch(id, { write: true, allowClosed: true });
+  const preview = validator.validatePreview(req.query);
   const data = validator.validateUpdate(req.body, current);
   const reopening = Object.keys(data).length === 1 && data.status === 'open';
 
@@ -85,6 +88,13 @@ async function update(req, res) {
       message: `O lancamento ${id} esta encerrado.`,
       action: 'Reabra o lancamento para altera-lo.',
     });
+  }
+
+  if (preview) {
+    res.json({
+      data: { preview: true, effect: await launchUpdateEffect(id, data) },
+    });
+    return;
   }
 
   res.json({ data: await Launch.update(id, data) });

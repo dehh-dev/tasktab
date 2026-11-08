@@ -165,6 +165,36 @@ function servicePeriod(lines, period) {
   return { period_start: dates[0], period_end: dates.at(-1) };
 }
 
+/** O que o livro deixa de cada dia, somado: Map data -> subcentavos. */
+function lineTotals(lines) {
+  const totals = new Map();
+  for (const line of lines) {
+    totals.set(line.date, (totals.get(line.date) ?? 0) + line.value_subcents);
+  }
+  return totals;
+}
+
+/**
+ * Os dias ja pagos cujo acerto muda entre duas contas da mesma pessoa
+ * (issue 71): a de antes e a de depois de uma mudanca no lancamento (diaria,
+ * feriado, horario). Dia que ficou sem diaria vigente tambem muda: o proximo
+ * pagamento deixaria a pessoa de fora.
+ */
+function changedDays(before, after) {
+  const was = lineTotals(before.lines);
+  const now = lineTotals(after.lines);
+  const unpriced = new Set(before.unpriced);
+  const dates = new Set([...was.keys(), ...now.keys(), ...after.unpriced]);
+
+  return [...dates]
+    .filter(
+      (date) =>
+        (was.get(date) ?? 0) !== (now.get(date) ?? 0) ||
+        (after.unpriced.includes(date) && !unpriced.has(date)),
+    )
+    .sort();
+}
+
 /** O menor numero livre: cancelar libera o numero para reemitir. */
 function nextPaymentNumber(taken) {
   const used = new Set(taken);
@@ -184,6 +214,7 @@ module.exports = {
   roundSubcents,
   planWorker,
   servicePeriod,
+  changedDays,
   nextPaymentNumber,
   paymentCode,
 };

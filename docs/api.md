@@ -93,7 +93,7 @@ plano e as etapas estao na issue 35.
 | `GET`    | `/api/rpa/launches`                   | Lista os lancamentos (filtro por `status`)      |
 | `POST`   | `/api/rpa/launches`                   | Cria, com horario padrao e diarias              |
 | `GET`    | `/api/rpa/launches/:id`               | Detalhe                                         |
-| `PATCH`  | `/api/rpa/launches/:id`               | Atualiza; encerrado so aceita reabrir           |
+| `PATCH`  | `/api/rpa/launches/:id`               | Atualiza (`?preview=true`: o efeito no pago)    |
 | `DELETE` | `/api/rpa/launches/:id`               | Apaga (recusa com `409` se ha RPA)              |
 | `POST`   | `/api/rpa/launches/:id/import`        | Importa a equipe das respostas do formulario    |
 | `GET`    | `/api/rpa/launches/:id/workers`       | A equipe, pelo numero fixo, com pendencias      |
@@ -125,7 +125,17 @@ e-mail de solicitacao), `email_to` e `email_cc`, `first_payment_daily_only`,
 lunch_in, end_time }]`, com `weekday` de 1 (segunda) a 7 (domingo); dia que
 nao vem e folga — e `rates` — as diarias por funcao, `[{ role, starts_on,
 ends_on, daily_cents, promoted_bonus_cents }]`, sem vigencias sobrepostas da
-mesma funcao. No `PATCH`, `schedule` e `rates` substituem a lista inteira.
+mesma funcao. No `PATCH`, `schedule` e `rates` substituem a lista inteira;
+encerrado so aceita reabrir.
+
+Mudar a diaria, um feriado ou o horario refaz o valor dos dias ja pagos, e a
+diferenca entra no proximo pagamento. `PATCH /api/rpa/launches/:id?preview=true`
+faz a mesma mudanca sem gravar e devolve `{ preview: true, effect }`:
+`days` (os dias ja pagos que mudam), `people`, `value_cents` (positivo a
+pagar, negativo a descontar) e `workers`, cada um com `days`,
+`unpriced_days` (os que ficariam sem diaria vigente) e `value_cents`. Para
+mudar a diaria a partir de uma data, feche a vigencia atual e crie outra: os
+dias ja pagos nao mudam.
 
 O lancamento devolve tambem `closed_at` (quando foi encerrado; reabrir limpa),
 `purge_on` (o dia, em Brasilia, a partir do qual a retencao apaga os dados

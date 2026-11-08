@@ -90,8 +90,33 @@ async function transaction(work) {
   }
 }
 
+/**
+ * Roda `work(client)` numa transacao e a desfaz no fim, sempre: a previa de
+ * uma escrita (issue 71). A conta ve o banco exatamente como ficaria, com as
+ * constraints de verdade, e nada fica gravado. Uma consulta por vez, como na
+ * `transaction`.
+ */
+async function rolledBack(work) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    return await work(client);
+  } finally {
+    await client.query('ROLLBACK').catch(() => {});
+    client.release();
+  }
+}
+
 function close() {
   return pool.end();
 }
 
-module.exports = { pool, query, queryWithTimeout, transaction, close };
+module.exports = {
+  pool,
+  query,
+  queryWithTimeout,
+  transaction,
+  rolledBack,
+  close,
+};

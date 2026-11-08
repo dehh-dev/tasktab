@@ -13,6 +13,9 @@
 - O `env.test` traz `PGOPTIONS=-c synchronous_commit=off`, que o `pg` le
   sozinho: o commit do teste nao espera o fsync (~7 ms cada no volume do
   Docker). Nao leve para o `env.development` — la ha dado que importa.
+- `db.rolledBack(work)` e a previa de uma escrita: BEGIN, a conta e ROLLBACK
+  sempre, mesmo quando ela termina. A previa do `PATCH` do lancamento do RPA
+  usa para ver o banco como ficaria, com as constraints de verdade.
 - **Dentro de `db.transaction`, uma consulta por vez**: o `client` e uma
   conexao so, e `Promise.all` nele o pg 8 enfileira com um DeprecationWarning
   (o 9 deixa de aceitar). Fora da transacao, pelo pool, o paralelo vale. A

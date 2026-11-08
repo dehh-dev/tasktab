@@ -161,6 +161,22 @@ test('do .xlsx do formulario ao .zip dos RPAs, pela tela', async ({
     '1. Pessoa Sintetica Numero 1: R$ 24,38 a pagar (extra adiado R$ 24,375)',
   ]);
 
+  // Mudar a diaria que ja pagou pergunta antes, com o efeito: R$ 10,00 a
+  // mais nos 15 dias pagos, e o extra adiado de 14/10 sobe R$ 1,875.
+  await page.getByRole('button', { name: 'Editar lancamento' }).click();
+  await page.getByLabel('Valor da diaria 1').fill('140,00');
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click();
+  const change = page.getByRole('dialog', { name: 'Mudar dias ja pagos' });
+  await expect(change).toContainText(
+    'Isso muda 15 dia(s) ja pago(s) de 3 pessoa(s): R$ 151,87 a pagar no proximo pagamento.',
+  );
+  await change.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(change).toHaveCount(0);
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await expect(
+    page.getByRole('list', { name: 'Saldo pendente por pessoa' }),
+  ).toContainText('R$ 24,38 a pagar');
+
   // Emissao: o e-mail montado e o .zip com um PDF por pessoa.
   await page.getByRole('button', { name: 'Emissao', exact: true }).click();
   await expect(page.getByLabel('Assunto', { exact: true })).toHaveValue(

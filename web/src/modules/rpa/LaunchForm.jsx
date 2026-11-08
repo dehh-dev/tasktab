@@ -544,7 +544,8 @@ export default function LaunchForm({
           </tbody>
         </table>
         <p className="field__hint">
-          Vigencia vazia vale o periodo do lancamento.
+          Vigencia vazia vale o periodo do lancamento. Para mudar a diaria a
+          partir de uma data, feche a vigencia atual e crie outra.
         </p>
         <button
           type="button"

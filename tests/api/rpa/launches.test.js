@@ -340,6 +340,10 @@ describe('PATCH /api/rpa/launches/:id', () => {
       'status fora do enum': patch({ status: 'paused' }),
       'filtro de status': () =>
         request('GET', '/api/rpa/launches?status=paused'),
+      'previa fora de true ou false': () =>
+        request('PATCH', `/api/rpa/launches/${launch.id}?preview=talvez`, {
+          development: 'Outro',
+        }),
     });
 
     expect(refused).toEqual({
@@ -347,6 +351,7 @@ describe('PATCH /api/rpa/launches/:id', () => {
       'estado que nao existe': ['state'],
       'status fora do enum': ['status'],
       'filtro de status': ['status'],
+      'previa fora de true ou false': ['preview'],
     });
   });
 
@@ -363,6 +368,164 @@ describe('PATCH /api/rpa/launches/:id', () => {
     expect(edit.status).toBe(409);
     expect(reopen.status).toBe(200);
     expect(reopen.body.data.status).toBe('open');
+  });
+});
+
+describe('PATCH /api/rpa/launches/:id?preview=true: o efeito nos dias ja pagos (issue 71)', () => {
+  const PAID_WEEK = [
+    '2026-10-13',
+    '2026-10-14',
+    '2026-10-15',
+    '2026-10-16',
+    '2026-10-19',
+  ];
+  const RATE = {
+    role: 'Assistente Administrativo',
+    starts_on: '2026-10-13',
+    ends_on: '2026-10-30',
+    daily_cents: 11000,
+  };
+
+  // Dias de 8h, so a diaria de R$ 110,00; a primeira semana paga para duas
+  // pessoas.
+  async function arrangePaidWeek() {
+    const created = await request(
+      'POST',
+      '/api/rpa/launches',
+      await validLaunch({
+        ends_on: '2026-10-30',
+        holidays: [],
+        rates: [RATE],
+        first_payment_daily_only: false,
+      }),
+    );
+    const launch = created.body.data;
+    const workers = [
+      await insertRpaWorker({ launch_id: launch.id, number: 1 }),
+      await insertRpaWorker({
+        launch_id: launch.id,
+        number: 2,
+        cpf: '11144477735',
+      }),
+    ];
+    const paid = await request(
+      'POST',
+      `/api/rpa/launches/${launch.id}/payments`,
+      {
+        period_start: '2026-10-13',
+        period_end: '2026-10-19',
+        payment_date: '2026-10-20',
+      },
+    );
+    expect(paid.status).toBe(201);
+
+    return { launch, workers };
+  }
+
+  const preview = (launchId, body) =>
+    request('PATCH', `/api/rpa/launches/${launchId}?preview=true`, body);
+
+  it('trocar o valor da vigencia que ja pagou: o efeito por pessoa, e nada e gravado', async () => {
+    const { launch, workers } = await arrangePaidWeek();
+
+    const response = await preview(launch.id, {
+      rates: [{ ...RATE, daily_cents: 12000 }],
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({
+      preview: true,
+      effect: {
+        days: 10,
+        people: 2,
+        value_cents: 2 * 5 * 1000,
+        workers: workers.map((worker) => ({
+          worker_id: worker.id,
+          worker_number: worker.number,
+          worker_name: worker.name,
+          days: PAID_WEEK,
+          unpriced_days: [],
+          value_cents: 5 * 1000,
+        })),
+      },
+    });
+
+    const shown = await request('GET', `/api/rpa/launches/${launch.id}`);
+    expect(shown.body.data.rates).toEqual([
+      expect.objectContaining({ daily_cents: 11000 }),
+    ]);
+    const balances = await request(
+      'GET',
+      `/api/rpa/launches/${launch.id}/balances`,
+    );
+    expect(balances.body.data).toEqual([]);
+  });
+
+  it('fechar a vigencia e abrir outra depois dos dias pagos nao muda nada pago', async () => {
+    const { launch } = await arrangePaidWeek();
+
+    const response = await preview(launch.id, {
+      rates: [
+        { ...RATE, ends_on: '2026-10-20' },
+        { ...RATE, starts_on: '2026-10-21', daily_cents: 12000 },
+      ],
+    });
+
+    expect(response.body.data.effect).toEqual({
+      days: 0,
+      people: 0,
+      value_cents: 0,
+      workers: [],
+    });
+  });
+
+  it('feriado num dia pago dobra a diaria; horario maior da extra em todos', async () => {
+    const { launch } = await arrangePaidWeek();
+
+    const holiday = await preview(launch.id, { holidays: ['2026-10-15'] });
+
+    expect(holiday.body.data.effect).toMatchObject({
+      days: 2,
+      people: 2,
+      value_cents: 2 * 11000,
+    });
+    expect(
+      holiday.body.data.effect.workers.map((worker) => worker.days),
+    ).toEqual([['2026-10-15'], ['2026-10-15']]);
+
+    // Saida as 18h: 1h a 50% sobre R$ 110,00 (R$ 20,625) nos 5 dias.
+    const longer = await preview(launch.id, {
+      schedule: SCHEDULE.map((day) => ({ ...day, end_time: '18:00' })),
+    });
+
+    expect(longer.body.data.effect).toMatchObject({
+      days: 10,
+      people: 2,
+      value_cents: 2 * 10313,
+    });
+  });
+
+  it('tirar a vigencia que cobre dia pago aponta os dias que ficariam sem diaria', async () => {
+    const { launch } = await arrangePaidWeek();
+
+    const response = await preview(launch.id, { rates: [] });
+
+    expect(response.body.data.effect).toMatchObject({ days: 10, people: 2 });
+    expect(
+      response.body.data.effect.workers.map((worker) => worker.unpriced_days),
+    ).toEqual([PAID_WEEK, PAID_WEEK]);
+  });
+
+  it('mudanca que nao toca dia pago, ou lancamento sem pagamento, nao tem efeito', async () => {
+    const { launch } = await arrangePaidWeek();
+    const fresh = await insertRpaLaunch();
+    const none = { days: 0, people: 0, value_cents: 0, workers: [] };
+
+    const renamed = await preview(launch.id, { development: 'Outro nome' });
+    const unpaid = await preview(fresh.id, { rates: [] });
+
+    expect(renamed.body.data.effect).toEqual(none);
+    expect(unpaid.body.data.effect).toEqual(none);
   });
 });
 

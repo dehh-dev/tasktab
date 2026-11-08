@@ -11,6 +11,8 @@ const {
 } = require('./rules');
 const { fold } = require('../services/rpa/text');
 const { validateWorkTimes } = require('./rpa-times');
+// `?preview=true` no PATCH: a mesma regra da previa do pagamento.
+const { validatePreview } = require('./rpa-payment.validator');
 
 const BODY_NOT_OBJECT = {
   message: 'Corpo da requisicao deve ser um objeto JSON.',
@@ -444,6 +446,7 @@ function validateListQuery(query = {}) {
 module.exports = {
   validateCreate,
   validateUpdate,
+  validatePreview,
   validateId,
   validateListQuery,
 };

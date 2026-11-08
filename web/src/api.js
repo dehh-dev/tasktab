@@ -343,8 +343,9 @@ export function createLaunch(data) {
   });
 }
 
-export function updateLaunch(id, data) {
-  return request(`${RPA_URL}/launches/${id}`, {
+/** `preview`: so o efeito nos dias ja pagos, sem gravar (issue 71). */
+export function updateLaunch(id, data, { preview = false } = {}) {
+  return request(`${RPA_URL}/launches/${id}${preview ? '?preview=true' : ''}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
