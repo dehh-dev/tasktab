@@ -18,7 +18,11 @@ terceiros — ver [seguranca.md](seguranca.md).
 2. **Lancamento.** Empresa, empreendimento, cidade, periodo, feriados, os
    campos do e-mail (obra, produto, insumo, destinatarios), o **horario
    padrao** por dia da semana e as **diarias por funcao**, com vigencia. Tipo
-   de servico e centro de custo vazios valem os da empresa.
+   de servico e centro de custo vazios valem os da empresa. Depois de pagar,
+   mudar a diaria, um feriado ou o horario refaz os dias ja pagos, e a
+   diferenca entra no proximo pagamento: a tela mostra o efeito e pergunta
+   antes de salvar. Para mudar a diaria a partir de uma data, feche a
+   vigencia atual e crie outra.
 3. **Equipe.** Suba o `.xlsx` ou `.csv` baixado das respostas do Google Forms.
    Cada pessoa aparece com as pendencias escritas (CPF invalido, endereco sem
    numero, campo vazio). Corrija na propria pessoa, ou de a pendencia por

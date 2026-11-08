@@ -3,7 +3,12 @@ import { ArrowLeft } from 'lucide-react';
 import * as api from '../../api';
 import { ApiError } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import { LAUNCH_STATUSES, formatDate, labelOf } from '../../constants';
+import {
+  LAUNCH_STATUSES,
+  formatDate,
+  formatMoney,
+  labelOf,
+} from '../../constants';
 import LaunchForm from './LaunchForm';
 import TeamTab from './TeamTab';
 import TimesheetTab from './TimesheetTab';
@@ -23,6 +28,21 @@ const TABS = [
   ['receipts', 'Recibos', ReceiptsTab],
 ];
 
+function valueText(cents) {
+  if (cents === 0) return 'sem diferenca de valor';
+  return `${formatMoney(Math.abs(cents))} ${cents > 0 ? 'a pagar' : 'a descontar'}`;
+}
+
+/** "Isso muda 33 dias ja pagos de 6 pessoas: R$ 330,00 a pagar...". */
+function effectMessage(effect) {
+  return (
+    `Isso muda ${effect.days} dia(s) ja pago(s) de ${effect.people} ` +
+    `pessoa(s): ${valueText(effect.value_cents)} no proximo pagamento. ` +
+    'Para mudar a diaria a partir de uma data, feche a vigencia atual e ' +
+    'crie outra.'
+  );
+}
+
 /**
  * Um lancamento: os dados dele no topo e uma etapa por vez embaixo. Encerrado,
  * tudo fica so leitura ate reabrir — como o relatorio fechado.
@@ -38,6 +58,9 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
   // com ele so avisa (issue 60), e quem decide e quem encerra.
   const [closing, setClosing] = useState(null);
   const [busy, setBusy] = useState(false);
+  // A mudanca que refaz dia ja pago (diaria, feriado, horario) pergunta antes
+  // de salvar, com o efeito (issue 71).
+  const [changing, setChanging] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -53,20 +76,47 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
     load();
   }, [load]);
 
-  async function save(payload) {
+  async function commit(payload) {
+    const response = await api.updateLaunch(launchId, payload);
+    setLaunch(response.data);
+    setEditing(false);
+    setError(null);
+  }
+
+  async function run(work) {
     setSubmitting(true);
     setFieldErrors({});
     try {
-      const response = await api.updateLaunch(launchId, payload);
-      setLaunch(response.data);
-      setEditing(false);
-      setError(null);
+      await work();
     } catch (caught) {
       if (caught instanceof ApiError) setFieldErrors(caught.fieldErrors());
       setError(toError(caught));
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function save(payload) {
+    return run(async () => {
+      const { data } = await api.updateLaunch(launchId, payload, {
+        preview: true,
+      });
+      if (data.effect.days > 0) {
+        setChanging({ payload, effect: data.effect });
+      } else {
+        await commit(payload);
+      }
+    });
+  }
+
+  function confirmChange() {
+    return run(async () => {
+      try {
+        await commit(changing.payload);
+      } finally {
+        setChanging(null);
+      }
+    });
   }
 
   async function setStatus(status) {
@@ -236,6 +286,29 @@ export default function LaunchDetail({ launchId, canWrite, onBack }) {
         launch={launch}
         canWrite={writable}
       />
+
+      {changing && (
+        <ConfirmDialog
+          title="Mudar dias ja pagos"
+          message={effectMessage(changing.effect)}
+          confirmLabel="Salvar mesmo assim"
+          busyLabel="Salvando..."
+          busy={submitting}
+          onCancel={() => setChanging(null)}
+          onConfirm={confirmChange}
+        >
+          <ul className="rpa-details" aria-label="Efeito nos dias ja pagos">
+            {changing.effect.workers.map((worker) => (
+              <li key={worker.worker_id}>
+                {worker.worker_number}. {worker.worker_name}:{' '}
+                {worker.days.length} dia(s), {valueText(worker.value_cents)}
+                {worker.unpriced_days.length > 0 &&
+                  `; sem diaria vigente em ${worker.unpriced_days.map(formatDate).join(', ')}`}
+              </li>
+            ))}
+          </ul>
+        </ConfirmDialog>
+      )}
 
       {closing && (
         <ConfirmDialog

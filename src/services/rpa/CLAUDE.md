@@ -158,6 +158,14 @@ pendencia barra a importacao.
   pago. Rota propria, na aba Pagamentos, no Inicio (`pending_balance`, so os
   lancamentos abertos) e no aviso de encerrar. **Encerrar com saldo so avisa
   na tela** (decisao de 2026-11-07); o bloqueio na API fica para depois.
+- **Mudar o lancamento depois de pagar mostra o efeito** (issue 71): diaria,
+  feriado e horario refazem o valor de dia pago, e o erro provavel e trocar o
+  valor da vigencia em vez de fechar a atual e abrir outra. O
+  `PATCH ?preview=true` aplica a mudanca numa transacao desfeita
+  (`db.rolledBack`, `Launch.applyUpdate`) e compara o livro antes e depois
+  (`ledgerPlans`, `changedDays`): a conta e a do saldo, com as constraints de
+  verdade, sem uma copia do lancamento montada a mao. Dia que ficaria sem
+  diaria vigente vem em `unpriced_days`. **Nao barra**: a tela pergunta.
 - `rpa_payment_days` leva **todo dia do periodo, inclusive o de valor zero**
   (falta, folga): e o que faz uma falta que vira dia trabalhado aparecer como
   correcao, e nao sumir.

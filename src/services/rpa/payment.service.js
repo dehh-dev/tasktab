@@ -11,6 +11,7 @@ const { buildGrid, workerPeriod } = require('./timesheet');
 const {
   planWorker,
   servicePeriod,
+  changedDays,
   nextPaymentNumber,
   paymentCode,
 } = require('./payment-plan');
@@ -319,6 +320,28 @@ const AFTER_EVERYTHING = { from: '9999-12-31', to: '9999-12-31' };
  * dia ainda nao pago nao entra. So quem tem saldo, no centavo.
  */
 async function launchBalances(launch, client = db) {
+  return (await ledgerPlans(launch, client)).flatMap(({ worker, plan }) =>
+    plan.value_cents === 0
+      ? []
+      : [
+          {
+            worker_id: worker.id,
+            worker_number: worker.number,
+            worker_name: worker.name,
+            extra_subcents: plan.totals.extra_subcents,
+            correction_subcents: plan.totals.correction_subcents,
+            value_cents: plan.value_cents,
+            lines: plan.lines,
+          },
+        ],
+  );
+}
+
+/**
+ * A conta do livro de cada pessoa que ja recebeu: o que os dias pagos ainda
+ * deixam, com o lancamento como esta (ou como ficaria, na previa do PATCH).
+ */
+async function ledgerPlans(launch, client = db) {
   const ledger = ledgerOf(await Payment.ledgerByLaunch(launch.id, client));
   const workers = (await Worker.findByLaunch(launch.id, client)).filter(
     (worker) => ledger.has(worker.id),
@@ -339,27 +362,64 @@ async function launchBalances(launch, client = db) {
     to: launch.ends_on,
   });
 
-  return grid.workers.flatMap((row, index) => {
-    const worker = workers[index];
-    const plan = planWorker({
+  return grid.workers.map((row, index) => ({
+    worker: workers[index],
+    plan: planWorker({
       days: new Map(row.days.map((day) => [day.date, day])),
-      ledger: ledger.get(worker.id),
+      ledger: ledger.get(workers[index].id),
       period: AFTER_EVERYTHING,
       dailyOnly: false,
-    });
-    if (plan.value_cents === 0) return [];
+    }),
+  }));
+}
 
-    return [
-      {
-        worker_id: worker.id,
-        worker_number: worker.number,
-        worker_name: worker.name,
-        extra_subcents: plan.totals.extra_subcents,
-        correction_subcents: plan.totals.correction_subcents,
-        value_cents: plan.value_cents,
-        lines: plan.lines,
-      },
-    ];
+/**
+ * O efeito de um PATCH do lancamento nos dias ja pagos (issue 71), sem
+ * gravar: mudar a diaria, um feriado ou o horario refaz o valor de dia pago,
+ * e a diferenca entra no proximo pagamento. O erro provavel e trocar o valor
+ * da vigencia que existe, em vez de fechar a atual e abrir outra. A mudanca
+ * e aplicada numa transacao desfeita no fim, e a conta e a do saldo, antes e
+ * depois. `value_cents` positivo e a pagar; negativo, a descontar.
+ */
+async function launchUpdateEffect(id, data) {
+  return db.rolledBack(async (client) => {
+    const before = await ledgerPlans(await Launch.findById(id, client), client);
+    const after = await ledgerPlans(
+      await Launch.applyUpdate(client, id, data),
+      client,
+    );
+    const previous = new Map(
+      before.map(({ worker, plan }) => [worker.id, plan]),
+    );
+
+    const workers = after.flatMap(({ worker, plan }) => {
+      const old = previous.get(worker.id);
+      const days = changedDays(old, plan);
+      if (days.length === 0) return [];
+
+      return [
+        {
+          worker_id: worker.id,
+          worker_number: worker.number,
+          worker_name: worker.name,
+          days,
+          unpriced_days: plan.unpriced.filter(
+            (date) => !old.unpriced.includes(date),
+          ),
+          value_cents: plan.value_cents - old.value_cents,
+        },
+      ];
+    });
+
+    return {
+      days: workers.reduce((total, entry) => total + entry.days.length, 0),
+      people: workers.length,
+      value_cents: workers.reduce(
+        (total, entry) => total + entry.value_cents,
+        0,
+      ),
+      workers,
+    };
   });
 }
 
@@ -476,5 +536,6 @@ module.exports = {
   previewPayments,
   issuePayments,
   launchBalances,
+  launchUpdateEffect,
   openBalances,
 };

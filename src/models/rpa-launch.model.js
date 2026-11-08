@@ -186,41 +186,44 @@ function create(data, createdBy) {
 }
 
 /**
- * Atualiza o que veio. `schedule` e `rates`, quando vem, substituem a lista
- * inteira: a tela manda o horario e a tabela de diarias como estao.
+ * Atualiza o que veio, na transacao de quem chama. `schedule` e `rates`,
+ * quando vem, substituem a lista inteira: a tela manda o horario e a tabela
+ * de diarias como estao. A previa do PATCH aplica isto e desfaz.
  */
+async function applyUpdate(client, id, data) {
+  const assignments = [];
+  const params = [];
+
+  for (const column of UPDATABLE_COLUMNS) {
+    if (Object.prototype.hasOwnProperty.call(data, column)) {
+      params.push(data[column]);
+      assignments.push(`${column} = $${params.length}${CASTS[column] || ''}`);
+    }
+  }
+
+  if (assignments.length > 0) {
+    // `updated_at` fica por conta do trigger rpa_launches_set_updated_at.
+    params.push(id);
+    await client.query(
+      `UPDATE rpa_launches SET ${assignments.join(', ')}
+       WHERE id = $${params.length}`,
+      params,
+    );
+  }
+
+  if (data.schedule !== undefined) {
+    await replaceSchedule(client, id, data.schedule);
+  }
+
+  if (data.rates !== undefined) {
+    await replaceRates(client, id, data.rates);
+  }
+
+  return findById(id, client);
+}
+
 function update(id, data) {
-  return db.transaction(async (client) => {
-    const assignments = [];
-    const params = [];
-
-    for (const column of UPDATABLE_COLUMNS) {
-      if (Object.prototype.hasOwnProperty.call(data, column)) {
-        params.push(data[column]);
-        assignments.push(`${column} = $${params.length}${CASTS[column] || ''}`);
-      }
-    }
-
-    if (assignments.length > 0) {
-      // `updated_at` fica por conta do trigger rpa_launches_set_updated_at.
-      params.push(id);
-      await client.query(
-        `UPDATE rpa_launches SET ${assignments.join(', ')}
-         WHERE id = $${params.length}`,
-        params,
-      );
-    }
-
-    if (data.schedule !== undefined) {
-      await replaceSchedule(client, id, data.schedule);
-    }
-
-    if (data.rates !== undefined) {
-      await replaceRates(client, id, data.rates);
-    }
-
-    return findById(id, client);
-  });
+  return db.transaction((client) => applyUpdate(client, id, data));
 }
 
 /**
@@ -293,6 +296,7 @@ module.exports = {
   count,
   findById,
   create,
+  applyUpdate,
   update,
   countPayments,
   remove,

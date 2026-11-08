@@ -85,6 +85,10 @@ JSX — o backend e que e CommonJS.
   tiver), nunca arredondado na tela.
 - Pendencia, aviso da previa, saldo pendente, marca do ponto e diferenca do
   recibo sempre com texto, como os badges.
+- **Salvar o lancamento passa antes pela previa** (issue 71): a `LaunchDetail`
+  manda o `PATCH` com `?preview=true` e, se o efeito toca dia ja pago, abre o
+  `ConfirmDialog` com quantos dias, de quem e quanto; sem efeito, salva
+  direto. A API grava sem perguntar: a pergunta e da tela.
 - **Encerrar com saldo pendente so avisa** (issue 60): a `LaunchDetail` busca
   o saldo (`getLaunchBalances`) antes do PATCH e, se houver, abre o
   `ConfirmDialog` com a lista. A API aceita encerrar assim mesmo: o bloqueio
