@@ -67,9 +67,12 @@ Um widget por modulo, com o resumo do proprio modulo e o "Abrir":
   Aguardando / Concluida) e contagem total vinda do `meta` da API.
   **Aguardando** e o que depende de outra pessoa, separado da fila de quem
   faz.
+- **Busca** no titulo e na referencia, junto do filtro: a consulta sai depois
+  de uma pausa na digitacao, e nao a cada tecla.
 - **Formulario unico** para criar e editar, com contador de caracteres do
-  titulo. Erros `422` aparecem no campo correspondente, preservando o que foi
-  digitado.
+  titulo e a **referencia** (Fatura 62502, EMP 363, Processo UAU 164), que
+  aparece na linha ao lado do `#id`. Erros `422` aparecem no campo
+  correspondente, preservando o que foi digitado.
 - **Exclusao** passa por um dialogo de confirmacao, na tag `<dialog>` nativa:
   o foco fica preso dentro dele, comeca no botao seguro (para que um `Enter`
   acidental nao delete nada) e volta ao botao que o abriu. `Escape` e clique

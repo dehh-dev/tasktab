@@ -72,6 +72,45 @@ test('o que espera outra pessoa fica em Aguardando, separado do pendente', async
   await expect(page.getByText('1 tarefa', { exact: true })).toBeVisible();
 });
 
+test('a referencia aparece ao lado do numero, e a busca acha por ela', async ({
+  page,
+  request,
+}) => {
+  await createTask(request, {
+    title: 'Lancar no UAU',
+    reference: 'Fatura 62502',
+  });
+  await createTask(request, { title: 'Vouchers de Rio Largo' });
+
+  await page.goto('/');
+  await openSection(page, 'Tarefas');
+
+  const invoice = page.locator('.task').filter({ hasText: 'Lancar no UAU' });
+  await expect(invoice.locator('.task__meta')).toContainText('Fatura 62502');
+
+  const search = page.getByLabel('Buscar no titulo e na referencia');
+  await search.fill('62502');
+  await expect(page.locator('.task')).toHaveCount(1);
+  await expect(page.getByText('1 tarefa', { exact: true })).toBeVisible();
+
+  await search.fill('');
+  await expect(page.locator('.task')).toHaveCount(2);
+
+  // A referencia entra pelo formulario, como o numero do processo ao concluir.
+  await page
+    .locator('.task')
+    .filter({ hasText: 'Vouchers de Rio Largo' })
+    .getByRole('button', { name: 'Editar' })
+    .click();
+  const form = page.locator('form.form');
+  await form.getByLabel('Referencia').fill('Processo UAU 164');
+  await form.getByRole('button', { name: 'Salvar alteracoes' }).click();
+
+  await search.fill('uau 164');
+  await expect(page.locator('.task')).toHaveCount(1);
+  await expect(page.locator('.task')).toContainText('Vouchers de Rio Largo');
+});
+
 test('edita uma tarefa a partir dos valores atuais', async ({
   page,
   request,

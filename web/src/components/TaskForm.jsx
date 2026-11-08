@@ -2,8 +2,15 @@ import { useState } from 'react';
 import { STATUSES } from '../constants';
 
 const TITLE_MAX_LENGTH = 255;
+const REFERENCE_MAX_LENGTH = 120;
 
-const EMPTY = { title: '', description: '', status: 'pending', due_date: '' };
+const EMPTY = {
+  title: '',
+  description: '',
+  status: 'pending',
+  due_date: '',
+  reference: '',
+};
 
 /**
  * Formulario unico para criacao e edicao. O App monta com key distinta por
@@ -25,6 +32,7 @@ export default function TaskForm({
           description: task.description ?? '',
           status: task.status,
           due_date: task.due_date ?? '',
+          reference: task.reference ?? '',
         }
       : EMPTY,
   );
@@ -89,6 +97,7 @@ export default function TaskForm({
       description: values.description.trim() || null,
       status: values.status,
       due_date: values.due_date || null,
+      reference: values.reference.trim() || null,
     });
   }
 
@@ -187,6 +196,34 @@ export default function TaskForm({
             </span>
           ) : (
             <span className="field__hint">Opcional</span>
+          )}
+        </div>
+
+        <div className="field field--full">
+          <label className="field__label" htmlFor="reference">
+            Referencia
+          </label>
+          <input
+            id="reference"
+            className="field__input"
+            type="text"
+            value={values.reference}
+            maxLength={REFERENCE_MAX_LENGTH}
+            aria-invalid={Boolean(errors.reference)}
+            aria-describedby={
+              errors.reference ? 'reference-error' : 'reference-hint'
+            }
+            onChange={(event) => setField('reference', event.target.value)}
+          />
+          {errors.reference ? (
+            <span className="field__error" id="reference-error" role="alert">
+              {errors.reference}
+            </span>
+          ) : (
+            <span className="field__hint" id="reference-hint">
+              Opcional. De onde veio ou o que identifica: Fatura 62502, EMP 363,
+              Processo UAU 164.
+            </span>
           )}
         </div>
       </div>

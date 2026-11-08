@@ -86,6 +86,61 @@ describe('GET /api/tasks', () => {
     ]);
   });
 
+  it('a busca q acha no titulo ou na referencia, sem caixa, e a contagem acompanha (issue 74)', async () => {
+    const fatura = await request('POST', '/api/tasks', {
+      title: 'Lancar no UAU',
+      reference: 'Fatura 62502',
+    });
+    await request('POST', '/api/tasks', {
+      title: 'Cobrar a FATURA da Movida',
+      status: 'waiting',
+    });
+    await request('POST', '/api/tasks', {
+      title: 'Vouchers de Rio Largo',
+      reference: 'EMP 363',
+    });
+
+    const byReference = await request('GET', '/api/tasks?q=62502');
+    const byBoth = await request('GET', '/api/tasks?q=fatura');
+    const withStatus = await request(
+      'GET',
+      '/api/tasks?q=fatura&status=waiting',
+    );
+    const empty = await request('GET', '/api/tasks?q=%20');
+
+    expect(byReference.body.data.map((task) => task.id)).toEqual([
+      fatura.body.data.id,
+    ]);
+    expect(byBoth.body.data.map((task) => task.title).sort()).toEqual([
+      'Cobrar a FATURA da Movida',
+      'Lancar no UAU',
+    ]);
+    expect(byBoth.body.meta.total).toBe(2);
+    expect(withStatus.body.data.map((task) => task.title)).toEqual([
+      'Cobrar a FATURA da Movida',
+    ]);
+    expect(withStatus.body.meta.total).toBe(1);
+    // Busca so de espaco e sem filtro.
+    expect(empty.body.meta.total).toBe(3);
+  });
+
+  it('% e _ na busca valem como texto, e nao como curinga', async () => {
+    await request('POST', '/api/tasks', { title: 'Desconto de 10% na fatura' });
+    await request('POST', '/api/tasks', { title: 'Desconto de 100 reais' });
+    await request('POST', '/api/tasks', { title: 'nota_fiscal pendente' });
+    await request('POST', '/api/tasks', { title: 'notaXfiscal' });
+
+    const percent = await request('GET', '/api/tasks?q=10%25');
+    const underscore = await request('GET', '/api/tasks?q=nota_fiscal');
+
+    expect(percent.body.data.map((task) => task.title)).toEqual([
+      'Desconto de 10% na fatura',
+    ]);
+    expect(underscore.body.data.map((task) => task.title)).toEqual([
+      'nota_fiscal pendente',
+    ]);
+  });
+
   it('respeita limit e offset', async () => {
     await insertTask({ title: 'A' });
     await insertTask({ title: 'B' });

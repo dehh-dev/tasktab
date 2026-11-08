@@ -146,7 +146,7 @@ export function changeOwnPassword(userId, currentPassword, newPassword) {
 // ---------- tarefas ----------
 
 /** `?status=...&limit=...`, so com o que veio: a API tem padrao para o resto. */
-function listUrl(base, { status, limit } = {}) {
+function listUrl(base, { status, limit, q } = {}) {
   const params = new URLSearchParams();
   if (status) {
     params.set('status', status);
@@ -154,12 +154,16 @@ function listUrl(base, { status, limit } = {}) {
   if (limit) {
     params.set('limit', String(limit));
   }
+  if (q) {
+    params.set('q', q);
+  }
   const query = params.toString();
   return query ? `${base}?${query}` : base;
 }
 
-export function listTasks({ status, limit } = {}) {
-  return request(listUrl(TASKS_URL, { status, limit }));
+/** `q` busca no titulo e na referencia (issue 74). */
+export function listTasks({ status, limit, q } = {}) {
+  return request(listUrl(TASKS_URL, { status, limit, q }));
 }
 
 export function createTask(data) {

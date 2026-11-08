@@ -933,6 +933,13 @@ body {
   gap: 10px;
 }
 
+/* A busca das tarefas cabe entre o filtro e o "Nova tarefa", e encolhe na
+   tela estreita. */
+.task-search {
+  flex: 1 1 180px;
+  max-width: 280px;
+}
+
 /* ---------- foco ---------- */
 
 /* Anel de 2px no acento, afastado do elemento: e o unico lugar onde o acento

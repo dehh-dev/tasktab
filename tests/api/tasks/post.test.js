@@ -1,6 +1,6 @@
 'use strict';
 
-const { request } = require('../../orchestrator');
+const { request, refusedFields } = require('../../orchestrator');
 
 describe('POST /api/tasks', () => {
   it('cria uma tarefa com todos os campos', async () => {
@@ -81,6 +81,40 @@ describe('POST /api/tasks', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.data.status).toBe('waiting');
+  });
+
+  it('guarda a referencia, aparada; vazia e sem referencia (issue 74)', async () => {
+    const withReference = await request('POST', '/api/tasks', {
+      title: 'Lancar fatura no UAU',
+      reference: '  Fatura 62502 ',
+    });
+    const blank = await request('POST', '/api/tasks', {
+      title: 'Sem referencia',
+      reference: '   ',
+    });
+
+    expect(withReference.status).toBe(201);
+    expect(withReference.body.data.reference).toBe('Fatura 62502');
+    expect(blank.body.data.reference).toBeNull();
+  });
+
+  it('referencia que nao e texto, ou com mais de 120 caracteres, responde 422 no campo', async () => {
+    const refused = await refusedFields({
+      'referencia numerica': () =>
+        request('POST', '/api/tasks', { title: 'T', reference: 62502 }),
+      'referencia longa': () =>
+        request('POST', '/api/tasks', {
+          title: 'T',
+          reference: 'x'.repeat(121),
+        }),
+      'busca longa': () => request('GET', `/api/tasks?q=${'x'.repeat(121)}`),
+    });
+
+    expect(refused).toEqual({
+      'referencia numerica': ['reference'],
+      'referencia longa': ['reference'],
+      'busca longa': ['q'],
+    });
   });
 
   it('rejeita status fora do enum', async () => {
