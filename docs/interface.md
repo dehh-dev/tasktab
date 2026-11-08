@@ -41,9 +41,11 @@ outra em teste E2E. Por isso tambem `ReportList` e `ReceiptList` usam
 
 Um widget por modulo, com o resumo do proprio modulo e o "Abrir":
 
-- **Tarefas**: quantas estao pendentes, em andamento e concluidas — o
-  `meta.total` de cada filtro, e nao a contagem da primeira pagina — e as
-  abertas, as em andamento primeiro.
+- **Tarefas**: quantas estao pendentes, em andamento, aguardando e
+  concluidas — o `meta.total` de cada filtro, e nao a contagem da primeira
+  pagina — e as abertas que **vencem nos proximos 7 dias ou ja venceram**, a
+  que vence primeiro no topo, com a vencida escrita como vencida. Vem da mesma
+  `GET /api/tasks`, ja ordenada pelo prazo.
 - **Prestacao de Contas**: quantos relatorios estao abertos e fechados, e os
   abertos. O titulo abre direto o detalhe do relatorio.
 - **RPA de Lancamentos**: os lancamentos abertos, o proximo pagamento (data,
@@ -60,7 +62,8 @@ Um widget por modulo, com o resumo do proprio modulo e o "Abrir":
 
 ## Tarefas
 
-- **Listagem** com filtro por status (Todas / Pendente / Em andamento /
+- **Listagem** pelo prazo (o que vence primeiro no topo, sem prazo no fim),
+  com filtro por status (Todas / Pendente / Em andamento /
   Aguardando / Concluida) e contagem total vinda do `meta` da API.
   **Aguardando** e o que depende de outra pessoa, separado da fila de quem
   faz.

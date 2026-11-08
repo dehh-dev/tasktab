@@ -56,34 +56,57 @@ test('o Inicio resume as tarefas, e o widget abre o modulo', async ({
   page,
   request,
 }) => {
+  // Prazos contados de hoje, no relogio da maquina, que e o do navegador.
+  const day = (offset) => {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  };
+  const shown = (offset) => day(offset).split('-').reverse().join('/');
+
   await clearTasks(request);
   await createTask(request, { title: 'Fazendo agora', status: 'in_progress' });
   await createTask(request, {
-    title: 'Na fila',
+    title: 'Vence amanha',
     status: 'pending',
-    due_date: '2026-12-31',
+    due_date: day(1),
   });
-  await createTask(request, { title: 'Ja foi', status: 'done' });
-  await createTask(request, { title: 'Esperando voucher', status: 'waiting' });
+  await createTask(request, {
+    title: 'Venceu ontem',
+    status: 'waiting',
+    due_date: day(-1),
+  });
+  await createTask(request, {
+    title: 'Daqui a um mes',
+    status: 'in_progress',
+    due_date: day(30),
+  });
+  await createTask(request, {
+    title: 'Ja foi',
+    status: 'done',
+    due_date: day(0),
+  });
 
   await page.goto('/');
 
   const widget = page.getByRole('region', { name: 'Tarefas', exact: true });
 
   await expect(stat(widget, 'Pendentes')).toHaveText('1');
-  await expect(stat(widget, 'Em andamento')).toHaveText('1');
+  await expect(stat(widget, 'Em andamento')).toHaveText('2');
   await expect(stat(widget, 'Aguardando')).toHaveText('1');
   await expect(stat(widget, 'Concluidas')).toHaveText('1');
 
-  // So o que esta em aberto: o em andamento primeiro, o que aguarda outra
-  // pessoa por ultimo.
-  const open = widget
-    .getByRole('list', { name: 'Tarefas em aberto' })
+  // So as abertas que vencem em 7 dias ou ja venceram, a que vence primeiro
+  // no topo: nem a sem prazo, nem a de daqui a um mes, nem a concluida.
+  const due = widget
+    .getByRole('list', { name: 'Prazo nos proximos 7 dias' })
     .getByRole('listitem');
-  await expect(open).toHaveCount(3);
-  await expect(open.first()).toContainText('Fazendo agora');
-  await expect(open.nth(1)).toContainText('Prazo 31/12/2026');
-  await expect(open.nth(2)).toContainText('Aguardando');
+  await expect(due).toHaveCount(2);
+  await expect(due.first()).toContainText('Venceu ontem');
+  await expect(due.first()).toContainText(`Vencida em ${shown(-1)}`);
+  await expect(due.nth(1)).toContainText('Vence amanha');
+  await expect(due.nth(1)).toContainText(`Prazo ${shown(1)}`);
 
   await widget.getByRole('button', { name: 'Abrir Tarefas' }).click();
 
@@ -91,7 +114,14 @@ test('o Inicio resume as tarefas, e o widget abre o modulo', async ({
   // O botao clicado sumiu junto com o Inicio: o foco vai para o titulo da
   // pagina nova, e nao para o <body>.
   await expect(pageTitle(page, 'Tarefas')).toBeFocused();
-  await expect(page.locator('.task')).toHaveCount(4);
+  // A lista vem pelo prazo, sem prazo no fim.
+  await expect(page.locator('.task .task__title')).toHaveText([
+    'Venceu ontem',
+    'Ja foi',
+    'Vence amanha',
+    'Daqui a um mes',
+    'Fazendo agora',
+  ]);
 });
 
 test('o widget da prestacao abre o relatorio direto no detalhe', async ({

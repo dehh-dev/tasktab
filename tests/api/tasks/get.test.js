@@ -59,6 +59,33 @@ describe('GET /api/tasks', () => {
     );
   });
 
+  it('ordena pelo prazo: o que vence primeiro, sem prazo no fim e, no mesmo prazo, a mais nova (issue 74)', async () => {
+    await insertTask({ title: 'Sem prazo, antiga' });
+    await insertTask({ title: 'Vence depois', due_date: '2026-11-20' });
+    await insertTask({ title: 'Vence primeiro', due_date: '2026-11-10' });
+    await insertTask({ title: 'Mesmo prazo, antiga', due_date: '2026-11-15' });
+    await insertTask({ title: 'Mesmo prazo, nova', due_date: '2026-11-15' });
+    await insertTask({ title: 'Sem prazo, nova' });
+
+    const response = await request('GET', '/api/tasks');
+
+    expect(response.body.data.map((task) => task.title)).toEqual([
+      'Vence primeiro',
+      'Mesmo prazo, nova',
+      'Mesmo prazo, antiga',
+      'Vence depois',
+      'Sem prazo, nova',
+      'Sem prazo, antiga',
+    ]);
+
+    // A pagina segue a mesma ordem.
+    const page = await request('GET', '/api/tasks?limit=2&offset=1');
+    expect(page.body.data.map((task) => task.title)).toEqual([
+      'Mesmo prazo, nova',
+      'Mesmo prazo, antiga',
+    ]);
+  });
+
   it('respeita limit e offset', async () => {
     await insertTask({ title: 'A' });
     await insertTask({ title: 'B' });
