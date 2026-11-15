@@ -27,10 +27,11 @@ A tela logada e uma casca (`web/src/shell/`) com os modulos dentro.
 
 `web/src/modules/registry.js` lista os modulos, na ordem da barra lateral.
 Cada um declara nome, descricao, icone, o escopo de leitura que o torna
-visivel, o de escrita que vira `canWrite`, a view, carregada sob demanda, e o
-widget do Inicio. Quem nao tem o escopo de leitura nao ve o modulo: a tela nao
-oferece o que a API so responderia com 403. Modulo novo e uma entrada no
-registro, a view e o widget — a casca nao muda.
+visivel, o de escrita que vira `canWrite`, a view, carregada sob demanda, o
+widget do Inicio e o `loadSummary`, que busca o resumo que o widget mostra.
+Quem nao tem o escopo de leitura nao ve o modulo: a tela nao oferece o que a
+API so responderia com 403. Modulo novo e uma entrada no registro, a view, o
+widget e o `loadSummary` — a casca nao muda.
 
 O modulo que sai e **desmontado**, nao so escondido: as telas reusam nomes de
 classe parecidos, e manter duas no DOM vazava linha de uma para a contagem da
@@ -39,7 +40,11 @@ outra em teste E2E. Por isso tambem `ReportList` e `ReceiptList` usam
 
 ### Inicio
 
-Um widget por modulo, com o resumo do proprio modulo e o "Abrir":
+Um widget por modulo, com o resumo do proprio modulo e o "Abrir". Os resumos
+saem todos ao abrir o Inicio, em paralelo, e os widgets aparecem **juntos**,
+quando o ultimo chega; ate la cada um mostra "Carregando...", com o "Abrir" ja
+valendo. Assim um card que cresce nao empurra os outros para baixo no meio do
+clique. Se um resumo falha, o motivo aparece so no card dele.
 
 - **Tarefas**: quantas estao pendentes, em andamento, aguardando e
   concluidas — o `meta.total` de cada filtro, e nao a contagem da primeira

@@ -177,6 +177,10 @@
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Pagina que nasce curta e cresce quando os dados chegam (o Inicio, uma
+     lista) ganharia a barra de rolagem no meio, e a tela inteira andaria para
+     o lado — botoes alinhados a direita inclusive. */
+  scrollbar-gutter: stable;
 }
 
 body {

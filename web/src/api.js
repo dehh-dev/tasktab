@@ -53,12 +53,14 @@ export function onSessionLost(listener) {
 async function request(url, options = {}) {
   let response;
 
-  // FormData (upload multipart) precisa que o browser defina o Content-Type
-  // sozinho, com o boundary — um header manual quebraria o corpo.
+  // Content-Type so com corpo JSON (sempre string aqui). FormData (upload
+  // multipart) precisa que o browser defina o proprio, com o boundary. E o GET
+  // vai sem nenhum, igual ao preload do `/api/auth/me` no index.html: com um
+  // header a mais, o Chrome descarta o preload e pede a sessao de novo.
   const headers =
-    options.body instanceof FormData
-      ? options.headers
-      : { 'Content-Type': 'application/json', ...options.headers };
+    typeof options.body === 'string'
+      ? { 'Content-Type': 'application/json', ...options.headers }
+      : options.headers;
 
   try {
     // `same-origin` e o padrao do fetch e ja mandaria o cookie de sessao;

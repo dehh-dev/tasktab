@@ -1,8 +1,10 @@
 import { lazy } from 'react';
 import { HandCoins, ListTodo, ReceiptText } from 'lucide-react';
-import TasksHomeWidget from './tasks/TasksHomeWidget';
-import ExpensesHomeWidget from './expenses/ExpensesHomeWidget';
-import RpaHomeWidget from './rpa/RpaHomeWidget';
+import TasksHomeWidget, { loadTasksSummary } from './tasks/TasksHomeWidget';
+import ExpensesHomeWidget, {
+  loadExpensesSummary,
+} from './expenses/ExpensesHomeWidget';
+import RpaHomeWidget, { loadRpaSummary } from './rpa/RpaHomeWidget';
 
 /**
  * Os modulos da casca, na ordem da barra lateral — a fonte unica de onde a
@@ -12,9 +14,11 @@ import RpaHomeWidget from './rpa/RpaHomeWidget';
  * ve o modulo, em vez de abrir uma tela que so responderia 403. O de escrita
  * vira o `canWrite` da view. A view carrega sob demanda — a Prestacao de
  * Contas, com revisao, imagem e upload, nao pesa na abertura de quem so usa
- * Tarefas —, e o widget do Inicio vem junto com a casca.
+ * Tarefas —, e o widget do Inicio vem junto com a casca. O `loadSummary`
+ * busca o resumo que o widget mostra; quem o chama e o Inicio (`HomeView`).
  *
- * Modulo novo: uma entrada aqui, a view e o widget. A casca nao muda.
+ * Modulo novo: uma entrada aqui, a view, o widget e o `loadSummary`. A casca
+ * nao muda.
  */
 export const MODULES = [
   {
@@ -26,6 +30,7 @@ export const MODULES = [
     writeScope: 'tasks:write',
     View: lazy(() => import('../components/TasksApp')),
     HomeWidget: TasksHomeWidget,
+    loadSummary: loadTasksSummary,
   },
   {
     id: 'expenses',
@@ -37,6 +42,7 @@ export const MODULES = [
     writeScope: 'reports:write',
     View: lazy(() => import('../components/ExpensesApp')),
     HomeWidget: ExpensesHomeWidget,
+    loadSummary: loadExpensesSummary,
   },
   {
     id: 'rpa',
@@ -48,6 +54,7 @@ export const MODULES = [
     writeScope: 'rpa:write',
     View: lazy(() => import('./rpa/RpaApp')),
     HomeWidget: RpaHomeWidget,
+    loadSummary: loadRpaSummary,
   },
 ];
 

@@ -6,8 +6,9 @@ framework; icones do `lucide-react`, a unica dependencia alem do React. ESM com
 JSX — o backend e que e CommonJS.
 
 - Em dev o Vite faz proxy de `/api`; em producao o Express serve `web/dist` com
-  fallback de SPA, so com o build no disco e fora do teste. Mesma origem
-  sempre: **nao adicione CORS**.
+  fallback de SPA, so com o build no disco e fora do teste, comprimido e em
+  cache (`src/middlewares/CLAUDE.md`). Mesma origem sempre: **nao adicione
+  CORS**.
 - Base neutra em zinco, com tema claro e escuro; os tons semanticos sao os do
   **GitHub Dark Colorblind**: acao destrutiva e laranja, e os status evitam o
   eixo verde/vermelho. **Cor nunca e o unico canal** — todo badge leva o texto
@@ -22,9 +23,10 @@ JSX — o backend e que e CommonJS.
 - O desenho segue o [lifeboard](https://github.com/lucianodiisouza/lifeboard),
   que **nao tem licenca**: e referencia visual e de arquitetura. Nao copie
   arquivo, trecho nem asset de la.
-- Modulo novo e uma entrada em `src/modules/registry.js`, a view e o widget
-  do Inicio. A casca nao muda. O `readScope` esconde o modulo de quem nao o
-  tem, e o `writeScope` vira o `canWrite` da view.
+- Modulo novo e uma entrada em `src/modules/registry.js`, a view, o widget
+  do Inicio e o `loadSummary` dele (ver "Desempenho"). A casca nao muda. O
+  `readScope` esconde o modulo de quem nao o tem, e o `writeScope` vira o
+  `canWrite` da view.
 - Barra lateral **ou** menu inferior, nunca os dois: `useMediaQuery` escolhe
   qual montar. Esconder um por CSS deixaria dois menus "Principal" na pagina,
   e cada destino seria achado duas vezes pelo leitor de tela e pelo teste.
@@ -52,6 +54,41 @@ JSX — o backend e que e CommonJS.
 - Sem escrita, a revisao e somente leitura: campos num `fieldset`
   desabilitado, sem "Confirmar", "Deletar" nem "Marcar como duplicata"
   (`e2e/expenses-readonly.spec.js`).
+
+## Desempenho
+
+A skill `vercel-react-best-practices` (`.agents/skills/`, instalada pelo
+`npx skills`) e escrita para Next.js com servidor; aqui e um SPA do Vite, sem
+SSR. Vale o que e de cliente: cascata (`async-parallel`,
+`async-suspense-boundaries`), re-render, renderizacao e JS. **Nao vale**:
+
+- `server-*`, hidratacao e `next/dynamic` — a view de modulo ja e
+  `React.lazy`, no registro;
+- regra que pede dependencia (SWR, `better-all`, `lru-cache`): poucas linhas
+  resolvem, e o Inicio busca uma vez por visita;
+- `bundle-barrel-imports` no `lucide-react`: o build do Vite ja descarta os
+  icones nao usados, e o bundle principal e quase todo React.
+
+Regras daqui:
+
+- **Meca o build, nao o Vite de dev**: `npm run build && npm start`, e o
+  Chrome DevTools com Fast 4G e CPU 4x. O dev serve modulo a modulo, sem
+  compressao, e o `StrictMode` dobra cada efeito. O "antes" sai de um
+  `git worktree` da `main` servido em outra porta — o cookie de sessao vale
+  para todas as portas do `localhost`.
+- **O Inicio mostra os widgets juntos** (`HomeView`): cada modulo exporta o
+  `loadSummary`, o `HomeView` chama todos ao abrir, o widget le com `use()` e
+  um `<Suspense>` so troca os cards de "Carregando..." quando o ultimo resumo
+  chega. Cada card aparecendo na sua hora empurrava os de baixo (CLS 0,15;
+  agora 0). Resumo que falha fica no proprio card (`WidgetBoundary`). Nao
+  volte a buscar em `useEffect` dentro do widget.
+- **A sessao sai do `index.html`** (`<link rel="preload" as="fetch">` do
+  `/api/auth/me`), junto com o JS, e o `getMe()` do `App` reaproveita a
+  resposta. So casa com requisicao identica: por isso o `request` de `api.js`
+  manda `Content-Type` so com corpo. Header novo em GET faz o Chrome pedir a
+  sessao duas vezes — na aba Network deve sair uma so.
+- `scrollbar-gutter: stable` no `html`: a barra de rolagem que surge quando a
+  pagina cresce nao arrasta a tela para o lado.
 
 ## Componentes
 
