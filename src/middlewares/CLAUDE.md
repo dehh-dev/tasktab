@@ -13,6 +13,15 @@ ninguem**; quem barra e `requireScope` / `requireAuth` (`authorize.js`).
   A unica excecao e a imagem: `private, no-cache`, revalidada pela sessao e
   pela posse a cada uso, com ETag e 304. **Nao volte a por `max-age`.** O 304
   leva os mesmos headers do 200, senao herda o `no-store`.
+- **O build da interface sai comprimido e em cache** (`web-assets.js`), porque
+  em producao nao ha proxy na frente. A compressao e feita **no build**
+  (`web/vite.config.js` grava `.br` e `.gz`), nao na hora: nao traga o pacote
+  `compression`. O brotli vem antes do gzip pela ordem do servidor — o Chrome
+  manda `gzip, deflate, br`, e o `acceptsEncodings('br', 'gzip')` escolheria
+  gzip. `/assets` e `immutable` por um ano (o nome leva o hash); o `index.html`
+  revalida sempre, e o `tema.js`, que bloqueia a pintura, revalida por tras.
+  A lista de `assets/` e lida ao subir: build novo pede reinicio. Em teste a
+  entrega so liga com `WEB_DIST` (`tests/infra/web-assets.test.js`).
 - Um teto para toda requisicao (`app.js`) e **um teto de escrita por familia
   de rota** (`routes/index.js`): o geral para `/auth`, `/users` e `/tasks`, e
   o `batchWriteLimiter` para `/reports`, `/receipts`, `/merchants` e `/rpa`,

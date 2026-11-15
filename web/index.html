@@ -7,6 +7,10 @@
     <title>tasktab — Tarefas e prestacao de contas</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script src="/tema.js"></script>
+    <!-- A sessao nao depende do JS: pedida aqui, chega junto com ele, e o
+         getMe() do App reaproveita a resposta. O `crossorigin` (anonymous)
+         casa o modo e as credenciais do fetch de api.js. -->
+    <link rel="preload" href="/api/auth/me" as="fetch" crossorigin />
   </head>
   <body>
     <div id="root"></div>

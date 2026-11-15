@@ -1,3 +1,8 @@
 node_modules
 coverage
 package-lock.json
+
+# Skills instaladas pelo `npx skills` (ver skills-lock.json): conteudo de
+# terceiros, atualizado pela propria ferramenta. Formatar mudaria o hash do
+# lock, e a proxima atualizacao desfaria tudo.
+.agents

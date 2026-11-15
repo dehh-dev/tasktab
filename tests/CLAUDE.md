@@ -23,6 +23,9 @@ importar `src/app`.
 sem `requireScope` passa em todos os testes dela mesma. Nao volte a escrever
 "404 para id inexistente" em cada arquivo.
 
+- `tests/infra/web-assets.test.js` roda o `vite build` de verdade (~2 s) num
+  diretorio temporario e sobe uma API com `WEB_DIST` apontando para ele: e o
+  unico teste que ve a interface servida pelo Express, compressao e cache.
 - `tests/api/rpa/launch-lifecycle.test.js` percorre o modulo RPA inteiro so
   pela API, da empresa ao lancamento encerrado, com a equipe sorteada (semente
   fixa no nome do teste; `RPA_SEED=<n>` sorteia outra). Os outros arquivos do

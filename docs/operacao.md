@@ -18,6 +18,7 @@ ambiente (nao existe `env.production` versionado).
 | `RATE_LIMIT_BATCH_WRITE_MAX`                          | Teto das rotas em lote (padrao 600)        |
 | `RATE_LIMIT_AUTH_MAX`                                 | Teto do login (padrao 20)                  |
 | `RATE_LIMIT_ENABLED`                                  | `true` liga em teste, `false` desliga      |
+| `WEB_DIST`                                            | Build da interface (padrao `web/dist`)     |
 | `UPLOAD_DIR`                                          | Onde os PDFs sao gravados (`uploads`)      |
 | `UPLOAD_MAX_BYTES`                                    | Tamanho maximo por arquivo                 |
 | `UPLOAD_MAX_FILES`                                    | Arquivos por requisicao                    |
@@ -53,6 +54,20 @@ Em desenvolvimento o Vite serve a interface e encaminha `/api` para o Express.
 Em producao nao ha Vite: rode `npm run build` e o Express passa a servir
 `web/dist` na mesma origem, com fallback de SPA para rotas que nao comecem com
 `/api`. Nos dois casos front e back ficam na mesma origem, o que dispensa CORS.
+
+Nao ha proxy na frente, entao a compressao e o cache sao do proprio Express:
+
+- O build grava um `.br` e um `.gz` ao lado de cada `.js` e `.css` (o JS
+  principal cai de 229 kB para ~62 kB), e o servidor entrega o melhor que o
+  navegador aceitar, brotli antes de gzip. Nada e comprimido na hora.
+- O que esta em `web/dist/assets/` leva o hash no nome e fica **um ano** no
+  cache do navegador (`immutable`). O `index.html` revalida a cada carga — e
+  ele que aponta para os arquivos do build novo. `tema.js` e `favicon.svg`
+  saem do cache na hora e revalidam por tras (`stale-while-revalidate`).
+- O servidor le a lista de `assets/` ao subir: depois de um build novo,
+  **reinicie** o processo, senao os arquivos novos saem sem compressao.
+- `WEB_DIST` aponta outro build (relativo a raiz). Em teste a entrega fica
+  desligada, e so essa variavel a religa.
 
 ## Container
 
