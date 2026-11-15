@@ -9,6 +9,7 @@ const routes = require('./routes');
 const controller = require('../infra/controller');
 const { httpLogger } = require('../infra/logger');
 const noStore = require('./middlewares/no-store');
+const webAssets = require('./middlewares/web-assets');
 const { readLimiter } = require('./middlewares/rate-limit');
 
 const app = express();
@@ -30,24 +31,9 @@ app.use('/api', noStore, readLimiter, routes);
 
 // Em desenvolvimento o Vite serve a interface e encaminha /api para ca. Em
 // producao nao ha Vite: o Express entrega o build estatico na mesma origem,
-// o que tambem dispensa CORS.
-// Fica de fora do ambiente de teste para que a suite da API se comporte igual
-// com ou sem um build presente no disco.
-const WEB_DIST = path.resolve(__dirname, '../web/dist');
-const serveWeb =
-  !env.isTest && fs.existsSync(path.join(WEB_DIST, 'index.html'));
-
-if (serveWeb) {
-  app.use(express.static(WEB_DIST));
-
-  // Fallback de SPA: qualquer GET que nao seja /api devolve o index.html,
-  // para que as rotas do cliente funcionem em recarregamento direto.
-  app.use((req, res, next) => {
-    if (req.method !== 'GET' || req.path.startsWith('/api')) {
-      return next();
-    }
-    return res.sendFile(path.join(WEB_DIST, 'index.html'));
-  });
+// o que tambem dispensa CORS. Fora do teste, salvo `WEB_DIST` (`env.js`).
+if (env.web.enabled && fs.existsSync(path.join(env.web.dist, 'index.html'))) {
+  app.use(webAssets(env.web.dist));
 }
 
 app.use(controller.errorHandlers.onNoMatch);

@@ -62,6 +62,14 @@ module.exports = {
     // dezenas de vezes, e o custo de producao nao e o que ela testa.
     scryptP: Number(process.env.PASSWORD_SCRYPT_P || 5),
   },
+  web: {
+    // O build da interface, que o Express entrega em producao. Em teste fica
+    // desligado, para a suite da API se comportar igual com ou sem build no
+    // disco; `WEB_DIST` aponta outro build e religa, numa instancia propria
+    // da API (`tests/infra/web-assets.test.js`).
+    dist: path.resolve(__dirname, '../..', process.env.WEB_DIST || 'web/dist'),
+    enabled: Boolean(process.env.WEB_DIST) || nodeEnv !== 'test',
+  },
   upload: {
     // Relativo a raiz do projeto quando nao absoluto. Em container e um volume:
     // a imagem nao carrega arquivo de usuario.
